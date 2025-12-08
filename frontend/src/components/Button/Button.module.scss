@@ -15,7 +15,22 @@
   width: 100%;
 
   &.disabled {
-    background-color: var(--color-backgroundPrimary);
+    background-color: var(--color-backgroundSecondary);
+    color: var(--color-textIconsSecondary);
+    opacity: 0.6;
+    cursor: not-allowed;
+    
+    // В светлой теме используем более темный фон для видимости
+    [data-theme='light'] & {
+      background-color: rgba(0, 0, 0, 0.05);
+      color: rgba(0, 0, 0, 0.4);
+    }
+    
+    // В темной теме используем более светлый фон
+    [data-theme='dark'] & {
+      background-color: rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.4);
+    }
   }
 }
 
@@ -38,6 +53,23 @@
   &-primary {
     background-color: var(--color-accentsBrandCommunity);
     color: var(--tg-theme-button-text-color);
+    
+    &.disabled {
+      // Для primary кнопки в disabled состоянии используем приглушенный акцентный цвет
+      background-color: var(--color-backgroundSecondary);
+      color: var(--color-textIconsSecondary);
+      opacity: 0.6;
+      
+      [data-theme='light'] & {
+        background-color: rgba(0, 0, 0, 0.05);
+        color: rgba(0, 0, 0, 0.4);
+      }
+      
+      [data-theme='dark'] & {
+        background-color: rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.4);
+      }
+    }
   }
 
   &-accent {
