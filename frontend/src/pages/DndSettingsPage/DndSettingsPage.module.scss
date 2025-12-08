@@ -1,0 +1,18 @@
+.timeInputWrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.timeInput {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.timeDisplay {
+  user-select: none;
+}
+

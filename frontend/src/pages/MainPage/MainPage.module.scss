@@ -1,0 +1,36 @@
+// Container для списка уведомлений с ограничением высоты и прокруткой
+.notificationsContainer {
+  // Вычитаем примерную высоту всех элементов выше списка и кнопки снизу
+  // Заголовок (~120px) + Source (~60px) + DND (~60px) + отступы (~100px) + кнопка (~80px) + safe area
+  max-height: calc(100vh - 420px - env(safe-area-inset-bottom, 0px));
+  min-height: 200px; // Минимальная высота для удобства
+  overflow-y: auto;
+  overflow-x: hidden;
+  
+  // Скрываем скроллбар для более чистого вида (но прокрутка работает)
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-fill-secondary) transparent;
+  
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--color-fill-secondary);
+    border-radius: 2px;
+  }
+  
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-fill-tertiary);
+  }
+  
+  // На мобильных устройствах используем более точный расчет
+  @media (max-height: 800px) {
+    max-height: calc(100vh - 380px - env(safe-area-inset-bottom, 0px));
+  }
+}
+

@@ -1,0 +1,88 @@
+.dropdown {
+  position: fixed;
+  min-width: 80px;
+  max-height: 50vh; // Максимальная высота - 50% экрана
+  border-radius: 12px;
+  background-color: var(--color-backgroundTertiary);
+  backdrop-filter: blur(25px);
+  box-shadow: 0 4px 40px 0 rgba(0, 0, 0, 0.2);
+  z-index: 0;
+  transition: 0.2s;
+  transform: scale(0.3);
+  opacity: 0;
+  transform-origin: top right;
+  overflow: hidden; // Скрываем содержимое за скругленными углами
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.dropdownActive {
+  opacity: 1;
+  visibility: visible;
+  z-index: 20;
+  transform: scale(1);
+  pointer-events: auto;
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto; // Скролл для длинных списков
+  overflow-x: hidden;
+  max-height: 100%; // Не превышать высоту dropdown
+  -webkit-overflow-scrolling: touch; // Плавный скролл на iOS
+  
+  // Стилизация скроллбара (для WebKit браузеров)
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--color-border-separator);
+    border-radius: 2px;
+    
+    &:hover {
+      background-color: var(--color-text-secondary);
+    }
+  }
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  padding: 11px 16px;
+  cursor: pointer;
+  gap: 8px;
+  border-bottom: 0.33px solid var(--color-border-separator);
+  transition: background-color 0.2s;
+
+  &:hover {
+    background-color: var(--color-fill-quarternary);
+  }
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.checkIcon {
+  opacity: 0;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  color: var(--color-accent-primary);
+  flex-shrink: 0;
+}
+
+.checkIconActive {
+  opacity: 1;
+}
+

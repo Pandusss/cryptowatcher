@@ -1,0 +1,2 @@
+export { ChooseCoinPage } from './ChooseCoinPage'
+
