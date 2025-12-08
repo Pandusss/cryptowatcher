@@ -97,6 +97,7 @@ git pull origin main --allow-unrelated-histories
 
 # Или если хотите использовать код из Git (перезаписать локальный)
 git reset --hard origin/main
+# .env файл не будет затронут, так как он в .gitignore
 ```
 
 #### Вариант B: Код на сервере отличается от Git
@@ -106,9 +107,6 @@ git reset --hard origin/main
 ```bash
 # На сервере
 cd /root/cryptowatcher
-
-# Сохраните важные файлы (если есть локальные изменения)
-cp .env .env.backup  # если .env был изменен локально
 
 # Добавьте все в Git
 git add .
@@ -123,8 +121,7 @@ git branch -M main
 # Синхронизируйте (может потребоваться разрешить конфликты)
 git pull origin main --allow-unrelated-histories
 
-# Восстановите .env если нужно
-# cp .env.backup .env  # только если .env был в Git (не рекомендуется)
+# .env файл не будет затронут, так как он в .gitignore
 ```
 
 #### Вариант C: Использовать код из Git (перезаписать локальный)
@@ -135,16 +132,12 @@ git pull origin main --allow-unrelated-histories
 # На сервере
 cd /root/cryptowatcher
 
-# Сохраните .env (он не должен быть в Git)
-cp .env .env.backup
-
 # Получите код из Git
 git fetch origin
 git reset --hard origin/main
 git clean -fd
 
-# Восстановите .env
-cp .env.backup .env
+# .env файл не будет затронут, так как он в .gitignore
 ```
 
 ---
