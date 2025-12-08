@@ -17,13 +17,25 @@
   position: relative;
   width: 44px;
   height: 24px;
-  background-color: var(--color-backgroundTertiary);
   border-radius: 12px;
   display: flex;
   align-items: center;
   padding: 2px;
   overflow: hidden;
   transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  // В темной теме используем более светлый серый для видимости
+  [data-theme='dark'] & {
+    background-color: rgba(255, 255, 255, 0.2);
+  }
+  
+  // В светлой теме используем темно-серый
+  [data-theme='light'] & {
+    background-color: rgba(0, 0, 0, 0.15);
+  }
+  
+  // Fallback для случаев, когда тема не определена
+  background-color: rgba(128, 128, 128, 0.3);
 }
 
 .thumb {
