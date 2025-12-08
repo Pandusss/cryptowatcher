@@ -292,7 +292,7 @@ import {
     
     const chartColor = getChartColor()
     
-    // Рассчитываем равномерный диапазон для Y-axis с четными числами
+    // Рассчитываем равномерный диапазон для Y-axis
     const getYAxisDomain = () => {
       if (chartData.length === 0) return ['dataMin', 'dataMax']
       
@@ -302,26 +302,77 @@ import {
       const minPrice = Math.min(...prices)
       const maxPrice = Math.max(...prices)
       const range = maxPrice - minPrice
+      const avgPrice = (minPrice + maxPrice) / 2
       
-      // Добавляем небольшой отступ сверху и снизу (5% от диапазона, но не меньше 1% от цены)
-      const padding = Math.max(range * 0.05, minPrice * 0.01)
-      let adjustedMin = Math.max(0, minPrice - padding)
-      let adjustedMax = maxPrice + padding
+      // Используем процентное соотношение для всех монет:
+      // Для 1D таймфрейма используем меньший процент (8%), для остальных - 15%
+      // Это предотвращает создание слишком большого пустого пространства на 1D
+      const relativeRangePercent = avgPrice > 0 ? range / avgPrice : 0
+      const targetPercent = selectedPeriod === '1d' ? 0.08 : 0.15 // 8% для 1D, 15% для остальных
+      
+      let adjustedMin = minPrice
+      let adjustedMax = maxPrice
+      
+      if (avgPrice > 0 && relativeRangePercent < targetPercent) {
+        // Расширяем диапазон до targetPercent от средней цены для лучшей видимости
+        // Но учитываем реальное распределение данных - расширяем больше там, где есть данные
+        const targetRange = avgPrice * targetPercent
+        
+        // Вычисляем, насколько данные смещены от центра
+        const dataCenter = avgPrice
+        const dataRange = range
+        
+        // Расширяем пропорционально: больше расширяем в сторону, где больше данных
+        // Если данные ближе к минимуму, расширяем больше вниз
+        // Если данные ближе к максимуму, расширяем больше вверх
+        const expansionNeeded = targetRange - dataRange
+        
+        if (expansionNeeded > 0) {
+          // Вычисляем смещение данных от центра диапазона
+          const rangeCenter = (minPrice + maxPrice) / 2
+          const offsetFromCenter = dataCenter - rangeCenter
+          
+          // Расширяем больше в сторону смещения данных
+          const expansionDown = expansionNeeded * (0.5 + Math.max(0, -offsetFromCenter) / dataRange)
+          const expansionUp = expansionNeeded * (0.5 + Math.max(0, offsetFromCenter) / dataRange)
+          
+          adjustedMin = Math.max(0, minPrice - expansionDown)
+          adjustedMax = maxPrice + expansionUp
+        }
+      } else {
+        // Если диапазон уже достаточно большой, используем стандартный padding
+        const padding = Math.max(range * 0.05, minPrice * 0.01)
+        adjustedMin = Math.max(0, minPrice - padding)
+        adjustedMax = maxPrice + padding
+      }
       
       // Определяем шаг округления на основе диапазона
+      const finalRange = adjustedMax - adjustedMin
       let step: number
-      if (range >= 10000) {
+      if (finalRange >= 10000) {
         step = 2000
-      } else if (range >= 1000) {
+      } else if (finalRange >= 1000) {
         step = 200
-      } else if (range >= 100) {
+      } else if (finalRange >= 100) {
         step = 20
-      } else if (range >= 10) {
+      } else if (finalRange >= 10) {
         step = 2
-      } else if (range >= 1) {
+      } else if (finalRange >= 1) {
         step = 0.2
-      } else {
+      } else if (finalRange >= 0.1) {
         step = 0.02
+      } else if (finalRange >= 0.01) {
+        step = 0.002
+      } else if (finalRange >= 0.001) {
+        step = 0.0002
+      } else if (finalRange >= 0.0001) {
+        step = 0.00002
+      } else if (finalRange >= 0.00001) {
+        step = 0.000002
+      } else if (finalRange >= 0.000001) {
+        step = 0.0000002
+      } else {
+        step = 0.00000002
       }
       
       // Округляем до ближайшего значения с учетом шага
@@ -336,7 +387,7 @@ import {
       return [adjustedMin, adjustedMax]
     }
     
-    // Генерируем уникальные тики для оси Y - всегда 5 тиков
+    // Генерируем тики для оси Y
     const getYAxisTicks = () => {
       if (chartData.length === 0) return undefined
       
@@ -351,37 +402,40 @@ import {
       
       if (range === 0) return undefined
       
+      // Определяем количество значащих цифр для округления на основе диапазона
+      const getSignificantDigits = (val: number): number => {
+        if (val >= 1000) return 0
+        if (val >= 100) return 1
+        if (val >= 10) return 1
+        if (val >= 1) return 2
+        if (val >= 0.1) return 3
+        if (val >= 0.01) return 4
+        if (val >= 0.001) return 5
+        if (val >= 0.0001) return 6
+        if (val >= 0.00001) return 7
+        if (val >= 0.000001) return 8
+        return 9
+      }
+      
       const tickCount = 5
       const step = range / (tickCount - 1)
+      const significantDigits = getSignificantDigits(range)
+      const multiplier = Math.pow(10, significantDigits)
       
       const ticks: number[] = []
       
       // Генерируем тики равномерно распределенные
       for (let i = 0; i < tickCount; i++) {
         const tickValue = min + (step * i)
-        // Округляем до разумного количества знаков
-        let roundedTick: number
-        if (tickValue >= 1000) {
-          roundedTick = Math.round(tickValue)
-        } else if (tickValue >= 100) {
-          roundedTick = Math.round(tickValue * 10) / 10
-        } else if (tickValue >= 10) {
-          roundedTick = Math.round(tickValue * 10) / 10
-        } else if (tickValue >= 1) {
-          roundedTick = Math.round(tickValue * 100) / 100
-        } else {
-          roundedTick = Math.round(tickValue * 1000) / 1000
-        }
-        
-        // Убираем дубликаты (проверяем с небольшой погрешностью)
-        const isDuplicate = ticks.some(existing => Math.abs(existing - roundedTick) < 0.0001)
-        if (!isDuplicate) {
-          ticks.push(roundedTick)
-        }
+        const roundedTick = Math.round(tickValue * multiplier) / multiplier
+        ticks.push(roundedTick)
       }
       
+      // Убираем дубликаты
+      const uniqueTicks = Array.from(new Set(ticks))
+      
       // Если после удаления дубликатов осталось меньше 3 тиков, возвращаем все без округления
-      if (ticks.length < 3) {
+      if (uniqueTicks.length < 3) {
         const simpleTicks: number[] = []
         for (let i = 0; i < tickCount; i++) {
           const tickValue = min + (step * i)
@@ -390,7 +444,7 @@ import {
         return simpleTicks
       }
       
-      return ticks.length > 0 ? ticks : undefined
+      return uniqueTicks.length > 0 ? uniqueTicks : undefined
     }
     
     const yAxisDomain = getYAxisDomain()
