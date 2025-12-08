@@ -6,6 +6,7 @@ import {
   Group,
   GroupItem,
   ListInput,
+  NumberInput,
   PageLayout,
   Text,
 } from '@components'
@@ -49,6 +50,7 @@ const VALUE_TYPE_OPTIONS: { label: string; value: NotificationValueType }[] =
   [
     { label: 'Percent', value: 'percent' },
     { label: 'Absolute Value', value: 'absolute' },
+    { label: 'Price', value: 'price' },
   ]
 
 const EXPIRE_TIME_OPTIONS: { label: string; value: string }[] = [
@@ -116,9 +118,14 @@ export const CreateNotificationPage = () => {
     if (valueType === 'percent') {
       // Если процент, показываем абсолютное значение в USD
       return (crypto.price * numValue) / 100
-    } else {
+    } else if (valueType === 'absolute') {
       // Если абсолютное значение, показываем процент
       return (numValue / crypto.price) * 100
+    } else {
+      // Если цена, показываем разницу в процентах и абсолютном значении
+      const priceDiff = numValue - crypto.price
+      const percentDiff = (priceDiff / crypto.price) * 100
+      return { priceDiff, percentDiff }
     }
   })()
 
@@ -384,6 +391,18 @@ export const CreateNotificationPage = () => {
     if (isNaN(numValue) || numValue <= 0) return { upper: null, lower: null }
 
     const currentPrice = crypto.price
+
+    // Если тип "price", используем указанную цену для обоих направлений
+    if (valueType === 'price') {
+      if (direction === 'rise') {
+        return { upper: numValue, lower: null }
+      } else if (direction === 'fall') {
+        return { upper: null, lower: numValue }
+      } else {
+        // Both: показываем одну линию на указанной цене
+        return { upper: numValue, lower: numValue }
+      }
+    }
 
     if (direction === 'both') {
       // Both: показываем обе линии
@@ -754,14 +773,18 @@ export const CreateNotificationPage = () => {
           <GroupItem
             text="Value"
             after={
-              <ListInput
+              <NumberInput
                 value={value}
                 onChange={setValue}
-                type="number"
-                inputMode="decimal"
-                placeholder={valueType === 'percent' ? '5%' : '100'}
+                placeholder={
+                  valueType === 'percent' ? '5%' : 
+                  valueType === 'absolute' ? '100' : 
+                  crypto ? crypto.price.toFixed(2) : '0'
+                }
                 className={styles.valueInput}
                 inputRef={valueInputRef}
+                min={0}
+                step={1}
               />
             }
           />
@@ -770,8 +793,12 @@ export const CreateNotificationPage = () => {
           <Block margin="top" marginValue={6} padding="left" paddingValue={16}>
             <Text type="caption" color="secondary">
               {valueType === 'percent' 
-                ? `${value}% ≈ $${formatCalculatedValue(calculatedValue)}`
-                : `$${formatCalculatedValue(parseFloat(value))} ≈ ${calculatedValue.toFixed(2)}%`
+                ? `${value}% ≈ $${formatCalculatedValue(calculatedValue as number)}`
+                : valueType === 'absolute'
+                ? `$${formatCalculatedValue(parseFloat(value))} ≈ ${(calculatedValue as number).toFixed(2)}%`
+                : typeof calculatedValue === 'object' && calculatedValue !== null && 'priceDiff' in calculatedValue
+                ? `$${formatCalculatedValue(parseFloat(value))} (${calculatedValue.priceDiff >= 0 ? '+' : ''}${calculatedValue.priceDiff.toFixed(2)} USD, ${calculatedValue.percentDiff >= 0 ? '+' : ''}${calculatedValue.percentDiff.toFixed(2)}%)`
+                : null
               }
             </Text>
           </Block>

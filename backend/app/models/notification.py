@@ -20,6 +20,7 @@ class NotificationTrigger(str, enum.Enum):
 class NotificationValueType(str, enum.Enum):
     PERCENT = "percent"
     ABSOLUTE = "absolute"
+    PRICE = "price"
 
 
 class Notification(Base):

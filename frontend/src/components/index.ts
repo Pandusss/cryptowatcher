@@ -10,4 +10,5 @@ export { CryptoIcon } from './CryptoIcon'
 export { SourceIcon } from './SourceIcon'
 export { TimePicker } from './TimePicker'
 export { Toggle } from './Toggle'
+export { NumberInput } from './NumberInput'
 

@@ -1,6 +1,6 @@
 export type NotificationDirection = 'rise' | 'fall' | 'both'
 export type NotificationTrigger = 'stop-loss' | 'take-profit'
-export type NotificationValueType = 'percent' | 'absolute'
+export type NotificationValueType = 'percent' | 'absolute' | 'price'
 export type NotificationSource = 'binance' | 'coingecko' | 'coinmarketcap'
 
 export interface Notification {

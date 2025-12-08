@@ -44,7 +44,18 @@ class NotificationChecker:
         price_change = current_price - original_price
         
         # Проверяем условие в зависимости от направления
-        if notification.direction == NotificationDirection.RISE:
+        if notification.value_type == NotificationValueType.PRICE:
+            # Если тип "price", сравниваем текущую цену с указанной ценой
+            if notification.direction == NotificationDirection.RISE:
+                # Цена должна подняться до указанной цены или выше
+                return current_price >= notification.value
+            elif notification.direction == NotificationDirection.FALL:
+                # Цена должна упасть до указанной цены или ниже
+                return current_price <= notification.value
+            else:  # BOTH
+                # Цена должна достичь указанной цены (в любом направлении)
+                return abs(current_price - notification.value) < 0.01  # Небольшая погрешность для сравнения float
+        elif notification.direction == NotificationDirection.RISE:
             # Цена должна подняться
             if notification.value_type == NotificationValueType.PERCENT:
                 change_percent = (price_change / original_price) * 100
