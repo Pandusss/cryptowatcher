@@ -69,17 +69,18 @@ export const ChooseCoinPage = () => {
   }, [coins, searchQuery])
 
   const handleSelectCoin = (coin: CoinListItem) => {
-    // Переходим на страницу с деталями монеты и графиком
+    // Возвращаемся на страницу создания уведомления с выбранной монетой
     const coinData = {
       id: coin.id,  // id уже строка
       symbol: coin.symbol,
       name: coin.name,
       price: coin.quote.USD.price,
+      currentPrice: coin.quote.USD.price,
       priceChangePercent24h: coin.quote.USD.percent_change_24h,
       imageUrl: coin.imageUrl,
     }
-    navigate(ROUTES_NAME.COIN_DETAILS.replace(':id', coin.id), {
-      state: { coin: coinData },
+    navigate(ROUTES_NAME.CREATE_NOTIFICATION, {
+      state: { selectedCoin: coinData },
     })
   }
 

@@ -1,0 +1,76 @@
+.toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  
+  &:focus-visible {
+    outline: 2px solid var(--color-accentsBrandCommunity);
+    outline-offset: 2px;
+    border-radius: 20px;
+  }
+}
+
+.track {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  background-color: var(--color-backgroundTertiary);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  overflow: hidden;
+  transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.thumb {
+  position: relative;
+  z-index: 2;
+  width: 20px;
+  height: 20px;
+  background-color: var(--color-backgroundPrimary);
+  border-radius: 50%;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateX(0); // По умолчанию слева (выключено)
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+// В темной теме knob должен быть белым/светлым
+[data-theme='dark'] .thumb {
+  background-color: var(--color-textIconsWhite);
+}
+
+// В светлой теме knob должен быть белым
+[data-theme='light'] .thumb {
+  background-color: var(--color-backgroundPrimary);
+}
+
+// Когда включен - knob справа, трек меняет цвет на акцентный
+.checked {
+  .track {
+    background-color: var(--color-accentsBrandCommunity);
+  }
+  
+  .thumb {
+    transform: translateX(20px); // Справа когда включен
+  }
+}
+
+.animating {
+  .thumb {
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .track::before {
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+

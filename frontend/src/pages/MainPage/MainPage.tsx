@@ -1,6 +1,7 @@
 import {
   Block,
   Button,
+  CryptoIcon,
   Group,
   GroupItem,
   PageLayout,
@@ -22,7 +23,9 @@ export const MainPage = () => {
   const location = useLocation()
   
   // Состояние для настроек DND
-  const [dndDisplay, setDndDisplay] = useState('12 PM - 7 AM')
+  const [dndDisplay, setDndDisplay] = useState('Always')
+  const [dndStartTime, setDndStartTime] = useState<string | null>(null)
+  const [dndEndTime, setDndEndTime] = useState<string | null>(null)
   // Состояние для источника данных
   const [sourceDisplay, setSourceDisplay] = useState('CoinGecko')
   const [notifications, setNotifications] = useState<NotificationResponse[]>([])
@@ -38,15 +41,71 @@ export const MainPage = () => {
   }, [])
 
   useEffect(() => {
-    // Получаем настройки DND из location state
+    // Получаем настройки DND из location state (при возврате со страницы настроек)
     if (location.state?.dndSettings?.display) {
       setDndDisplay(location.state.dndSettings.display)
+      setDndStartTime(location.state.dndSettings.startTime || null)
+      setDndEndTime(location.state.dndSettings.endTime || null)
     }
     // Получаем настройки Source из location state
     if (location.state?.sourceDisplay) {
       setSourceDisplay(location.state.sourceDisplay)
     }
   }, [location.state])
+
+  useEffect(() => {
+    // Загружаем DND настройки с сервера при первой загрузке
+    const loadDndSettings = async () => {
+      const userId = getTelegramUserId()
+      if (!userId) {
+        return
+      }
+
+      try {
+        const settings = await apiService.getDndSettings(userId)
+        if (settings.dnd_start_time && settings.dnd_end_time) {
+          // Сохраняем время в формате HH:MM
+          setDndStartTime(settings.dnd_start_time)
+          setDndEndTime(settings.dnd_end_time)
+          
+          // Форматируем время для отображения
+          const formatTimeForDisplay = (time: string) => {
+            const [hours, minutes] = time.split(':')
+            const hour = parseInt(hours, 10)
+            const minute = parseInt(minutes, 10)
+            
+            if (hour === 0 && minute === 0) {
+              return '12 AM'
+            }
+            
+            const period = hour >= 12 ? 'PM' : 'AM'
+            const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
+            
+            if (minute === 0) {
+              return `${displayHour} ${period}`
+            }
+            
+            return `${displayHour}:${minute.toString().padStart(2, '0')} ${period}`
+          }
+          
+          const display = `${formatTimeForDisplay(settings.dnd_start_time)} - ${formatTimeForDisplay(settings.dnd_end_time)}`
+          setDndDisplay(display)
+        } else {
+          // Если оба времени null, значит DND отключен
+          setDndDisplay('Always')
+          setDndStartTime(null as any)
+          setDndEndTime(null as any)
+        }
+      } catch (error) {
+        console.error('Failed to load DND settings:', error)
+      }
+    }
+
+    // Загружаем только если нет данных в location.state (первая загрузка)
+    if (!location.state?.dndSettings?.display) {
+      loadDndSettings()
+    }
+  }, []) // Запускаем только один раз при монтировании
 
   useEffect(() => {
     // Загружаем список уведомлений
@@ -193,8 +252,8 @@ export const MainPage = () => {
             onClick={() => {
               navigate(ROUTES_NAME.DND_SETTINGS, {
                 state: {
-                  startTime: location.state?.dndSettings?.startTime || '12:00',
-                  endTime: location.state?.dndSettings?.endTime || '07:00',
+                  startTime: dndStartTime || null,
+                  endTime: dndEndTime || null,
                 },
               })
             }}
@@ -222,6 +281,14 @@ export const MainPage = () => {
                   key={notification.id}
                   text={notification.crypto_name}
                   description={formatNotificationDescription(notification)}
+                  before={
+                    <CryptoIcon
+                      symbol={notification.crypto_symbol}
+                      name={notification.crypto_name}
+                      size={32}
+                      imageUrl={notification.crypto_image_url}
+                    />
+                  }
                   chevron
                   onClick={() => {
                     navigate(`${ROUTES_NAME.EDIT_NOTIFICATION.replace(':id', String(notification.id))}`)

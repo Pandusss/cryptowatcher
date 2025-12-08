@@ -5,12 +5,16 @@ import {
   GroupItem,
   PageLayout,
   Text,
+  TimePicker,
+  Toggle,
 } from '@components'
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import { ROUTES_NAME } from '../../constants/routes'
 import { useTelegramBackButton } from '@hooks'
+import { apiService } from '@services'
+import { getTelegramUserId } from '@utils'
 
 import styles from './DndSettingsPage.module.scss'
 
@@ -19,14 +23,14 @@ export const DndSettingsPage = () => {
   const location = useLocation()
   
   // Получаем начальные значения из location state или используем дефолтные
-  const initialStartTime = location.state?.startTime || '12:00'
-  const initialEndTime = location.state?.endTime || '07:00'
+  const initialStartTime = location.state?.startTime || null
+  const initialEndTime = location.state?.endTime || null
   
-  const [startTime, setStartTime] = useState(initialStartTime)
-  const [endTime, setEndTime] = useState(initialEndTime)
-  
-  const startTimeInputRef = useRef<HTMLInputElement>(null)
-  const endTimeInputRef = useRef<HTMLInputElement>(null)
+  // Определяем, включен ли DND (если оба времени не null)
+  const [isDndEnabled, setIsDndEnabled] = useState(initialStartTime !== null && initialEndTime !== null)
+  const [startTime, setStartTime] = useState(initialStartTime || '12:00')
+  const [endTime, setEndTime] = useState(initialEndTime || '07:00')
+  const [isSaving, setIsSaving] = useState(false)
 
   // Управление кнопкой "Назад" в Telegram Mini App
   useTelegramBackButton()
@@ -56,18 +60,52 @@ export const DndSettingsPage = () => {
     return `${formatTimeForDisplay(startTime)} - ${formatTimeForDisplay(endTime)}`
   }
 
-  const handleSave = () => {
-    // TODO: Сохранить настройки через API
-    // Пока просто возвращаемся назад с данными
-    navigate(ROUTES_NAME.MAIN, {
-      state: {
-        dndSettings: {
-          startTime,
-          endTime,
-          display: formatTimeRange(),
+  const handleSave = async () => {
+    console.log('handleSave called') // Debug
+    
+    const userId = getTelegramUserId()
+    if (!userId) {
+      console.error('User ID not found')
+      return
+    }
+
+    // Если DND отключен, отправляем null
+    const dndStartTime = isDndEnabled ? startTime : null
+    const dndEndTime = isDndEnabled ? endTime : null
+
+    console.log('Saving DND settings:', { userId, dndStartTime, dndEndTime, isDndEnabled }) // Debug
+    setIsSaving(true)
+    try {
+      // Сохраняем настройки через API
+      const result = await apiService.updateDndSettings(userId, {
+        dnd_start_time: dndStartTime,
+        dnd_end_time: dndEndTime,
+      })
+
+      console.log('DND settings saved successfully:', result) // Debug
+
+      // Возвращаемся назад с данными
+      navigate(ROUTES_NAME.MAIN, {
+        state: {
+          dndSettings: {
+            startTime: dndStartTime,
+            endTime: dndEndTime,
+            display: isDndEnabled ? formatTimeRange() : 'Always',
+          },
         },
-      },
-    })
+      })
+    } catch (error: any) {
+      console.error('Failed to save DND settings:', error)
+      console.error('Error details:', {
+        message: error?.message,
+        status: error?.status,
+        response: error?.response,
+        stack: error?.stack,
+      })
+      // Показываем ошибку пользователю
+      alert(`Failed to save settings: ${error?.message || 'Unknown error'}`)
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -81,57 +119,52 @@ export const DndSettingsPage = () => {
       <Block margin="top" marginValue={32}>
         <Group>
           <GroupItem
-            text="Start Time"
+            text="Enable Don't Disturb"
             after={
-              <div className={styles.timeInputWrapper}>
-                <input
-                  ref={startTimeInputRef}
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  className={styles.timeInput}
-                />
-                <span className={styles.timeDisplay}>
-                  <Text type="text" color="accent">
-                    {formatTimeForDisplay(startTime)}
-                  </Text>
-                </span>
-              </div>
+              <Toggle
+                checked={isDndEnabled}
+                onChange={setIsDndEnabled}
+              />
             }
-            onClick={() => startTimeInputRef.current?.showPicker()}
           />
-          <GroupItem
-            text="End Time"
-            after={
-              <div className={styles.timeInputWrapper}>
-                <input
-                  ref={endTimeInputRef}
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  className={styles.timeInput}
-                />
-                <span className={styles.timeDisplay}>
-                  <Text type="text" color="accent">
-                    {formatTimeForDisplay(endTime)}
-                  </Text>
-                </span>
-              </div>
-            }
-            onClick={() => endTimeInputRef.current?.showPicker()}
-          />
+          {isDndEnabled && (
+            <>
+              <GroupItem
+                text="Start Time"
+                after={
+                  <div className={styles.timePickerWrapper}>
+                    <TimePicker value={startTime} onChange={setStartTime} />
+                  </div>
+                }
+              />
+              <GroupItem
+                text="End Time"
+                after={
+                  <div className={styles.timePickerWrapper}>
+                    <TimePicker value={endTime} onChange={setEndTime} />
+                  </div>
+                }
+              />
+            </>
+          )}
         </Group>
       </Block>
 
       <Block margin="top" marginValue={16}>
         <Text type="text" color="secondary" align="center">
-          Notifications will be muted during this time
+          {isDndEnabled 
+            ? 'Notifications will be muted during this time'
+            : 'Notifications will always be sent'}
         </Text>
       </Block>
 
       <Block margin="top" marginValue={32} fixed="bottom">
-        <Button type="primary" onClick={handleSave}>
-          Save
+        <Button 
+          type="primary" 
+          onClick={handleSave} 
+          disabled={isSaving}
+        >
+          {isSaving ? 'Saving...' : 'Save'}
         </Button>
       </Block>
     </PageLayout>

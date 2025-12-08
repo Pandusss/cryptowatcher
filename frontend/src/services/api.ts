@@ -12,6 +12,7 @@ import type {
 export interface ChartDataPoint {
   date: string
   price: number
+  volume?: number
 }
 
 export interface ChartResponse {
@@ -88,6 +89,7 @@ export interface NotificationResponse {
   updated_at?: string
   triggered_at?: string
   expire_time_hours?: number | null  // null означает бессрочное уведомление
+  crypto_image_url?: string  // URL изображения монеты из CoinGecko
 }
 
 class ApiService {
@@ -98,7 +100,10 @@ class ApiService {
   }
 
   private async fetch<T>(endpoint: string, options?: RequestInit): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+    const url = `${this.baseUrl}${endpoint}`
+    console.log('API Request:', { url, method: options?.method || 'GET', body: options?.body })
+    
+    const response = await fetch(url, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
@@ -106,11 +111,27 @@ class ApiService {
       },
     })
 
+    console.log('API Response:', { status: response.status, statusText: response.statusText, ok: response.ok })
+
     if (!response.ok) {
-      throw new Error(`API Error: ${response.statusText}`)
+      let errorMessage = `API Error: ${response.statusText}`
+      try {
+        const errorData = await response.json()
+        console.error('API Error data:', errorData)
+        errorMessage = errorData.detail || errorData.message || errorMessage
+      } catch (e) {
+        // Если не удалось распарсить JSON, используем статус текст
+        const text = await response.text()
+        console.error('API Error text:', text)
+      }
+      const error: any = new Error(errorMessage)
+      error.status = response.status
+      throw error
     }
 
-    return response.json()
+    const data = await response.json()
+    console.log('API Response data:', data)
+    return data
   }
 
   async getCoinChart(coinId: string, period: string = '7d'): Promise<ChartDataPoint[]> {
@@ -234,6 +255,38 @@ class ApiService {
     } catch (error) {
       console.error('Failed to register user:', error)
       // Не бросаем ошибку, так как это не критично
+    }
+  }
+
+  // DND Settings API
+  async getDndSettings(userId: number): Promise<{ dnd_start_time: string | null; dnd_end_time: string | null }> {
+    try {
+      const response = await this.fetch<{ dnd_start_time: string | null; dnd_end_time: string | null }>(
+        `/api/v1/users/${userId}/dnd-settings`
+      )
+      return response
+    } catch (error) {
+      console.error('Failed to fetch DND settings:', error)
+      return { dnd_start_time: null, dnd_end_time: null }
+    }
+  }
+
+  async updateDndSettings(
+    userId: number,
+    settings: { dnd_start_time?: string | null; dnd_end_time?: string | null }
+  ): Promise<{ dnd_start_time: string | null; dnd_end_time: string | null }> {
+    try {
+      const response = await this.fetch<{ dnd_start_time: string | null; dnd_end_time: string | null }>(
+        `/api/v1/users/${userId}/dnd-settings`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(settings),
+        }
+      )
+      return response
+    } catch (error) {
+      console.error('Failed to update DND settings:', error)
+      throw error
     }
   }
 }

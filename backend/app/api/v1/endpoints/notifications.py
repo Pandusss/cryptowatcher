@@ -7,6 +7,7 @@ from app.core.database import get_db
 from app.models.notification import Notification
 from app.schemas.notification import NotificationCreate, NotificationUpdate, NotificationResponse
 from app.services.user_service import get_or_create_user
+from app.services.coingecko import CoinGeckoService
 
 router = APIRouter()
 
@@ -23,7 +24,59 @@ async def get_notifications(
         None,
         lambda: db.query(Notification).filter(Notification.user_id == user_id).all()
     )
-    return notifications
+    
+    # Получаем imageUrl для каждой монеты из CoinGecko (с долгосрочным кэшированием)
+    coingecko_service = CoinGeckoService()
+    
+    # Создаем словарь для хранения imageUrl по crypto_id
+    image_urls = {}
+    
+    # Получаем уникальные crypto_id из уведомлений
+    unique_crypto_ids = list(set([n.crypto_id for n in notifications]))
+    
+    # Получаем imageUrl для каждой монеты параллельно (используем оптимизированный метод)
+    async def get_image_url(crypto_id: str):
+        try:
+            image_url = await coingecko_service.get_coin_image_url(crypto_id)
+            return crypto_id, image_url
+        except Exception as e:
+            print(f"[get_notifications] Failed to get imageUrl for {crypto_id}: {e}")
+            return crypto_id, None
+    
+    # Запускаем параллельные запросы
+    results = await asyncio.gather(*[get_image_url(crypto_id) for crypto_id in unique_crypto_ids], return_exceptions=True)
+    
+    # Заполняем словарь image_urls
+    for result in results:
+        if isinstance(result, tuple):
+            crypto_id, image_url = result
+            image_urls[crypto_id] = image_url
+    
+    # Добавляем imageUrl к каждому уведомлению
+    notifications_with_images = []
+    for notification in notifications:
+        # Создаем словарь из уведомления
+        notification_dict = {
+            "id": notification.id,
+            "user_id": notification.user_id,
+            "crypto_id": notification.crypto_id,
+            "crypto_symbol": notification.crypto_symbol,
+            "crypto_name": notification.crypto_name,
+            "direction": notification.direction,
+            "trigger": notification.trigger,
+            "value_type": notification.value_type,
+            "value": notification.value,
+            "current_price": notification.current_price,
+            "is_active": notification.is_active,
+            "expire_time_hours": notification.expire_time_hours,
+            "created_at": notification.created_at,
+            "updated_at": notification.updated_at,
+            "triggered_at": notification.triggered_at,
+            "crypto_image_url": image_urls.get(notification.crypto_id),
+        }
+        notifications_with_images.append(NotificationResponse(**notification_dict))
+    
+    return notifications_with_images
 
 
 @router.get("/{notification_id}", response_model=NotificationResponse)
@@ -39,7 +92,36 @@ async def get_notification(
     )
     if not notification:
         raise HTTPException(status_code=404, detail="Notification not found")
-    return notification
+    
+    # Получаем imageUrl из CoinGecko (с долгосрочным кэшированием)
+    coingecko_service = CoinGeckoService()
+    image_url = None
+    try:
+        image_url = await coingecko_service.get_coin_image_url(notification.crypto_id)
+    except Exception as e:
+        print(f"[get_notification] Failed to get imageUrl for {notification.crypto_id}: {e}")
+    
+    # Создаем словарь из уведомления с imageUrl
+    notification_dict = {
+        "id": notification.id,
+        "user_id": notification.user_id,
+        "crypto_id": notification.crypto_id,
+        "crypto_symbol": notification.crypto_symbol,
+        "crypto_name": notification.crypto_name,
+        "direction": notification.direction,
+        "trigger": notification.trigger,
+        "value_type": notification.value_type,
+        "value": notification.value,
+        "current_price": notification.current_price,
+        "is_active": notification.is_active,
+        "expire_time_hours": notification.expire_time_hours,
+        "created_at": notification.created_at,
+        "updated_at": notification.updated_at,
+        "triggered_at": notification.triggered_at,
+        "crypto_image_url": image_url,
+    }
+    
+    return NotificationResponse(**notification_dict)
 
 
 @router.post("/", response_model=NotificationResponse)

@@ -1,0 +1,24 @@
+.timePicker {
+  display: flex;
+  align-items: center;
+}
+
+.timeDisplay {
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background-color 0.2s;
+  user-select: none;
+}
+
+.timeDisplay.clickable {
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--color-fill-quarternary);
+  }
+
+  &:active {
+    background-color: var(--color-fill-tertiary);
+  }
+}
+

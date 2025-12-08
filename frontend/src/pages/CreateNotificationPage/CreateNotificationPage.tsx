@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   Area,
+  Bar,
   ComposedChart,
   ReferenceLine,
   ResponsiveContainer,
@@ -27,7 +28,7 @@ import type {
   NotificationTrigger,
   NotificationValueType,
 } from '@types'
-import { apiService } from '@services'
+import { apiService, type ChartDataPoint } from '@services'
 import { getTelegramUserId } from '@utils'
 import { useTelegramBackButton } from '@hooks'
 
@@ -62,6 +63,13 @@ const EXPIRE_TIME_OPTIONS: { label: string; value: string }[] = [
   { label: '72 hours', value: '72' },
 ]
 
+const PERIOD_OPTIONS = [
+  { label: '1D', value: '1d' },
+  { label: '7D', value: '7d' },
+  { label: '30D', value: '30d' },
+  { label: '1Y', value: '1y' },
+]
+
 export const CreateNotificationPage = () => {
   const navigate = useNavigate()
   const location = useLocation()
@@ -82,8 +90,9 @@ export const CreateNotificationPage = () => {
   const [isDeleting, setIsDeleting] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [chartData, setChartData] = useState<{ date: string; price: number }[]>([])
+  const [chartData, setChartData] = useState<ChartDataPoint[]>([])
   const [chartLoading, setChartLoading] = useState(false)
+  const [selectedPeriod, setSelectedPeriod] = useState('7d') // Таймфрейм для графика
 
   // Dropdown states
   const [directionDropdownOpen, setDirectionDropdownOpen] = useState(false)
@@ -214,13 +223,13 @@ export const CreateNotificationPage = () => {
     // без автоматического редиректа, чтобы избежать цикла
   }, [id, isEditMode, location.state?.selectedCoin, location.state?.fromBackButton, navigate])
 
-  // Загружаем данные графика когда есть crypto и в режиме редактирования
+  // Загружаем данные графика когда есть crypto (и при создании, и при редактировании)
   useEffect(() => {
-    if (isEditMode && crypto?.id) {
+    if (crypto?.id) {
       const loadChartData = async () => {
         try {
           setChartLoading(true)
-          const data = await apiService.getCoinChart(crypto.id, '7d')
+          const data = await apiService.getCoinChart(crypto.id, selectedPeriod)
           setChartData(data)
         } catch (error) {
           console.error('Failed to load chart data:', error)
@@ -234,7 +243,7 @@ export const CreateNotificationPage = () => {
     } else {
       setChartData([])
     }
-  }, [isEditMode, crypto?.id])
+  }, [crypto?.id, selectedPeriod])
 
   const handleCreate = async () => {
     if (!crypto || !value) return
@@ -329,6 +338,7 @@ export const CreateNotificationPage = () => {
   }
 
   // Вычисляем уровень триггера для отображения на графике
+  // Позиция линии зависит только от Direction и Value, Trigger - это просто метка
   const getTriggerLevel = (): number | null => {
     if (!crypto || !value) return null
 
@@ -339,26 +349,67 @@ export const CreateNotificationPage = () => {
 
     if (valueType === 'percent') {
       // Если процент, вычисляем абсолютное значение
-      if (trigger === 'stop-loss') {
-        // Stop-loss: цена ниже текущей на X%
+      if (direction === 'rise') {
+        // Rise: цена выше текущей на X%
+        return currentPrice * (1 + numValue / 100)
+      } else if (direction === 'fall') {
+        // Fall: цена ниже текущей на X%
         return currentPrice * (1 - numValue / 100)
       } else {
-        // Take-profit: цена выше текущей на X%
+        // Both: показываем обе линии (выше и ниже)
+        // Для упрощения показываем только верхнюю линию
         return currentPrice * (1 + numValue / 100)
       }
     } else {
       // Если абсолютное значение
-      if (trigger === 'stop-loss') {
-        // Stop-loss: цена ниже текущей на X USD
+      if (direction === 'rise') {
+        // Rise: цена выше текущей на X USD
+        return currentPrice + numValue
+      } else if (direction === 'fall') {
+        // Fall: цена ниже текущей на X USD
         return currentPrice - numValue
       } else {
-        // Take-profit: цена выше текущей на X USD
+        // Both: показываем обе линии (выше и ниже)
+        // Для упрощения показываем только верхнюю линию
         return currentPrice + numValue
       }
     }
   }
 
+  // Для Both показываем две линии (выше и ниже)
+  const getTriggerLevels = (): { upper: number | null; lower: number | null } => {
+    if (!crypto || !value) return { upper: null, lower: null }
+
+    const numValue = parseFloat(value)
+    if (isNaN(numValue) || numValue <= 0) return { upper: null, lower: null }
+
+    const currentPrice = crypto.price
+
+    if (direction === 'both') {
+      // Both: показываем обе линии
+      if (valueType === 'percent') {
+        return {
+          upper: currentPrice * (1 + numValue / 100),
+          lower: currentPrice * (1 - numValue / 100),
+        }
+      } else {
+        return {
+          upper: currentPrice + numValue,
+          lower: currentPrice - numValue,
+        }
+      }
+    } else {
+      // Для Rise или Fall показываем только одну линию
+      const singleLevel = getTriggerLevel()
+      return {
+        upper: direction === 'rise' ? singleLevel : null,
+        lower: direction === 'fall' ? singleLevel : null,
+      }
+    }
+  }
+
   const triggerLevel = getTriggerLevel()
+  const triggerLevels = getTriggerLevels()
 
 
   // Определяем цвет графика на основе тренда (как в CoinDetailsPage)
@@ -391,10 +442,14 @@ export const CreateNotificationPage = () => {
     let adjustedMin = Math.max(0, minPrice - padding)
     let adjustedMax = maxPrice + padding
     
-    // Если есть уровень триггера, учитываем его
-    if (triggerLevel !== null) {
-      adjustedMin = Math.min(adjustedMin, triggerLevel)
-      adjustedMax = Math.max(adjustedMax, triggerLevel)
+    // Если есть уровни триггеров, учитываем их
+    if (triggerLevels.upper !== null) {
+      adjustedMin = Math.min(adjustedMin, triggerLevels.upper)
+      adjustedMax = Math.max(adjustedMax, triggerLevels.upper)
+    }
+    if (triggerLevels.lower !== null) {
+      adjustedMin = Math.min(adjustedMin, triggerLevels.lower)
+      adjustedMax = Math.max(adjustedMax, triggerLevels.lower)
     }
     
     // Определяем шаг округления на основе диапазона
@@ -504,6 +559,34 @@ export const CreateNotificationPage = () => {
     }
   }
 
+  // Рассчитываем домен для объемов - ограничиваем их высоту до 30% от графика
+  const getVolumeDomain = (): [number, number] => {
+    if (chartData.length === 0) return [0, 1]
+    
+    const volumes = chartData.map(item => item.volume || 0).filter(v => v > 0)
+    if (volumes.length === 0) return [0, 1]
+    
+    const maxVolume = Math.max(...volumes)
+    // Увеличиваем максимальное значение в 2 раза, чтобы объемы занимали только ~30% высоты
+    return [0, maxVolume * 2]
+  }
+
+  const volumeDomain = getVolumeDomain()
+
+  // Форматирование объема
+  const formatVolume = (volume: number) => {
+    if (volume >= 1000000000) {
+      return `$${(volume / 1000000000).toFixed(2)}B`
+    }
+    if (volume >= 1000000) {
+      return `$${(volume / 1000000).toFixed(2)}M`
+    }
+    if (volume >= 1000) {
+      return `$${(volume / 1000).toFixed(2)}K`
+    }
+    return `$${volume.toFixed(2)}`
+  }
+
   // Получаем тики для оси X
   const getXAxisTicks = () => {
     if (chartData.length === 0) return undefined
@@ -564,9 +647,6 @@ export const CreateNotificationPage = () => {
   return (
     <PageLayout>
       <Block margin="top" marginValue={16} align="center">
-        {!isEditMode && (
-          <div style={{ fontSize: '64px', marginBottom: '16px' }}>💰</div>
-        )}
         <Text type="title1" align="center">
           {isEditMode ? 'Edit Notification' : 'Create Notification'}
         </Text>
@@ -772,9 +852,35 @@ export const CreateNotificationPage = () => {
         triggerRef={expireTimeRef}
       />
 
-      {/* График с линией триггера (только в режиме редактирования) */}
-      {isEditMode && crypto && chartData.length > 0 && (
+      {/* График с линией триггера (показываем когда выбрана монета) */}
+      {crypto && chartData.length > 0 && (
         <Block margin="top" marginValue={24}>
+          {/* Селектор таймфреймов */}
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '16px' }}>
+            {PERIOD_OPTIONS.map((period) => (
+              <button
+                key={period.value}
+                onClick={() => setSelectedPeriod(period.value)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: selectedPeriod === period.value 
+                    ? 'var(--color-accentsBrandCommunity)' 
+                    : 'var(--color-backgroundTertiary)',
+                  color: selectedPeriod === period.value 
+                    ? 'var(--tg-theme-button-text-color, white)' 
+                    : 'var(--color-foreground-primary)',
+                  fontSize: '14px',
+                  fontWeight: selectedPeriod === period.value ? 600 : 400,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+              >
+                {period.label}
+              </button>
+            ))}
+          </div>
           <div className={styles.chartContainer}>
             <ResponsiveContainer width="100%" height={280}>
               <ComposedChart
@@ -782,7 +888,7 @@ export const CreateNotificationPage = () => {
                 margin={{ 
                   top: 10, 
                   right: 5, 
-                  left: 5, 
+                  left: 15,  // Увеличиваем отступ слева для метки Stop-loss/Take-profit
                   bottom: 5
                 }}
               >
@@ -815,6 +921,16 @@ export const CreateNotificationPage = () => {
                   allowDecimals={true}
                   tickFormatter={formatPriceForYAxis}
                 />
+                <YAxis 
+                  yAxisId="volume"
+                  orientation="left"
+                  domain={volumeDomain}
+                  tick={{ fill: 'transparent', fontSize: 0 }}
+                  axisLine={{ stroke: 'transparent' }}
+                  tickLine={{ stroke: 'transparent' }}
+                  width={0}
+                  hide={true}
+                />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: 'var(--color-background-modal)',
@@ -831,7 +947,10 @@ export const CreateNotificationPage = () => {
                     color: 'var(--color-foreground-primary)',
                     fontSize: '12px',
                   }}
-                  formatter={(value: number) => {
+                  formatter={(value: number, name: string) => {
+                    if (name === 'volume') {
+                      return [formatVolume(value), 'Vol 24h']
+                    }
                     return [formatPriceForYAxis(value), 'Price']
                   }}
                   labelFormatter={(label) => formatDateForTooltip(label as string)}
@@ -848,21 +967,160 @@ export const CreateNotificationPage = () => {
                   activeDot={{ r: 4, fill: chartColor, strokeWidth: 2, stroke: 'var(--color-background-primary)' }}
                   connectNulls={false}
                 />
-                {triggerLevel !== null && (
+                <Bar
+                  yAxisId="volume"
+                  dataKey="volume"
+                  fill="var(--color-foreground-tertiary)"
+                  opacity={0.3}
+                  radius={[2, 2, 0, 0]}
+                />
+                {/* Линия текущей цены */}
+                {crypto && (
                   <ReferenceLine
                     yAxisId="price"
-                    y={triggerLevel}
-                    stroke={trigger === 'stop-loss' ? 'var(--color-state-destructive)' : 'var(--color-state-success)'}
-                    strokeWidth={2}
-                    strokeDasharray="5 5"
+                    y={crypto.price}
+                    stroke="var(--color-foreground-secondary)"
+                    strokeWidth={1}
+                    strokeDasharray="3 3"
                     label={{
-                      value: `${trigger === 'stop-loss' ? 'Stop-loss' : 'Take-profit'}: ${formatPriceForYAxis(triggerLevel)}`,
+                      value: formatPriceForYAxis(crypto.price),
                       position: 'right',
-                      fill: trigger === 'stop-loss' ? 'var(--color-state-destructive)' : 'var(--color-state-success)',
-                      fontSize: 11,
-                      fontWeight: 'bold',
+                      fill: 'var(--color-foreground-secondary)',
+                      fontSize: 10,
+                      fontWeight: 'normal',
                     }}
                   />
+                )}
+                {/* Отображаем линии в зависимости от Direction, цвет зависит от Trigger */}
+                {triggerLevels.upper !== null && (
+                  <>
+                    {/* Основная линия с меткой слева (Stop-loss/Take-profit) */}
+                    <ReferenceLine
+                      yAxisId="price"
+                      y={triggerLevels.upper}
+                      stroke={trigger === 'stop-loss' ? 'var(--color-state-destructive)' : 'var(--color-state-success)'}
+                      strokeWidth={2}
+                      strokeDasharray="5 5"
+                      label={{
+                        value: trigger === 'stop-loss' ? 'Stop-loss' : 'Take-profit',
+                        position: 'left',
+                        content: ({ viewBox }: any) => {
+                          if (!viewBox) return null
+                          // Получаем цвет из CSS переменных
+                          const root = document.documentElement
+                          const color = trigger === 'stop-loss' 
+                            ? getComputedStyle(root).getPropertyValue('--color-state-destructive').trim() || '#ff3b30'
+                            : getComputedStyle(root).getPropertyValue('--color-state-success').trim() || '#34c759'
+                          const text = trigger === 'stop-loss' ? 'Stop-loss' : 'Take-profit'
+                          const textWidth = text.length * 7 + 8
+                          // Позиционируем прямоугольник слева от линии, но внутри области графика
+                          // viewBox.x - это координата точки на линии относительно начала графика
+                          // Учитываем отступ слева графика (70px), поэтому метка должна быть на позиции 0-60px
+                          const rectX = Math.max(0, viewBox.x - textWidth - 4) // Не выходим за левую границу (0)
+                          return (
+                            <g>
+                              <rect
+                                x={rectX}
+                                y={viewBox.y - 9}
+                                width={textWidth-12}
+                                height={18}
+                                fill={color}
+                                rx={4}
+                              />
+                              <text
+                                x={rectX + 4}
+                                y={viewBox.y + 4}
+                                fill="white"
+                                fontSize={11}
+                                fontWeight="bold"
+                              >
+                                {text}
+                              </text>
+                            </g>
+                          )
+                        },
+                      }}
+                    />
+                    {/* Невидимая линия с ценой справа */}
+                    <ReferenceLine
+                      yAxisId="price"
+                      y={triggerLevels.upper}
+                      stroke="transparent"
+                      strokeWidth={0}
+                      label={{
+                        value: formatPriceForYAxis(triggerLevels.upper),
+                        position: 'right',
+                        fill: trigger === 'stop-loss' ? 'var(--color-state-destructive)' : 'var(--color-state-success)',
+                        fontSize: 11,
+                        fontWeight: 'bold',
+                      }}
+                    />
+                  </>
+                )}
+                {triggerLevels.lower !== null && (
+                  <>
+                    {/* Основная линия с меткой слева (Stop-loss/Take-profit) */}
+                    <ReferenceLine
+                      yAxisId="price"
+                      y={triggerLevels.lower}
+                      stroke={trigger === 'stop-loss' ? 'var(--color-state-destructive)' : 'var(--color-state-success)'}
+                      strokeWidth={2}
+                      strokeDasharray="5 5"
+                      label={{
+                        value: trigger === 'stop-loss' ? 'Stop-loss' : 'Take-profit',
+                        position: 'left',
+                        content: ({ viewBox }: any) => {
+                          if (!viewBox) return null
+                          // Получаем цвет из CSS переменных
+                          const root = document.documentElement
+                          const color = trigger === 'stop-loss' 
+                            ? getComputedStyle(root).getPropertyValue('--color-state-destructive').trim() || '#ff3b30'
+                            : getComputedStyle(root).getPropertyValue('--color-state-success').trim() || '#34c759'
+                          const text = trigger === 'stop-loss' ? 'Stop-loss' : 'Take-profit'
+                          const textWidth = text.length * 7 + 8
+                          // Позиционируем прямоугольник слева от линии, но внутри области графика
+                          // viewBox.x - это координата точки на линии относительно начала графика
+                          // Учитываем отступ слева графика (70px), поэтому метка должна быть на позиции 0-60px
+                          const rectX = Math.max(0, viewBox.x - textWidth - 4) // Не выходим за левую границу (0)
+                          return (
+                            <g>
+                              <rect
+                                x={rectX}
+                                y={viewBox.y - 9}
+                                width={textWidth}
+                                height={18}
+                                fill={color}
+                                rx={4}
+                              />
+                              <text
+                                x={rectX + 4}
+                                y={viewBox.y + 4}
+                                fill="white"
+                                fontSize={11}
+                                fontWeight="bold"
+                              >
+                                {text}
+                              </text>
+                            </g>
+                          )
+                        },
+                      }}
+                    />
+                    {/* Невидимая линия с ценой справа */}
+                    <ReferenceLine
+                      yAxisId="price"
+                      y={triggerLevels.lower}
+                      stroke="transparent"
+                      strokeWidth={0}
+                      label={{
+                        value: formatPriceForYAxis(triggerLevels.lower),
+                        position: 'right',
+                        fill: trigger === 'stop-loss' ? 'var(--color-state-destructive)' : 'var(--color-state-success)',
+                        fontSize: 11,
+                        fontWeight: 'bold',
+                      }}
+                    />
+                  </>
                 )}
               </ComposedChart>
             </ResponsiveContainer>

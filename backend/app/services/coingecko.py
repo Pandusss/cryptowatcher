@@ -1,5 +1,5 @@
 import httpx
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from app.core.config import settings
 from app.core.redis_client import get_redis
@@ -149,13 +149,26 @@ class CoinGeckoService:
                     price = 0
             
             # Получаем URL изображения из CoinGecko
+            coin_id = coin_data.get("id", "")
             image_url = coin_data.get("image", "")
             
+            # Сохраняем иконку в долгосрочный кэш (7 дней) для использования в других местах
+            if redis and image_url and coin_id:
+                try:
+                    cache_key = f"coin_image_url:{coin_id}"
+                    # Проверяем, есть ли уже в кэше (чтобы не перезаписывать)
+                    existing = await redis.get(cache_key)
+                    if not existing:
+                        await redis.setex(cache_key, 604800, image_url)  # 7 дней
+                        print(f"[get_crypto_list] Иконка {coin_id} сохранена в долгосрочный кэш")
+                except Exception as e:
+                    print(f"[get_crypto_list] Ошибка сохранения иконки {coin_id} в кэш: {e}")
+            
             formatted_coins.append({
-                "id": coin_data.get("id", ""),  # CoinGecko использует id как строку (например, "bitcoin")
+                "id": coin_id,  # CoinGecko использует id как строку (например, "bitcoin")
                 "name": coin_data.get("name", ""),
                 "symbol": coin_data.get("symbol", "").upper(),
-                "slug": coin_data.get("id", ""),  # Используем id как slug
+                "slug": coin_id,  # Используем id как slug
                 "imageUrl": image_url,  # URL изображения из CoinGecko
                 "quote": {
                     "USD": {
@@ -220,6 +233,18 @@ class CoinGeckoService:
         
         print(f"[get_crypto_details] Price: {current_price}, Change 24h: {price_change_percent_24h}%")
         
+        # Сохраняем иконку в долгосрочный кэш (7 дней) для использования в других местах
+        if redis and image_url:
+            try:
+                cache_key = f"coin_image_url:{coin_id}"
+                # Проверяем, есть ли уже в кэше (чтобы не перезаписывать)
+                existing = await redis.get(cache_key)
+                if not existing:
+                    await redis.setex(cache_key, 604800, image_url)  # 7 дней
+                    print(f"[get_crypto_details] Иконка {coin_id} сохранена в долгосрочный кэш")
+            except Exception as e:
+                print(f"[get_crypto_details] Ошибка сохранения иконки {coin_id} в кэш: {e}")
+        
         # Объединяем данные
         coin = {
             "id": data.get("id", coin_id),
@@ -243,6 +268,68 @@ class CoinGeckoService:
                 pass  # Пропускаем кэширование если ошибка
         
         return coin
+    
+    async def get_coin_image_url(self, coin_id: str) -> Optional[str]:
+        """
+        Получить URL изображения монеты из CoinGecko.
+        Иконки монет не меняются, поэтому кэшируем на 7 дней.
+        
+        Args:
+            coin_id: CoinGecko ID монеты (например, "bitcoin")
+        
+        Returns:
+            URL изображения монеты или None если не удалось получить
+        """
+        redis = await get_redis()
+        
+        # Проверяем кэш в Redis (TTL 7 дней = 604800 секунд)
+        if redis:
+            try:
+                cache_key = f"coin_image_url:{coin_id}"
+                cached_url = await redis.get(cache_key)
+                
+                if cached_url:
+                    print(f"[get_coin_image_url] Иконка {coin_id} из кэша Redis")
+                    return cached_url
+            except Exception as e:
+                print(f"[get_coin_image_url] Ошибка чтения из Redis: {e}")
+        
+        # Если в кэше нет, запрашиваем из API
+        try:
+            # Используем легковесный эндпоинт для получения только базовой информации
+            data = await self._make_request(
+                f"/coins/{coin_id}",
+                params={
+                    "localization": False,
+                    "tickers": False,
+                    "market_data": False,  # Не нужны данные рынка
+                    "community_data": False,
+                    "developer_data": False,
+                    "sparkline": False,
+                },
+            )
+            
+            # Извлекаем imageUrl
+            image_url = data.get("image", {}).get("large") or data.get("image", {}).get("small")
+            
+            if image_url:
+                # Сохраняем в кэш на 7 дней (604800 секунд)
+                if redis:
+                    try:
+                        cache_key = f"coin_image_url:{coin_id}"
+                        await redis.setex(cache_key, 604800, image_url)  # 7 дней
+                        print(f"[get_coin_image_url] Иконка {coin_id} сохранена в кэш на 7 дней")
+                    except Exception as e:
+                        print(f"[get_coin_image_url] Ошибка записи в Redis: {e}")
+                
+                return image_url
+            else:
+                print(f"[get_coin_image_url] Не найдена иконка для {coin_id}")
+                return None
+                
+        except Exception as e:
+            print(f"[get_coin_image_url] Ошибка при получении иконки для {coin_id}: {e}")
+            return None
     
     async def get_crypto_chart(
         self,

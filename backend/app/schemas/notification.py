@@ -42,6 +42,7 @@ class NotificationResponse(NotificationBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
     triggered_at: Optional[datetime] = None
+    crypto_image_url: Optional[str] = None  # URL изображения монеты из CoinGecko
 
     class Config:
         from_attributes = True

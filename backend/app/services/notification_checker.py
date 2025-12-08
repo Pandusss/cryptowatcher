@@ -11,6 +11,7 @@ from collections import defaultdict
 from app.core.database import SessionLocal
 from app.core.redis_client import get_redis
 from app.models.notification import Notification, NotificationDirection, NotificationTrigger, NotificationValueType
+from app.models.user import User
 from app.services.coingecko import CoinGeckoService
 from app.services.telegram import telegram_service
 
@@ -139,6 +140,13 @@ class NotificationChecker:
             if self._check_notification_condition(notification, current_price):
                 print(f"[NotificationChecker] ✅ Уведомление {notification.id} сработало! Цена: {current_price}")
                 
+                # Проверяем DND режим пользователя
+                user = db.query(User).filter(User.id == notification.user_id).first()
+                if user and self._is_dnd_active(user):
+                    print(f"[NotificationChecker] ⏸️ Уведомление {notification.id} пропущено из-за DND режима (пользователь {notification.user_id})")
+                    # Не отправляем уведомление, но и не деактивируем его - оно сработает позже
+                    return False
+                
                 # Отправляем уведомление в Telegram
                 success = await telegram_service.send_notification(
                     user_id=notification.user_id,
@@ -169,6 +177,35 @@ class NotificationChecker:
             print(f"[NotificationChecker] Ошибка при проверке уведомления {notification.id}: {str(e)}")
             print(f"[NotificationChecker] Traceback: {traceback.format_exc()}")
             return False
+    
+    def _is_dnd_active(self, user: User) -> bool:
+        """
+        Проверить, активен ли режим Don't Disturb для пользователя
+        
+        Args:
+            user: Пользователь для проверки
+        
+        Returns:
+            True если DND активен (уведомления не должны отправляться), False иначе
+        """
+        if not user.dnd_start_time or not user.dnd_end_time:
+            # Если DND не настроен, уведомления отправляются всегда
+            return False
+        
+        # Получаем текущее время UTC
+        current_time = datetime.utcnow().time()
+        start_time = user.dnd_start_time
+        end_time = user.dnd_end_time
+        
+        # Если start_time < end_time, то DND в пределах одного дня
+        # Например: 12:00 - 19:00 означает DND с 12:00 до 19:00
+        if start_time < end_time:
+            return start_time <= current_time <= end_time
+        
+        # Если start_time >= end_time, то DND переходит через полночь
+        # Например: 22:00 - 08:00 означает DND с 22:00 до 08:00 следующего дня
+        # В этом случае DND активен если current_time >= start_time ИЛИ current_time <= end_time
+        return current_time >= start_time or current_time <= end_time
     
     def _check_notification_expired(self, notification: Notification) -> bool:
         """

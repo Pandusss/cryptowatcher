@@ -17,6 +17,7 @@
   bottom: max(24px, calc(env(safe-area-inset-bottom, 0px) + 16px));
   /* Используем safe-area-inset-bottom для устройств с вырезом (iPhone X и новее) */
   /* Минимум 24px отступ снизу для лучшей видимости на мобильных */
+  z-index: 30; /* Выше чем dropdown (z-index: 20) */
 }
 
 .row {
