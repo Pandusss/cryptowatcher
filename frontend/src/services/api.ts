@@ -28,6 +28,7 @@ export interface CoinDetailsResponse {
     priceChange24h?: number
     priceChangePercent24h?: number
     imageUrl?: string
+    priceDecimals?: number  // Количество знаков после запятой (кэшируется в Redis на 1 день)
   }
 }
 
@@ -37,6 +38,7 @@ export interface CoinListItem {
   symbol: string
   slug: string
   imageUrl?: string
+  priceDecimals?: number  // Количество знаков после запятой (кэшируется в Redis на 1 день)
   quote: {
     USD: {
       price: number

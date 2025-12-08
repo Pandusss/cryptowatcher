@@ -156,6 +156,7 @@ import {
             priceChange24h: coinFromState.priceChange24h,
             priceChangePercent24h: coinFromState.priceChangePercent24h,
             imageUrl: coinFromState.imageUrl,
+            priceDecimals: coinFromState.priceDecimals,  // Используем кэшированное значение из API
           }
           setCoin(cryptoCurrency)
         } else if (id) {
@@ -171,6 +172,7 @@ import {
                 priceChange24h: coinDetails.priceChange24h,
                 priceChangePercent24h: coinDetails.priceChangePercent24h,
                 imageUrl: coinDetails.imageUrl,
+                priceDecimals: coinDetails.priceDecimals,  // Используем кэшированное значение из API
               })
             }
           } catch (error) {
@@ -242,11 +244,31 @@ import {
       }
     }
   
+    // Определяем количество знаков после запятой на основе цены
+    // Используем кэшированное значение из API, если есть, иначе вычисляем локально
+    const getPriceDecimals = (price: number): number => {
+      // Если есть кэшированное значение из API, используем его
+      if (coin?.priceDecimals !== undefined) {
+        return coin.priceDecimals
+      }
+      // Иначе вычисляем локально
+      if (price >= 1) return 2
+      if (price >= 0.1) return 3
+      if (price >= 0.01) return 4
+      if (price >= 0.001) return 5
+      if (price >= 0.0001) return 6
+      if (price >= 0.00001) return 7
+      if (price >= 0.000001) return 8
+      if (price >= 0.0000001) return 9
+      return 10
+    }
+
     const formatPrice = (price: number) => {
+      const decimals = coin ? getPriceDecimals(coin.currentPrice) : 2
       // Форматируем с точками для тысяч и запятой для десятичных (например: 89.357,00)
-      const parts = price.toFixed(2).split('.')
+      const parts = price.toFixed(decimals).split('.')
       const integerPart = parts[0]
-      const decimalPart = parts[1] || '00'
+      const decimalPart = parts[1] || '0'.repeat(decimals)
       
       // Добавляем точки для разделения тысяч
       const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
@@ -540,6 +562,7 @@ import {
     
     // Форматирование цены для tooltip (с K для тысяч)
     const formatPriceForTooltip = (price: number) => {
+      const decimals = coin ? getPriceDecimals(coin.currentPrice) : 2
       if (price >= 1000000) {
         const value = (price / 1000000).toFixed(2)
         return `$${value.replace('.', ',')}M`
@@ -548,7 +571,7 @@ import {
         const value = (price / 1000).toFixed(2)
         return `$${value.replace('.', ',')}K`
       }
-      const value = price.toFixed(2)
+      const value = price.toFixed(decimals)
       return `$${value.replace('.', ',')}`
     }
     
@@ -734,6 +757,7 @@ import {
                   ticks={getYAxisTicks()}
                   allowDecimals={true}
                   tickFormatter={(value: number) => {
+                    const decimals = coin ? getPriceDecimals(coin.currentPrice) : 2
                     // Форматируем значение с точками для тысяч и запятой для десятичных
                     if (value >= 1000000) {
                       const formatted = (value / 1000000).toFixed(1).replace('.', ',')
@@ -745,13 +769,13 @@ import {
                     }
                     // Для значений меньше 1000
                     if (value < 1) {
-                      return `$${value.toFixed(2).replace('.', ',')}`
+                      return `$${value.toFixed(decimals).replace('.', ',')}`
                     }
                     if (value < 10) {
-                      return `$${value.toFixed(2).replace('.', ',')}`
+                      return `$${value.toFixed(decimals).replace('.', ',')}`
                     }
                     if (value < 100) {
-                      return `$${value.toFixed(1).replace('.', ',')}`
+                      return `$${value.toFixed(Math.min(decimals, 1)).replace('.', ',')}`
                     }
                     // Для больших значений добавляем точки для тысяч
                     const parts = value.toFixed(0).split('.')

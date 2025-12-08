@@ -141,6 +141,19 @@ export const MainPage = () => {
     return mapping[display] || 'coingecko'
   }
 
+  // Определяем количество знаков после запятой на основе цены
+  const getPriceDecimals = (price: number): number => {
+    if (price >= 1) return 2
+    if (price >= 0.1) return 3
+    if (price >= 0.01) return 4
+    if (price >= 0.001) return 5
+    if (price >= 0.0001) return 6
+    if (price >= 0.00001) return 7
+    if (price >= 0.000001) return 8
+    if (price >= 0.0000001) return 9
+    return 10
+  }
+
   // Форматируем описание уведомления для отображения
   const formatNotificationDescription = (notification: NotificationResponse) => {
     const directionMap: Record<string, string> = {
@@ -158,6 +171,8 @@ export const MainPage = () => {
 
     const valueText = notification.value_type === 'percent' 
       ? `${notification.value}%`
+      : notification.value_type === 'price'
+      ? `$${notification.value.toFixed(getPriceDecimals(notification.value))}`
       : `$${notification.value.toFixed(2)}`
 
     return `${directionText} - ${triggerText} - ${valueText}`

@@ -41,12 +41,32 @@ export const ChooseCoinPage = () => {
     fetchCoins()
   }, [])
 
+  // Определяем количество знаков после запятой на основе цены
+  // Используем кэшированное значение из API, если есть, иначе вычисляем локально
+  const getPriceDecimals = (price: number, coin?: CoinListItem): number => {
+    // Если есть кэшированное значение из API, используем его
+    if (coin?.priceDecimals !== undefined) {
+      return coin.priceDecimals
+    }
+    // Иначе вычисляем локально
+    if (price >= 1) return 2
+    if (price >= 0.1) return 3
+    if (price >= 0.01) return 4
+    if (price >= 0.001) return 5
+    if (price >= 0.0001) return 6
+    if (price >= 0.00001) return 7
+    if (price >= 0.000001) return 8
+    if (price >= 0.0000001) return 9
+    return 10
+  }
+
   // Format price with spaces for thousands and comma for decimals
-  const formatPrice = (price: number) => {
+  const formatPrice = (price: number, coin?: CoinListItem) => {
+    const decimals = getPriceDecimals(price, coin)
     // Форматируем с точками для тысяч и запятой для десятичных (например: 89.357,00)
-    const parts = price.toFixed(2).split('.')
+    const parts = price.toFixed(decimals).split('.')
     const integerPart = parts[0]
-    const decimalPart = parts[1] || '00'
+    const decimalPart = parts[1] || '0'.repeat(decimals)
     
     // Добавляем точки для разделения тысяч
     const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
@@ -78,6 +98,7 @@ export const ChooseCoinPage = () => {
       currentPrice: coin.quote.USD.price,
       priceChangePercent24h: coin.quote.USD.percent_change_24h,
       imageUrl: coin.imageUrl,
+      priceDecimals: coin.priceDecimals,  // Кэшированное значение из API
     }
     navigate(ROUTES_NAME.CREATE_NOTIFICATION, {
       state: { selectedCoin: coinData },
@@ -177,7 +198,7 @@ export const ChooseCoinPage = () => {
                 description={coin.symbol}
                 after={
                   <Text type="text" color="secondary">
-                    ${formatPrice(coin.quote.USD.price)}
+                    ${formatPrice(coin.quote.USD.price, coin)}
                   </Text>
                 }
                 chevron

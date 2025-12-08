@@ -8,6 +8,27 @@ from app.core.redis_client import get_redis
 class CoinGeckoService:
     BASE_URL = "https://api.coingecko.com/api/v3"
     
+    @staticmethod
+    def get_price_decimals(price: float) -> int:
+        """Определяет количество знаков после запятой на основе цены"""
+        if price >= 1:
+            return 2
+        if price >= 0.1:
+            return 3
+        if price >= 0.01:
+            return 4
+        if price >= 0.001:
+            return 5
+        if price >= 0.0001:
+            return 6
+        if price >= 0.00001:
+            return 7
+        if price >= 0.000001:
+            return 8
+        if price >= 0.0000001:
+            return 9
+        return 10
+    
     def __init__(self):
         # CoinGecko не требует API ключа для базового использования
         # Но можно использовать API ключ для увеличения лимитов
@@ -111,8 +132,14 @@ class CoinGeckoService:
                 
                 if cached:
                     import json
+                    cached_data = json.loads(cached)
+                    # Проверяем и добавляем priceDecimals для каждой монеты, если его нет
+                    for coin in cached_data:
+                        if "priceDecimals" not in coin:
+                            price = coin.get("quote", {}).get("USD", {}).get("price", 0)
+                            coin["priceDecimals"] = self.get_price_decimals(price)
                     print(f"[get_crypto_list] Данные из кэша Redis")
-                    return json.loads(cached)
+                    return cached_data
             except Exception:
                 pass  # Продолжаем без кэша
         
@@ -152,6 +179,9 @@ class CoinGeckoService:
             coin_id = coin_data.get("id", "")
             image_url = coin_data.get("image", "")
             
+            # Вычисляем количество знаков после запятой
+            price_decimals = self.get_price_decimals(price)
+            
             # Сохраняем иконку в долгосрочный кэш (7 дней) для использования в других местах
             if redis and image_url and coin_id:
                 try:
@@ -164,12 +194,21 @@ class CoinGeckoService:
                 except Exception as e:
                     print(f"[get_crypto_list] Ошибка сохранения иконки {coin_id} в кэш: {e}")
             
+            # Сохраняем количество знаков после запятой в кэш на 1 день
+            if redis and coin_id:
+                try:
+                    cache_key = f"coin_price_decimals:{coin_id}"
+                    await redis.setex(cache_key, 86400, str(price_decimals))  # 1 день = 86400 секунд
+                except Exception as e:
+                    print(f"[get_crypto_list] Ошибка сохранения price_decimals {coin_id} в кэш: {e}")
+            
             formatted_coins.append({
                 "id": coin_id,  # CoinGecko использует id как строку (например, "bitcoin")
                 "name": coin_data.get("name", ""),
                 "symbol": coin_data.get("symbol", "").upper(),
                 "slug": coin_id,  # Используем id как slug
                 "imageUrl": image_url,  # URL изображения из CoinGecko
+                "priceDecimals": price_decimals,  # Количество знаков после запятой
                 "quote": {
                     "USD": {
                         "price": price,
@@ -205,8 +244,13 @@ class CoinGeckoService:
                 
                 if cached:
                     import json
+                    cached_data = json.loads(cached)
+                    # Проверяем и добавляем priceDecimals, если его нет
+                    if "priceDecimals" not in cached_data:
+                        price = cached_data.get("currentPrice", 0)
+                        cached_data["priceDecimals"] = self.get_price_decimals(price)
                     print(f"[get_crypto_details] Данные из кэша Redis")
-                    return json.loads(cached)
+                    return cached_data
             except Exception:
                 pass  # Продолжаем без кэша
         
@@ -233,6 +277,10 @@ class CoinGeckoService:
         
         print(f"[get_crypto_details] Price: {current_price}, Change 24h: {price_change_percent_24h}%")
         
+        # Вычисляем количество знаков после запятой
+        current_price_float = float(current_price) if current_price else 0
+        price_decimals = self.get_price_decimals(current_price_float)
+        
         # Сохраняем иконку в долгосрочный кэш (7 дней) для использования в других местах
         if redis and image_url:
             try:
@@ -245,15 +293,24 @@ class CoinGeckoService:
             except Exception as e:
                 print(f"[get_crypto_details] Ошибка сохранения иконки {coin_id} в кэш: {e}")
         
+        # Сохраняем количество знаков после запятой в кэш на 1 день
+        if redis:
+            try:
+                cache_key = f"coin_price_decimals:{coin_id}"
+                await redis.setex(cache_key, 86400, str(price_decimals))  # 1 день = 86400 секунд
+            except Exception as e:
+                print(f"[get_crypto_details] Ошибка сохранения price_decimals {coin_id} в кэш: {e}")
+        
         # Объединяем данные
         coin = {
             "id": data.get("id", coin_id),
             "name": data.get("name", ""),
             "symbol": data.get("symbol", "").upper(),
-            "currentPrice": float(current_price) if current_price else 0,
+            "currentPrice": current_price_float,
             "priceChange24h": float(price_change_24h) if price_change_24h else 0,
             "priceChangePercent24h": float(price_change_percent_24h) if price_change_percent_24h else 0,
             "imageUrl": image_url,
+            "priceDecimals": price_decimals,  # Количество знаков после запятой
         }
         
         print(f"\n[get_crypto_details] Final coin data: {coin}")

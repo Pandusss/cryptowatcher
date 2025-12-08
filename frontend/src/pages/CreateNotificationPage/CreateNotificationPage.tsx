@@ -82,7 +82,7 @@ export const CreateNotificationPage = () => {
   useTelegramBackButton()
 
   // Form state
-  const [crypto, setCrypto] = useState<{ id: string; symbol: string; name: string; price: number; imageUrl?: string } | null>(null)
+  const [crypto, setCrypto] = useState<{ id: string; symbol: string; name: string; price: number; imageUrl?: string; priceDecimals?: number } | null>(null)
   const [direction, setDirection] = useState<NotificationDirection>('rise')
   const [trigger, setTrigger] = useState<NotificationTrigger>('stop-loss')
   const [valueType, setValueType] = useState<NotificationValueType>('percent')
@@ -141,6 +141,7 @@ export const CreateNotificationPage = () => {
           // Получаем актуальную цену и imageUrl из API параллельно
           let imageUrl: string | undefined
           let currentPrice = notification.current_price || 0
+          let priceDecimals: number | undefined
           
           // Запускаем запросы параллельно для ускорения загрузки
           const [coinsListResult, coinDetailsResult] = await Promise.allSettled([
@@ -155,6 +156,9 @@ export const CreateNotificationPage = () => {
               imageUrl = coin.imageUrl
               console.log('[CreateNotificationPage] Found imageUrl from coins list:', imageUrl)
             }
+            if (coin?.priceDecimals !== undefined) {
+              priceDecimals = coin.priceDecimals
+            }
           } else {
             console.warn('[CreateNotificationPage] Failed to fetch coins list for imageUrl:', coinsListResult.reason)
           }
@@ -166,10 +170,15 @@ export const CreateNotificationPage = () => {
             if (!imageUrl && coinDetailsResult.value.imageUrl) {
               imageUrl = coinDetailsResult.value.imageUrl
             }
+            // Используем priceDecimals из деталей, если не был получен из списка
+            if (priceDecimals === undefined && coinDetailsResult.value.priceDecimals !== undefined) {
+              priceDecimals = coinDetailsResult.value.priceDecimals
+            }
             console.log('[CreateNotificationPage] Loaded coin details:', {
               crypto_id: notification.crypto_id,
               imageUrl,
               currentPrice,
+              priceDecimals,
             })
           } else {
             console.warn('[CreateNotificationPage] Failed to fetch coin details, using saved price:', coinDetailsResult.status === 'rejected' ? coinDetailsResult.reason : 'null result')
@@ -183,6 +192,7 @@ export const CreateNotificationPage = () => {
             name: notification.crypto_name,
             price: currentPrice,
             imageUrl,
+            priceDecimals,  // Используем кэшированное значение из API
           })
           setDirection(notification.direction)
           setTrigger(notification.trigger)
@@ -203,7 +213,7 @@ export const CreateNotificationPage = () => {
 
     // Получаем выбранную криптовалюту из navigation state
     const selectedCoin = location.state?.selectedCoin as
-      | { id: string; symbol: string; name: string; price?: number; currentPrice?: number; imageUrl?: string }
+      | { id: string; symbol: string; name: string; price?: number; currentPrice?: number; imageUrl?: string; priceDecimals?: number }
       | undefined
 
     // Проверяем, пришли ли мы по кнопке "Назад"
@@ -219,6 +229,7 @@ export const CreateNotificationPage = () => {
         name: selectedCoin.name,
         price: price,
         imageUrl: selectedCoin.imageUrl,
+        priceDecimals: selectedCoin.priceDecimals,  // Используем кэшированное значение из API
       })
     } else if (!crypto && !isReturningBack && !isEditMode) {
       // Если криптовалюта не выбрана и это не возврат по кнопке "Назад" и не режим редактирования,
@@ -323,12 +334,32 @@ export const CreateNotificationPage = () => {
     }
   }
 
+  // Определяем количество знаков после запятой на основе цены
+  // Используем кэшированное значение из API, если есть, иначе вычисляем локально
+  const getPriceDecimals = (price: number): number => {
+    // Если есть кэшированное значение из API, используем его
+    if (crypto?.priceDecimals !== undefined) {
+      return crypto.priceDecimals
+    }
+    // Иначе вычисляем локально
+    if (price >= 1) return 2
+    if (price >= 0.1) return 3
+    if (price >= 0.01) return 4
+    if (price >= 0.001) return 5
+    if (price >= 0.0001) return 6
+    if (price >= 0.00001) return 7
+    if (price >= 0.000001) return 8
+    if (price >= 0.0000001) return 9
+    return 10
+  }
+
   // Format number with spaces for thousands and comma for decimals
   const formatPrice = (price: number) => {
+    const decimals = crypto ? getPriceDecimals(crypto.price) : 2
     // Форматируем с точками для тысяч и запятой для десятичных (например: 89.357,00)
-    const parts = price.toFixed(2).split('.')
+    const parts = price.toFixed(decimals).split('.')
     const integerPart = parts[0]
-    const decimalPart = parts[1] || '00'
+    const decimalPart = parts[1] || '0'.repeat(decimals)
     
     // Добавляем точки для разделения тысяч
     const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
@@ -337,10 +368,11 @@ export const CreateNotificationPage = () => {
   }
 
   const formatCalculatedValue = (val: number) => {
+    const decimals = crypto ? getPriceDecimals(crypto.price) : 2
     // Format: replace dot with comma, keep spaces for thousands
     return val.toLocaleString('ru-RU', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
     }).replace(/,/g, ' ').replace('.', ',')
   }
 
@@ -541,6 +573,8 @@ export const CreateNotificationPage = () => {
 
   // Форматирование цены для Y оси (как в CoinDetailsPage)
   const formatPriceForYAxis = (value: number) => {
+    const decimals = crypto ? getPriceDecimals(crypto.price) : 2
+    
     if (value >= 1000000) {
       const formatted = (value / 1000000).toFixed(1).replace('.', ',')
       return `$${formatted}M`
@@ -550,13 +584,13 @@ export const CreateNotificationPage = () => {
       return `$${formatted}K`
     }
     if (value < 1) {
-      return `$${value.toFixed(2).replace('.', ',')}`
+      return `$${value.toFixed(decimals).replace('.', ',')}`
     }
     if (value < 10) {
-      return `$${value.toFixed(2).replace('.', ',')}`
+      return `$${value.toFixed(decimals).replace('.', ',')}`
     }
     if (value < 100) {
-      return `$${value.toFixed(1).replace('.', ',')}`
+      return `$${value.toFixed(Math.min(decimals, 1)).replace('.', ',')}`
     }
     const parts = value.toFixed(0).split('.')
     const integerPart = parts[0]
@@ -779,7 +813,7 @@ export const CreateNotificationPage = () => {
                 placeholder={
                   valueType === 'percent' ? '5%' : 
                   valueType === 'absolute' ? '100' : 
-                  crypto ? crypto.price.toFixed(2) : '0'
+                  crypto ? crypto.price.toFixed(getPriceDecimals(crypto.price)) : '0'
                 }
                 className={styles.valueInput}
                 inputRef={valueInputRef}
@@ -797,7 +831,7 @@ export const CreateNotificationPage = () => {
                 : valueType === 'absolute'
                 ? `$${formatCalculatedValue(parseFloat(value))} ≈ ${(calculatedValue as number).toFixed(2)}%`
                 : typeof calculatedValue === 'object' && calculatedValue !== null && 'priceDiff' in calculatedValue
-                ? `$${formatCalculatedValue(parseFloat(value))} (${calculatedValue.priceDiff >= 0 ? '+' : ''}${calculatedValue.priceDiff.toFixed(2)} USD, ${calculatedValue.percentDiff >= 0 ? '+' : ''}${calculatedValue.percentDiff.toFixed(2)}%)`
+                ? `$${formatCalculatedValue(parseFloat(value))} (${calculatedValue.priceDiff >= 0 ? '+' : ''}${calculatedValue.priceDiff.toFixed(crypto ? getPriceDecimals(crypto.price) : 2)} USD, ${calculatedValue.percentDiff >= 0 ? '+' : ''}${calculatedValue.percentDiff.toFixed(2)}%)`
                 : null
               }
             </Text>
