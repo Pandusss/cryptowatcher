@@ -9,12 +9,13 @@ router = APIRouter()
 async def get_coins_list(
     limit: int = 100,
     start: int = 1,
+    force_refresh: bool = False,
 ):
     """Получить список криптовалют"""
-    print(f"\n[API Endpoint] GET /coins/list - limit={limit}, start={start}")
+    print(f"\n[API Endpoint] GET /coins/list - limit={limit}, start={start}, force_refresh={force_refresh}")
     service = CoinGeckoService()
     try:
-        coins = await service.get_crypto_list(limit=limit, page=start)
+        coins = await service.get_crypto_list(limit=limit, page=start, force_refresh=force_refresh)
         print(f"[API Endpoint] Возвращаем {len(coins)} монет клиенту")
         return {"data": coins}
     except Exception as e:

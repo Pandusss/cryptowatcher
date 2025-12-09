@@ -1,4 +1,7 @@
 import httpx
+import json
+import os
+from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from app.core.config import settings
@@ -117,119 +120,218 @@ class CoinGeckoService:
             # Если дошли сюда, значит все попытки исчерпаны
             raise Exception("Превышено максимальное количество попыток из-за rate limit")
     
+    def _load_coins_config(self) -> tuple[List[str], str]:
+        """Загрузить список ID монет из конфиг-файла и его хеш для проверки изменений"""
+        try:
+            # Путь к конфиг-файлу относительно текущего файла
+            config_path = Path(__file__).parent.parent / "config" / "coins.json"
+            if not config_path.exists():
+                print(f"[get_crypto_list] Конфиг-файл не найден: {config_path}")
+                return [], ""
+            
+            with open(config_path, 'r', encoding='utf-8') as f:
+                coins_list = json.load(f)
+            
+            # Вычисляем хеш содержимого файла для проверки изменений
+            import hashlib
+            with open(config_path, 'rb') as f:
+                file_hash = hashlib.md5(f.read()).hexdigest()
+            
+            print(f"[get_crypto_list] Загружено {len(coins_list)} монет из конфиг-файла (хеш: {file_hash[:8]}...)")
+            return coins_list, file_hash
+        except Exception as e:
+            print(f"[get_crypto_list] Ошибка загрузки конфиг-файла: {e}")
+            return [], ""
+    
+    def _format_coin_data(self, coin_data: Dict, coin_id: str) -> Dict:
+        """Форматировать данные монеты для фронтенда"""
+        price = coin_data.get("current_price", 0)
+        
+        # Убеждаемся, что цена не None и является числом
+        if price is None:
+            price = 0
+        elif not isinstance(price, (int, float)):
+            try:
+                price = float(price)
+            except (ValueError, TypeError):
+                price = 0
+        
+        # Получаем URL изображения из CoinGecko
+        image_url = coin_data.get("image", "")
+        
+        # Вычисляем количество знаков после запятой
+        price_decimals = self.get_price_decimals(price)
+        
+        return {
+            "id": coin_id,
+            "name": coin_data.get("name", ""),
+            "symbol": coin_data.get("symbol", "").upper(),
+            "slug": coin_id,
+            "imageUrl": image_url,
+            "priceDecimals": price_decimals,
+            "quote": {
+                "USD": {
+                    "price": price,
+                    "percent_change_24h": coin_data.get("price_change_percentage_24h"),
+                    "volume_24h": coin_data.get("total_volume"),
+                }
+            },
+        }
+    
     async def get_crypto_list(
         self,
         limit: int = 100,
         page: int = 1,
+        force_refresh: bool = False,
     ) -> List[Dict]:
-        """Получить список криптовалют"""
-        # Проверяем кэш в Redis (если доступен)
+        """Получить список криптовалют, отфильтрованный по конфиг-файлу"""
+        # Загружаем список монет из конфиг-файла и его хеш
+        config_coins, config_hash = self._load_coins_config()
+        
+        # Если конфиг пустой, возвращаем пустой список
+        if not config_coins:
+            print("[get_crypto_list] Конфиг-файл пустой, возвращаем пустой список")
+            return []
+        
         redis = await get_redis()
-        if redis:
-            try:
-                cache_key = f"coins_list:{limit}:{page}"
-                cached = await redis.get(cache_key)
-                
-                if cached:
-                    import json
-                    cached_data = json.loads(cached)
-                    # Проверяем и добавляем priceDecimals для каждой монеты, если его нет
-                    for coin in cached_data:
-                        if "priceDecimals" not in coin:
-                            price = coin.get("quote", {}).get("USD", {}).get("price", 0)
-                            coin["priceDecimals"] = self.get_price_decimals(price)
-                    print(f"[get_crypto_list] Данные из кэша Redis")
-                    return cached_data
-            except Exception:
-                pass  # Продолжаем без кэша
         
-        # CoinGecko использует per_page и page для пагинации
-        per_page = min(limit, 250)  # Максимум 250 на страницу
-        
-        data = await self._make_request(
-            "/coins/markets",
-            params={
-                "vs_currency": "usd",
-                "order": "market_cap_desc",
-                "per_page": per_page,
-                "page": page,
-                "sparkline": False,
-            },
-        )
-        
-        print(f"\n[get_crypto_list] Получено монет: {len(data)}")
-        if data:
-            print(f"[get_crypto_list] Первая монета (сырые данные): {str(data[0])[:300]}")
-        
-        # Форматируем данные для фронтенда (совместимость с текущим форматом)
+        # Проверяем кэш для каждой монеты индивидуально
         formatted_coins = []
-        for coin_data in data:
-            price = coin_data.get("current_price", 0)
-            
-            # Убеждаемся, что цена не None и является числом
-            if price is None:
-                price = 0
-            elif not isinstance(price, (int, float)):
-                try:
-                    price = float(price)
-                except (ValueError, TypeError):
-                    price = 0
-            
-            # Получаем URL изображения из CoinGecko
-            coin_id = coin_data.get("id", "")
-            image_url = coin_data.get("image", "")
-            
-            # Вычисляем количество знаков после запятой
-            price_decimals = self.get_price_decimals(price)
-            
-            # Сохраняем иконку в долгосрочный кэш (7 дней) для использования в других местах
-            if redis and image_url and coin_id:
-                try:
-                    cache_key = f"coin_image_url:{coin_id}"
-                    # Проверяем, есть ли уже в кэше (чтобы не перезаписывать)
-                    existing = await redis.get(cache_key)
-                    if not existing:
-                        await redis.setex(cache_key, 604800, image_url)  # 7 дней
-                        print(f"[get_crypto_list] Иконка {coin_id} сохранена в долгосрочный кэш")
-                except Exception as e:
-                    print(f"[get_crypto_list] Ошибка сохранения иконки {coin_id} в кэш: {e}")
-            
-            # Сохраняем количество знаков после запятой в кэш на 1 день
-            if redis and coin_id:
-                try:
-                    cache_key = f"coin_price_decimals:{coin_id}"
-                    await redis.setex(cache_key, 86400, str(price_decimals))  # 1 день = 86400 секунд
-                except Exception as e:
-                    print(f"[get_crypto_list] Ошибка сохранения price_decimals {coin_id} в кэш: {e}")
-            
-            formatted_coins.append({
-                "id": coin_id,  # CoinGecko использует id как строку (например, "bitcoin")
-                "name": coin_data.get("name", ""),
-                "symbol": coin_data.get("symbol", "").upper(),
-                "slug": coin_id,  # Используем id как slug
-                "imageUrl": image_url,  # URL изображения из CoinGecko
-                "priceDecimals": price_decimals,  # Количество знаков после запятой
-                "quote": {
-                    "USD": {
-                        "price": price,
-                        "percent_change_24h": coin_data.get("price_change_percentage_24h"),
-                        "volume_24h": coin_data.get("total_volume"),
-                    }
-                },
-            })
+        coins_to_fetch = []  # Монеты, которых нет в кэше
         
-        # Кэшируем на 15 минут (если Redis доступен)
-        if redis:
-            try:
-                cache_key = f"coins_list:{limit}:{page}"
-                import json
-                await redis.setex(cache_key, 900, json.dumps(formatted_coins))  # 15 минут = 900 секунд
-            except Exception:
-                pass  # Пропускаем кэширование если ошибка
+        print(f"[get_crypto_list] Проверяем кэш для {len(config_coins)} монет из конфига...")
         
-        print(f"[get_crypto_list] Отформатировано монет: {len(formatted_coins)}")
+        for coin_id in config_coins:
+            cached_coin = None
+            
+            # Проверяем индивидуальный кэш для монеты (если не требуется принудительное обновление)
+            if redis and not force_refresh:
+                try:
+                    cache_key = f"coin_data:{coin_id}"
+                    cached = await redis.get(cache_key)
+                    if cached:
+                        cached_coin = json.loads(cached)
+                        # Проверяем и добавляем priceDecimals, если его нет
+                        if "priceDecimals" not in cached_coin:
+                            price = cached_coin.get("quote", {}).get("USD", {}).get("price", 0)
+                            cached_coin["priceDecimals"] = self.get_price_decimals(price)
+                except Exception as e:
+                    print(f"[get_crypto_list] Ошибка при чтении кэша для {coin_id}: {e}")
+            
+            if cached_coin:
+                formatted_coins.append(cached_coin)
+            else:
+                # Монета не найдена в кэше, нужно запросить из API
+                coins_to_fetch.append(coin_id)
+        
+        print(f"[get_crypto_list] Найдено в кэше: {len(formatted_coins)}, нужно загрузить: {len(coins_to_fetch)}")
+        
+        # Если есть монеты, которых нет в кэше, запрашиваем их из API
+        if coins_to_fetch:
+            # Проверяем кэш топ-3000 монет
+            all_coins_dict = {}
+            top3000_cache_key = "coins_list:top3000"
+            
+            if redis and not force_refresh:
+                try:
+                    cached_top3000 = await redis.get(top3000_cache_key)
+                    if cached_top3000:
+                        cached_data = json.loads(cached_top3000)
+                        # Преобразуем список в словарь для быстрого поиска
+                        for coin_data in cached_data:
+                            coin_id = coin_data.get("id", "")
+                            if coin_id:
+                                all_coins_dict[coin_id] = coin_data
+                        print(f"[get_crypto_list] Топ-3000 монет загружены из кэша: {len(all_coins_dict)} монет")
+                except Exception as e:
+                    print(f"[get_crypto_list] Ошибка при чтении кэша топ-3000: {e}")
+            
+            # Если кэша нет или требуется обновление, запрашиваем топ-3000 из API
+            if not all_coins_dict:
+                per_page = 250  # Максимум 250 на страницу
+                total_pages = 12  # 12 страниц * 250 = 3000 монет
+                
+                print(f"[get_crypto_list] Получаем топ-3000 монет из CoinGecko API...")
+                all_coins_list = []  # Список для кэширования
+                
+                for page_num in range(1, total_pages + 1):
+                    try:
+                        data = await self._make_request(
+                            "/coins/markets",
+                            params={
+                                "vs_currency": "usd",
+                                "order": "market_cap_desc",
+                                "per_page": per_page,
+                                "page": page_num,
+                                "sparkline": False,
+                            },
+                        )
+                        
+                        # Добавляем монеты в словарь и список
+                        for coin_data in data:
+                            coin_id = coin_data.get("id", "")
+                            if coin_id:
+                                all_coins_dict[coin_id] = coin_data
+                                all_coins_list.append(coin_data)
+                        
+                        print(f"[get_crypto_list] Получено {len(data)} монет со страницы {page_num}")
+                        
+                        # Если получили меньше монет, чем ожидалось, значит достигли конца списка
+                        if len(data) < per_page:
+                            break
+                            
+                    except Exception as e:
+                        print(f"[get_crypto_list] Ошибка при получении страницы {page_num}: {e}")
+                        break
+                
+                print(f"[get_crypto_list] Всего получено {len(all_coins_dict)} уникальных монет из API")
+                
+                # Кэшируем топ-3000 на 1 час (3600 секунд)
+                if redis and all_coins_list:
+                    try:
+                        await redis.setex(top3000_cache_key, 3600, json.dumps(all_coins_list))
+                        print(f"[get_crypto_list] Топ-3000 монет сохранены в кэш на 1 час")
+                    except Exception as e:
+                        print(f"[get_crypto_list] Ошибка при сохранении топ-3000 в кэш: {e}")
+            
+            # Обрабатываем монеты, которые нужно было загрузить
+            for coin_id in coins_to_fetch:
+                if coin_id in all_coins_dict:
+                    coin_data = all_coins_dict[coin_id]
+                    formatted_coin = self._format_coin_data(coin_data, coin_id)
+                    formatted_coins.append(formatted_coin)
+                    
+                    # Кэшируем монету на 1 час (3600 секунд)
+                    if redis:
+                        try:
+                            cache_key = f"coin_data:{coin_id}"
+                            await redis.setex(cache_key, 3600, json.dumps(formatted_coin))
+                            
+                            # Сохраняем иконку в долгосрочный кэш (7 дней)
+                            image_url = formatted_coin.get("imageUrl", "")
+                            if image_url:
+                                image_cache_key = f"coin_image_url:{coin_id}"
+                                existing = await redis.get(image_cache_key)
+                                if not existing:
+                                    await redis.setex(image_cache_key, 604800, image_url)
+                            
+                            # Сохраняем price_decimals в кэш на 1 день
+                            price_decimals = formatted_coin.get("priceDecimals")
+                            if price_decimals is not None:
+                                decimals_cache_key = f"coin_price_decimals:{coin_id}"
+                                await redis.setex(decimals_cache_key, 86400, str(price_decimals))
+                        except Exception as e:
+                            print(f"[get_crypto_list] Ошибка при сохранении {coin_id} в кэш: {e}")
+                else:
+                    print(f"[get_crypto_list] Монета {coin_id} из конфига не найдена в топ-1000")
+        
+        # Сортируем монеты по порядку из конфига
+        coin_order = {coin_id: idx for idx, coin_id in enumerate(config_coins)}
+        formatted_coins.sort(key=lambda x: coin_order.get(x.get("id"), 9999))
+        
+        print(f"[get_crypto_list] Итого отформатировано {len(formatted_coins)} монет")
         if formatted_coins:
-            print(f"[get_crypto_list] Первая монета (отформатированные данные): {formatted_coins[0]}")
+            print(f"[get_crypto_list] Первая монета: {formatted_coins[0].get('name')}")
         
         return formatted_coins
     
