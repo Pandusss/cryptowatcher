@@ -471,8 +471,7 @@ import {
       // Оптимальное количество: 5-8 меток
       switch (selectedPeriod) {
         case '1d':
-          // Для 1D показываем каждый час (24 метки)
-          return 24
+          return 6 // Каждые 4 часа
         case '7d':
           return 7 // Раз в день
         case '30d':
@@ -536,6 +535,84 @@ import {
     const getXAxisTicks = () => {
       if (chartData.length === 0) return undefined
       
+      // Для 1D таймфрейма выбираем точки каждые 4 часа
+      if (selectedPeriod === '1d') {
+        const ticks: string[] = []
+        const fourHoursInMs = 4 * 60 * 60 * 1000 // 4 часа в миллисекундах
+        
+        if (chartData.length === 0) return undefined
+        
+        const firstDate = new Date(chartData[0].date)
+        const lastDate = new Date(chartData[chartData.length - 1].date)
+        
+        // Округляем первую дату до ближайшего часа, кратного 4 (0, 4, 8, 12, 16, 20)
+        const firstHour = firstDate.getHours()
+        const roundedFirstHour = Math.floor(firstHour / 4) * 4
+        const roundedFirstDate = new Date(firstDate)
+        roundedFirstDate.setHours(roundedFirstHour, 0, 0, 0)
+        
+        // Находим ближайшую точку данных к округленной дате
+        let currentTick = roundedFirstDate.getTime()
+        
+        while (currentTick <= lastDate.getTime()) {
+          // Находим ближайшую точку данных к текущему тику
+          let closestIndex = 0
+          let minDiff = Math.abs(new Date(chartData[0].date).getTime() - currentTick)
+          
+          for (let i = 1; i < chartData.length; i++) {
+            const diff = Math.abs(new Date(chartData[i].date).getTime() - currentTick)
+            if (diff < minDiff) {
+              minDiff = diff
+              closestIndex = i
+            }
+          }
+          
+          // Добавляем тик, если он еще не добавлен и достаточно далеко от предыдущего
+          const tickDate = chartData[closestIndex].date
+          const tickTime = new Date(tickDate).getTime()
+          const twoHoursInMs = 2 * 60 * 60 * 1000 // 2 часа в миллисекундах
+          
+          if (!ticks.includes(tickDate)) {
+            // Проверяем расстояние до последнего добавленного тика
+            if (ticks.length === 0) {
+              ticks.push(tickDate)
+            } else {
+              const lastTickTime = new Date(ticks[ticks.length - 1]).getTime()
+              const timeDiff = Math.abs(tickTime - lastTickTime)
+              
+              // Добавляем только если расстояние больше 2 часов
+              if (timeDiff > twoHoursInMs) {
+                ticks.push(tickDate)
+              }
+            }
+          }
+          
+          // Переходим к следующему 4-часовому интервалу
+          currentTick += fourHoursInMs
+        }
+        
+        // Добавляем последнюю точку только если она достаточно далеко от последнего тика
+        const lastTick = chartData[chartData.length - 1].date
+        const lastTickTime = new Date(lastTick).getTime()
+        
+        if (ticks.length > 0) {
+          const lastAddedTickTime = new Date(ticks[ticks.length - 1]).getTime()
+          const timeDiff = Math.abs(lastTickTime - lastAddedTickTime)
+          const twoHoursInMs = 2 * 60 * 60 * 1000 // 2 часа в миллисекундах
+          
+          // Добавляем последнюю точку только если она достаточно далеко от последнего тика
+          if (!ticks.includes(lastTick) && timeDiff > twoHoursInMs) {
+            ticks.push(lastTick)
+          }
+        } else {
+          // Если тиков нет, добавляем последнюю точку
+          ticks.push(lastTick)
+        }
+        
+        return ticks.length > 0 ? ticks : undefined
+      }
+      
+      // Для остальных таймфреймов используем стандартную логику
       const optimalCount = getOptimalTickCount()
       const totalPoints = chartData.length
       
@@ -633,8 +710,12 @@ import {
     // Округляем время до ближайшего получаса или часа
     const roundTime = (hours: number, minutes: number, period: string) => {
       if (period === '1d') {
-        // Для 1d округляем до часа (0 минут)
-        return { h: hours, m: 0 }
+        // Для 1d округляем до получаса (0 или 30 минут)
+        const roundedMinutes = minutes < 15 ? 0 : minutes < 45 ? 30 : 60
+        if (roundedMinutes === 60) {
+          return { h: hours + 1, m: 0 }
+        }
+        return { h: hours, m: roundedMinutes }
       } else if (period === '7d') {
         // Для 7d округляем до часа (0 минут)
         return { h: hours, m: 0 }
@@ -665,8 +746,9 @@ import {
         
         switch (selectedPeriod) {
           case '1d':
-            // Показываем только час (HH:00)
-            return `${String(roundedTime.h).padStart(2, '0')}:00`
+            // Показываем только время (HH:00) - округленное до часа, кратного 4 (0, 4, 8, 12, 16, 20)
+            const roundedHour = Math.floor(roundedTime.h / 4) * 4
+            return `${String(roundedHour).padStart(2, '0')}:00`
           case '7d':
             // Показываем только месяц и день (MMM DD) - короткий формат
             return `${monthShort} ${day}`
@@ -688,9 +770,6 @@ import {
             if (timePart && timePart.includes(':')) {
               const [hours, minutes] = timePart.split(':').map(Number)
               const roundedTime = roundTime(hours || 0, minutes || 0, selectedPeriod)
-              if (selectedPeriod === '1d') {
-                return `${String(roundedTime.h).padStart(2, '0')}:00`
-              }
               return `${String(roundedTime.h).padStart(2, '0')}:${String(roundedTime.m).padStart(2, '0')}`
             }
           }
@@ -798,7 +877,7 @@ import {
                   interval={getXAxisInterval()}
                   angle={0}
                   tick={renderCustomTick}
-                  minTickGap={selectedPeriod === '1d' ? 8 : selectedPeriod === '30d' || selectedPeriod === '1y' ? 8 : 6}
+                  minTickGap={selectedPeriod === '1d' ? 12 : selectedPeriod === '30d' || selectedPeriod === '1y' ? 8 : 6}
                 />
                 <YAxis 
                   yAxisId="price"

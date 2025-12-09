@@ -710,6 +710,84 @@ export const CreateNotificationPage = () => {
   const getXAxisTicks = () => {
     if (chartData.length === 0) return undefined
     
+    // Для 1D таймфрейма выбираем точки каждые 4 часа
+    if (selectedPeriod === '1d') {
+      const ticks: string[] = []
+      const fourHoursInMs = 4 * 60 * 60 * 1000 // 4 часа в миллисекундах
+      
+      if (chartData.length === 0) return undefined
+      
+      const firstDate = new Date(chartData[0].date)
+      const lastDate = new Date(chartData[chartData.length - 1].date)
+      
+      // Округляем первую дату до ближайшего часа, кратного 4 (0, 4, 8, 12, 16, 20)
+      const firstHour = firstDate.getHours()
+      const roundedFirstHour = Math.floor(firstHour / 4) * 4
+      const roundedFirstDate = new Date(firstDate)
+      roundedFirstDate.setHours(roundedFirstHour, 0, 0, 0)
+      
+      // Находим ближайшую точку данных к округленной дате
+      let currentTick = roundedFirstDate.getTime()
+      
+      while (currentTick <= lastDate.getTime()) {
+        // Находим ближайшую точку данных к текущему тику
+        let closestIndex = 0
+        let minDiff = Math.abs(new Date(chartData[0].date).getTime() - currentTick)
+        
+        for (let i = 1; i < chartData.length; i++) {
+          const diff = Math.abs(new Date(chartData[i].date).getTime() - currentTick)
+          if (diff < minDiff) {
+            minDiff = diff
+            closestIndex = i
+          }
+        }
+        
+        // Добавляем тик, если он еще не добавлен и достаточно далеко от предыдущего
+        const tickDate = chartData[closestIndex].date
+        const tickTime = new Date(tickDate).getTime()
+        const twoHoursInMs = 2 * 60 * 60 * 1000 // 2 часа в миллисекундах
+        
+        if (!ticks.includes(tickDate)) {
+          // Проверяем расстояние до последнего добавленного тика
+          if (ticks.length === 0) {
+            ticks.push(tickDate)
+          } else {
+            const lastTickTime = new Date(ticks[ticks.length - 1]).getTime()
+            const timeDiff = Math.abs(tickTime - lastTickTime)
+            
+            // Добавляем только если расстояние больше 2 часов
+            if (timeDiff > twoHoursInMs) {
+              ticks.push(tickDate)
+            }
+          }
+        }
+        
+        // Переходим к следующему 4-часовому интервалу
+        currentTick += fourHoursInMs
+      }
+      
+      // Добавляем последнюю точку только если она достаточно далеко от последнего тика
+      const lastTick = chartData[chartData.length - 1].date
+      const lastTickTime = new Date(lastTick).getTime()
+      
+      if (ticks.length > 0) {
+        const lastAddedTickTime = new Date(ticks[ticks.length - 1]).getTime()
+        const timeDiff = Math.abs(lastTickTime - lastAddedTickTime)
+        const twoHoursInMs = 2 * 60 * 60 * 1000 // 2 часа в миллисекундах
+        
+        // Добавляем последнюю точку только если она достаточно далеко от последнего тика
+        if (!ticks.includes(lastTick) && timeDiff > twoHoursInMs) {
+          ticks.push(lastTick)
+        }
+      } else {
+        // Если тиков нет, добавляем последнюю точку
+        ticks.push(lastTick)
+      }
+      
+      return ticks.length > 0 ? ticks : undefined
+    }
+    
+    // Для остальных таймфреймов используем стандартную логику
     const optimalCount = 7
     const totalPoints = chartData.length
     
@@ -740,9 +818,40 @@ export const CreateNotificationPage = () => {
     return ticks.length > 0 ? ticks : undefined
   }
 
-  // Рендер кастомного тика для X оси (как в CoinDetailsPage)
+  // Рендер кастомного тика для X оси
   const renderCustomTick = (props: any) => {
     const { x, y, payload } = props
+    
+    // Для 1D таймфрейма показываем время (HH:MM)
+    if (selectedPeriod === '1d') {
+      try {
+        const date = new Date(payload.value)
+        const hours = date.getHours()
+        const minutes = date.getMinutes()
+        
+        // Округляем до ближайшего часа, кратного 4 (0, 4, 8, 12, 16, 20)
+        const roundedHour = Math.floor(hours / 4) * 4
+        
+        return (
+          <g transform={`translate(${x},${y})`}>
+            <text
+              x={0}
+              y={0}
+              dy={16}
+              textAnchor="middle"
+              fill="var(--color-foreground-tertiary)"
+              fontSize={10}
+            >
+              {`${String(roundedHour).padStart(2, '0')}:00`}
+            </text>
+          </g>
+        )
+      } catch {
+        return null
+      }
+    }
+    
+    // Для остальных таймфреймов показываем дату
     const date = new Date(payload.value)
     const day = date.getDate()
     const month = date.toLocaleDateString('en-US', { month: 'short' })
