@@ -471,7 +471,8 @@ import {
       // Оптимальное количество: 5-8 меток
       switch (selectedPeriod) {
         case '1d':
-          return 6 // Каждые 4 часа
+          // Для 1D показываем каждый час (24 метки)
+          return 24
         case '7d':
           return 7 // Раз в день
         case '30d':
@@ -632,12 +633,8 @@ import {
     // Округляем время до ближайшего получаса или часа
     const roundTime = (hours: number, minutes: number, period: string) => {
       if (period === '1d') {
-        // Для 1d округляем до получаса (0 или 30 минут)
-        const roundedMinutes = minutes < 15 ? 0 : minutes < 45 ? 30 : 60
-        if (roundedMinutes === 60) {
-          return { h: hours + 1, m: 0 }
-        }
-        return { h: hours, m: roundedMinutes }
+        // Для 1d округляем до часа (0 минут)
+        return { h: hours, m: 0 }
       } else if (period === '7d') {
         // Для 7d округляем до часа (0 минут)
         return { h: hours, m: 0 }
@@ -668,8 +665,8 @@ import {
         
         switch (selectedPeriod) {
           case '1d':
-            // Показываем только время (HH:MM) - округленное до получаса
-            return `${String(roundedTime.h).padStart(2, '0')}:${String(roundedTime.m).padStart(2, '0')}`
+            // Показываем только час (HH:00)
+            return `${String(roundedTime.h).padStart(2, '0')}:00`
           case '7d':
             // Показываем только месяц и день (MMM DD) - короткий формат
             return `${monthShort} ${day}`
@@ -691,6 +688,9 @@ import {
             if (timePart && timePart.includes(':')) {
               const [hours, minutes] = timePart.split(':').map(Number)
               const roundedTime = roundTime(hours || 0, minutes || 0, selectedPeriod)
+              if (selectedPeriod === '1d') {
+                return `${String(roundedTime.h).padStart(2, '0')}:00`
+              }
               return `${String(roundedTime.h).padStart(2, '0')}:${String(roundedTime.m).padStart(2, '0')}`
             }
           }
@@ -798,7 +798,7 @@ import {
                   interval={getXAxisInterval()}
                   angle={0}
                   tick={renderCustomTick}
-                  minTickGap={selectedPeriod === '1d' ? 12 : selectedPeriod === '30d' || selectedPeriod === '1y' ? 8 : 6}
+                  minTickGap={selectedPeriod === '1d' ? 8 : selectedPeriod === '30d' || selectedPeriod === '1y' ? 8 : 6}
                 />
                 <YAxis 
                   yAxisId="price"
