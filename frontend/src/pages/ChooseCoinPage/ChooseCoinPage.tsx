@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom'
 import { ROUTES_NAME } from '../../constants/routes'
 import { apiService, type CoinListItem } from '../../services/api'
 import { useTelegramBackButton } from '@hooks'
+import { getPriceDecimals } from '@utils'
 
 import styles from './ChooseCoinPage.module.scss'
 
@@ -41,28 +42,9 @@ export const ChooseCoinPage = () => {
     fetchCoins()
   }, [])
 
-  // Определяем количество знаков после запятой на основе цены
-  // Используем кэшированное значение из API, если есть, иначе вычисляем локально
-  const getPriceDecimals = (price: number, coin?: CoinListItem): number => {
-    // Если есть кэшированное значение из API, используем его
-    if (coin?.priceDecimals !== undefined) {
-      return coin.priceDecimals
-    }
-    // Иначе вычисляем локально
-    if (price >= 1) return 2
-    if (price >= 0.1) return 3
-    if (price >= 0.01) return 4
-    if (price >= 0.001) return 5
-    if (price >= 0.0001) return 6
-    if (price >= 0.00001) return 7
-    if (price >= 0.000001) return 8
-    if (price >= 0.0000001) return 9
-    return 10
-  }
-
   // Format price with spaces for thousands and comma for decimals
   const formatPrice = (price: number, coin?: CoinListItem) => {
-    const decimals = getPriceDecimals(price, coin)
+    const decimals = getPriceDecimals(price, coin?.priceDecimals)
     // Форматируем с точками для тысяч и запятой для десятичных (например: 89.357,00)
     const parts = price.toFixed(decimals).split('.')
     const integerPart = parts[0]

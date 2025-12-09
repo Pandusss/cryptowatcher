@@ -61,7 +61,6 @@ export const DndSettingsPage = () => {
   }
 
   const handleSave = async () => {
-    console.log('handleSave called') // Debug
     
     const userId = getTelegramUserId()
     if (!userId) {
@@ -73,7 +72,6 @@ export const DndSettingsPage = () => {
     const dndStartTime = isDndEnabled ? startTime : null
     const dndEndTime = isDndEnabled ? endTime : null
 
-    console.log('Saving DND settings:', { userId, dndStartTime, dndEndTime, isDndEnabled }) // Debug
     setIsSaving(true)
     try {
       // Сохраняем настройки через API
@@ -82,7 +80,6 @@ export const DndSettingsPage = () => {
         dnd_end_time: dndEndTime,
       })
 
-      console.log('DND settings saved successfully:', result) // Debug
 
       // Возвращаемся назад с данными
       navigate(ROUTES_NAME.MAIN, {

@@ -4,6 +4,10 @@
 import asyncio
 from app.services.coingecko import CoinGeckoService
 
+# Константы
+UPDATE_INTERVAL_SECONDS = 3600  # 1 час
+ERROR_RETRY_DELAY_SECONDS = 60  # 1 минута
+
 
 class CoinsCacheUpdater:
     """Класс для управления фоновым обновлением кэша монет"""
@@ -33,8 +37,8 @@ class CoinsCacheUpdater:
         """Цикл периодического обновления кэша"""
         while self._running:
             try:
-                # Ждем 1 час (3600 секунд) перед следующим обновлением
-                await asyncio.sleep(3600)
+                # Ждем 1 час перед следующим обновлением
+                await asyncio.sleep(UPDATE_INTERVAL_SECONDS)
                 
                 if self._running:
                     print("[CoinsCacheUpdater] Начинаем плановое обновление кэша...")
@@ -47,7 +51,7 @@ class CoinsCacheUpdater:
             except Exception as e:
                 print(f"[CoinsCacheUpdater] Ошибка в цикле обновления: {e}")
                 # Продолжаем работу даже при ошибке
-                await asyncio.sleep(60)  # Ждем 1 минуту перед повтором при ошибке
+                await asyncio.sleep(ERROR_RETRY_DELAY_SECONDS)
     
     def stop(self):
         """Остановить фоновую задачу"""

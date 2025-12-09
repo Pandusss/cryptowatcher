@@ -1,15 +1,27 @@
 import httpx
 import json
-import os
 from pathlib import Path
 from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime
 from app.core.config import settings
 from app.core.redis_client import get_redis
 
 
 class CoinGeckoService:
+    """Сервис для работы с CoinGecko API"""
+    
     BASE_URL = "https://api.coingecko.com/api/v3"
+    
+    # Константы для кэширования
+    CACHE_TTL_TOP3000 = 3600  # 1 час в секундах
+    CACHE_TTL_COIN_DATA = 3600  # 1 час в секундах
+    CACHE_TTL_IMAGE_URL = 604800  # 7 дней в секундах
+    CACHE_TTL_PRICE_DECIMALS = 86400  # 1 день в секундах
+    CACHE_TTL_CHART = 60  # 1 минута в секундах
+    
+    # Константы для пагинации
+    PER_PAGE_MAX = 250  # Максимум монет на страницу
+    TOP_COINS_PAGES = 12  # Количество страниц для топ-3000
     
     @staticmethod
     def get_price_decimals(price: float) -> int:
@@ -187,8 +199,8 @@ class CoinGeckoService:
                 print("[refresh_top3000_cache] Redis недоступен, пропускаем обновление")
                 return
             
-            per_page = 250  # Максимум 250 на страницу
-            total_pages = 12  # 12 страниц * 250 = 3000 монет
+            per_page = self.PER_PAGE_MAX
+            total_pages = self.TOP_COINS_PAGES
             all_coins_list = []
             all_coins_dict = {}
             
@@ -222,11 +234,11 @@ class CoinGeckoService:
                     print(f"[refresh_top3000_cache] Ошибка при получении страницы {page_num}: {e}")
                     break
             
-            # Кэшируем топ-3000 на 1 час (3600 секунд)
+            # Кэшируем топ-3000 на 1 час
             if all_coins_list:
                 try:
                     top3000_cache_key = "coins_list:top3000"
-                    await redis.setex(top3000_cache_key, 3600, json.dumps(all_coins_list))
+                    await redis.setex(top3000_cache_key, self.CACHE_TTL_TOP3000, json.dumps(all_coins_list))
                     print(f"[refresh_top3000_cache] Топ-3000 монет успешно обновлены в кэше: {len(all_coins_list)} монет")
                 except Exception as e:
                     print(f"[refresh_top3000_cache] Ошибка при сохранении топ-3000 в кэш: {e}")
@@ -306,8 +318,8 @@ class CoinGeckoService:
             
             # Если кэша нет или требуется обновление, запрашиваем топ-3000 из API
             if not all_coins_dict:
-                per_page = 250  # Максимум 250 на страницу
-                total_pages = 12  # 12 страниц * 250 = 3000 монет
+                per_page = self.PER_PAGE_MAX
+                total_pages = self.TOP_COINS_PAGES
                 
                 print(f"[get_crypto_list] Получаем топ-3000 монет из CoinGecko API...")
                 all_coins_list = []  # Список для кэширования
@@ -344,10 +356,10 @@ class CoinGeckoService:
                 
                 print(f"[get_crypto_list] Всего получено {len(all_coins_dict)} уникальных монет из API")
                 
-                # Кэшируем топ-3000 на 1 час (3600 секунд)
+                # Кэшируем топ-3000 на 1 час
                 if redis and all_coins_list:
                     try:
-                        await redis.setex(top3000_cache_key, 3600, json.dumps(all_coins_list))
+                        await redis.setex(top3000_cache_key, self.CACHE_TTL_TOP3000, json.dumps(all_coins_list))
                         print(f"[get_crypto_list] Топ-3000 монет сохранены в кэш на 1 час")
                     except Exception as e:
                         print(f"[get_crypto_list] Ошибка при сохранении топ-3000 в кэш: {e}")
@@ -359,11 +371,11 @@ class CoinGeckoService:
                     formatted_coin = self._format_coin_data(coin_data, coin_id)
                     formatted_coins.append(formatted_coin)
                     
-                    # Кэшируем монету на 1 час (3600 секунд)
+                    # Кэшируем монету на 1 час
                     if redis:
                         try:
                             cache_key = f"coin_data:{coin_id}"
-                            await redis.setex(cache_key, 3600, json.dumps(formatted_coin))
+                            await redis.setex(cache_key, self.CACHE_TTL_COIN_DATA, json.dumps(formatted_coin))
                             
                             # Сохраняем иконку в долгосрочный кэш (7 дней)
                             image_url = formatted_coin.get("imageUrl", "")
@@ -371,13 +383,13 @@ class CoinGeckoService:
                                 image_cache_key = f"coin_image_url:{coin_id}"
                                 existing = await redis.get(image_cache_key)
                                 if not existing:
-                                    await redis.setex(image_cache_key, 604800, image_url)
+                                    await redis.setex(image_cache_key, self.CACHE_TTL_IMAGE_URL, image_url)
                             
                             # Сохраняем price_decimals в кэш на 1 день
                             price_decimals = formatted_coin.get("priceDecimals")
                             if price_decimals is not None:
                                 decimals_cache_key = f"coin_price_decimals:{coin_id}"
-                                await redis.setex(decimals_cache_key, 86400, str(price_decimals))
+                                await redis.setex(decimals_cache_key, self.CACHE_TTL_PRICE_DECIMALS, str(price_decimals))
                         except Exception as e:
                             print(f"[get_crypto_list] Ошибка при сохранении {coin_id} в кэш: {e}")
                 else:
@@ -448,7 +460,7 @@ class CoinGeckoService:
                 # Проверяем, есть ли уже в кэше (чтобы не перезаписывать)
                 existing = await redis.get(cache_key)
                 if not existing:
-                    await redis.setex(cache_key, 604800, image_url)  # 7 дней
+                    await redis.setex(cache_key, self.CACHE_TTL_IMAGE_URL, image_url)
                     print(f"[get_crypto_details] Иконка {coin_id} сохранена в долгосрочный кэш")
             except Exception as e:
                 print(f"[get_crypto_details] Ошибка сохранения иконки {coin_id} в кэш: {e}")
@@ -457,7 +469,7 @@ class CoinGeckoService:
         if redis:
             try:
                 cache_key = f"coin_price_decimals:{coin_id}"
-                await redis.setex(cache_key, 86400, str(price_decimals))  # 1 день = 86400 секунд
+                await redis.setex(cache_key, self.CACHE_TTL_PRICE_DECIMALS, str(price_decimals))
             except Exception as e:
                 print(f"[get_crypto_details] Ошибка сохранения price_decimals {coin_id} в кэш: {e}")
         
@@ -534,7 +546,7 @@ class CoinGeckoService:
                 if redis:
                     try:
                         cache_key = f"coin_image_url:{coin_id}"
-                        await redis.setex(cache_key, 604800, image_url)  # 7 дней
+                        await redis.setex(cache_key, self.CACHE_TTL_IMAGE_URL, image_url)
                         print(f"[get_coin_image_url] Иконка {coin_id} сохранена в кэш на 7 дней")
                     except Exception as e:
                         print(f"[get_coin_image_url] Ошибка записи в Redis: {e}")
@@ -700,7 +712,7 @@ class CoinGeckoService:
             try:
                 cache_key = f"coin_chart:{coin_id}:{period}"
                 import json
-                await redis.setex(cache_key, 60, json.dumps(chart_data))  # Кэш на 1 минуту
+                await redis.setex(cache_key, self.CACHE_TTL_CHART, json.dumps(chart_data))
             except Exception:
                 pass
         

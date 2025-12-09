@@ -14,7 +14,7 @@ import Lottie from 'lottie-react'
 
 import { ROUTES_NAME } from '../../constants/routes'
 import { apiService, type NotificationResponse } from '@services'
-import { getTelegramUserId } from '@utils'
+import { getTelegramUserId, getPriceDecimals } from '@utils'
 
 import styles from './MainPage.module.scss'
 
@@ -139,19 +139,6 @@ export const MainPage = () => {
       'Coinbase': 'coinbase',
     }
     return mapping[display] || 'coingecko'
-  }
-
-  // Определяем количество знаков после запятой на основе цены
-  const getPriceDecimals = (price: number): number => {
-    if (price >= 1) return 2
-    if (price >= 0.1) return 3
-    if (price >= 0.01) return 4
-    if (price >= 0.001) return 5
-    if (price >= 0.0001) return 6
-    if (price >= 0.00001) return 7
-    if (price >= 0.000001) return 8
-    if (price >= 0.0000001) return 9
-    return 10
   }
 
   // Форматируем описание уведомления для отображения

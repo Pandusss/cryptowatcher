@@ -30,7 +30,7 @@ import type {
   NotificationValueType,
 } from '@types'
 import { apiService, type ChartDataPoint } from '@services'
-import { getTelegramUserId } from '@utils'
+import { getTelegramUserId, getPriceDecimals } from '@utils'
 import { useTelegramBackButton } from '@hooks'
 
 import styles from './CreateNotificationPage.module.scss'
@@ -160,7 +160,6 @@ export const CreateNotificationPage = () => {
               priceDecimals = coin.priceDecimals
             }
           } else {
-            console.warn('[CreateNotificationPage] Failed to fetch coins list for imageUrl:', coinsListResult.reason)
           }
           
           // Обрабатываем результат деталей монеты
@@ -174,14 +173,7 @@ export const CreateNotificationPage = () => {
             if (priceDecimals === undefined && coinDetailsResult.value.priceDecimals !== undefined) {
               priceDecimals = coinDetailsResult.value.priceDecimals
             }
-            console.log('[CreateNotificationPage] Loaded coin details:', {
-              crypto_id: notification.crypto_id,
-              imageUrl,
-              currentPrice,
-              priceDecimals,
-            })
           } else {
-            console.warn('[CreateNotificationPage] Failed to fetch coin details, using saved price:', coinDetailsResult.status === 'rejected' ? coinDetailsResult.reason : 'null result')
             // Используем сохраненную цену если не удалось получить актуальную
           }
           
@@ -334,28 +326,9 @@ export const CreateNotificationPage = () => {
     }
   }
 
-  // Определяем количество знаков после запятой на основе цены
-  // Используем кэшированное значение из API, если есть, иначе вычисляем локально
-  const getPriceDecimals = (price: number): number => {
-    // Если есть кэшированное значение из API, используем его
-    if (crypto?.priceDecimals !== undefined) {
-      return crypto.priceDecimals
-    }
-    // Иначе вычисляем локально
-    if (price >= 1) return 2
-    if (price >= 0.1) return 3
-    if (price >= 0.01) return 4
-    if (price >= 0.001) return 5
-    if (price >= 0.0001) return 6
-    if (price >= 0.00001) return 7
-    if (price >= 0.000001) return 8
-    if (price >= 0.0000001) return 9
-    return 10
-  }
-
   // Format number with spaces for thousands and comma for decimals
   const formatPrice = (price: number) => {
-    const decimals = crypto ? getPriceDecimals(crypto.price) : 2
+    const decimals = crypto ? getPriceDecimals(crypto.price, crypto.priceDecimals) : 2
     // Форматируем с точками для тысяч и запятой для десятичных (например: 89.357,00)
     const parts = price.toFixed(decimals).split('.')
     const integerPart = parts[0]
@@ -368,7 +341,7 @@ export const CreateNotificationPage = () => {
   }
 
   const formatCalculatedValue = (val: number) => {
-    const decimals = crypto ? getPriceDecimals(crypto.price) : 2
+    const decimals = crypto ? getPriceDecimals(crypto.price, crypto.priceDecimals) : 2
     // Format: replace dot with comma, keep spaces for thousands
     return val.toLocaleString('ru-RU', {
       minimumFractionDigits: decimals,
@@ -639,7 +612,7 @@ export const CreateNotificationPage = () => {
 
   // Форматирование цены для Y оси (как в CoinDetailsPage)
   const formatPriceForYAxis = (value: number) => {
-    const decimals = crypto ? getPriceDecimals(crypto.price) : 2
+    const decimals = crypto ? getPriceDecimals(crypto.price, crypto.priceDecimals) : 2
     
     if (value >= 1000000) {
       const formatted = (value / 1000000).toFixed(1).replace('.', ',')
