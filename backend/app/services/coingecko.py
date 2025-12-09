@@ -178,6 +178,64 @@ class CoinGeckoService:
             },
         }
     
+    async def refresh_top3000_cache(self) -> None:
+        """Обновить кэш топ-3000 монет в фоновом режиме"""
+        print(f"[refresh_top3000_cache] Начинаем обновление кэша топ-3000 монет...")
+        try:
+            redis = await get_redis()
+            if not redis:
+                print("[refresh_top3000_cache] Redis недоступен, пропускаем обновление")
+                return
+            
+            per_page = 250  # Максимум 250 на страницу
+            total_pages = 12  # 12 страниц * 250 = 3000 монет
+            all_coins_list = []
+            all_coins_dict = {}
+            
+            for page_num in range(1, total_pages + 1):
+                try:
+                    data = await self._make_request(
+                        "/coins/markets",
+                        params={
+                            "vs_currency": "usd",
+                            "order": "market_cap_desc",
+                            "per_page": per_page,
+                            "page": page_num,
+                            "sparkline": False,
+                        },
+                    )
+                    
+                    # Добавляем монеты в словарь и список
+                    for coin_data in data:
+                        coin_id = coin_data.get("id", "")
+                        if coin_id:
+                            all_coins_dict[coin_id] = coin_data
+                            all_coins_list.append(coin_data)
+                    
+                    print(f"[refresh_top3000_cache] Получено {len(data)} монет со страницы {page_num}")
+                    
+                    # Если получили меньше монет, чем ожидалось, значит достигли конца списка
+                    if len(data) < per_page:
+                        break
+                        
+                except Exception as e:
+                    print(f"[refresh_top3000_cache] Ошибка при получении страницы {page_num}: {e}")
+                    break
+            
+            # Кэшируем топ-3000 на 1 час (3600 секунд)
+            if all_coins_list:
+                try:
+                    top3000_cache_key = "coins_list:top3000"
+                    await redis.setex(top3000_cache_key, 3600, json.dumps(all_coins_list))
+                    print(f"[refresh_top3000_cache] Топ-3000 монет успешно обновлены в кэше: {len(all_coins_list)} монет")
+                except Exception as e:
+                    print(f"[refresh_top3000_cache] Ошибка при сохранении топ-3000 в кэш: {e}")
+            else:
+                print("[refresh_top3000_cache] Не удалось получить данные для кэширования")
+                
+        except Exception as e:
+            print(f"[refresh_top3000_cache] Ошибка при обновлении кэша топ-3000: {e}")
+    
     async def get_crypto_list(
         self,
         limit: int = 100,

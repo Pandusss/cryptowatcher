@@ -6,6 +6,7 @@ from app.core.config import settings
 from app.api.v1.router import api_router
 from app.services.bot_polling import bot_polling
 from app.services.notification_checker import notification_checker
+from app.services.coins_cache_updater import coins_cache_updater
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -44,6 +45,9 @@ async def startup_event():
     
     # Запускаем проверку уведомлений
     asyncio.create_task(notification_checker.start())
+    
+    # Запускаем автоматическое обновление кэша топ-3000 монет каждые 1 час
+    asyncio.create_task(coins_cache_updater.start())
 
 
 @app.on_event("shutdown")
@@ -51,4 +55,5 @@ async def shutdown_event():
     """Остановка фоновых задач при выключении приложения"""
     bot_polling.stop()
     notification_checker.stop()
+    coins_cache_updater.stop()
 
