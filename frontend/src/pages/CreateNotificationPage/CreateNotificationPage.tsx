@@ -710,26 +710,33 @@ export const CreateNotificationPage = () => {
   const getXAxisTicks = () => {
     if (chartData.length === 0) return undefined
     
-    // Для 1D таймфрейма выбираем точки каждые 4 часа
+    // Для 1D таймфрейма показываем фиксированные временные метки каждые 3 часа
     if (selectedPeriod === '1d') {
-      const ticks: string[] = []
-      const fourHoursInMs = 4 * 60 * 60 * 1000 // 4 часа в миллисекундах
-      
       if (chartData.length === 0) return undefined
+      
+      const ticks: string[] = []
+      const threeHoursInMs = 3 * 60 * 60 * 1000 // 3 часа в миллисекундах
       
       const firstDate = new Date(chartData[0].date)
       const lastDate = new Date(chartData[chartData.length - 1].date)
+      const firstTime = firstDate.getTime()
+      const lastTime = lastDate.getTime()
       
-      // Округляем первую дату до ближайшего часа, кратного 4 (0, 4, 8, 12, 16, 20)
+      // Находим первый час, кратный 3, который >= первой даты
       const firstHour = firstDate.getHours()
-      const roundedFirstHour = Math.floor(firstHour / 4) * 4
-      const roundedFirstDate = new Date(firstDate)
-      roundedFirstDate.setHours(roundedFirstHour, 0, 0, 0)
+      const firstRoundedHour = Math.floor(firstHour / 3) * 3
+      const startTick = new Date(firstDate)
+      startTick.setHours(firstRoundedHour, 0, 0, 0)
       
-      // Находим ближайшую точку данных к округленной дате
-      let currentTick = roundedFirstDate.getTime()
+      // Если округленный час меньше текущего часа, добавляем 3 часа
+      if (startTick.getTime() < firstTime) {
+        startTick.setHours(startTick.getHours() + 3)
+      }
       
-      while (currentTick <= lastDate.getTime()) {
+      // Генерируем фиксированные временные метки каждые 3 часа
+      let currentTick = startTick.getTime()
+      
+      while (currentTick <= lastTime) {
         // Находим ближайшую точку данных к текущему тику
         let closestIndex = 0
         let minDiff = Math.abs(new Date(chartData[0].date).getTime() - currentTick)
@@ -742,46 +749,14 @@ export const CreateNotificationPage = () => {
           }
         }
         
-        // Добавляем тик, если он еще не добавлен и достаточно далеко от предыдущего
+        // Добавляем тик, если он еще не добавлен
         const tickDate = chartData[closestIndex].date
-        const tickTime = new Date(tickDate).getTime()
-        const twoHoursInMs = 2 * 60 * 60 * 1000 // 2 часа в миллисекундах
-        
         if (!ticks.includes(tickDate)) {
-          // Проверяем расстояние до последнего добавленного тика
-          if (ticks.length === 0) {
-            ticks.push(tickDate)
-          } else {
-            const lastTickTime = new Date(ticks[ticks.length - 1]).getTime()
-            const timeDiff = Math.abs(tickTime - lastTickTime)
-            
-            // Добавляем только если расстояние больше 2 часов
-            if (timeDiff > twoHoursInMs) {
-              ticks.push(tickDate)
-            }
-          }
+          ticks.push(tickDate)
         }
         
-        // Переходим к следующему 4-часовому интервалу
-        currentTick += fourHoursInMs
-      }
-      
-      // Добавляем последнюю точку только если она достаточно далеко от последнего тика
-      const lastTick = chartData[chartData.length - 1].date
-      const lastTickTime = new Date(lastTick).getTime()
-      
-      if (ticks.length > 0) {
-        const lastAddedTickTime = new Date(ticks[ticks.length - 1]).getTime()
-        const timeDiff = Math.abs(lastTickTime - lastAddedTickTime)
-        const twoHoursInMs = 2 * 60 * 60 * 1000 // 2 часа в миллисекундах
-        
-        // Добавляем последнюю точку только если она достаточно далеко от последнего тика
-        if (!ticks.includes(lastTick) && timeDiff > twoHoursInMs) {
-          ticks.push(lastTick)
-        }
-      } else {
-        // Если тиков нет, добавляем последнюю точку
-        ticks.push(lastTick)
+        // Переходим к следующему 3-часовому интервалу
+        currentTick += threeHoursInMs
       }
       
       return ticks.length > 0 ? ticks : undefined
@@ -822,15 +797,26 @@ export const CreateNotificationPage = () => {
   const renderCustomTick = (props: any) => {
     const { x, y, payload } = props
     
-    // Для 1D таймфрейма показываем время (HH:MM)
+    // Для 1D таймфрейма показываем фиксированное время (HH:00)
     if (selectedPeriod === '1d') {
       try {
         const date = new Date(payload.value)
         const hours = date.getHours()
         const minutes = date.getMinutes()
         
-        // Округляем до ближайшего часа, кратного 4 (0, 4, 8, 12, 16, 20)
-        const roundedHour = Math.floor(hours / 4) * 4
+        // Вычисляем фиксированное время метки: округляем до ближайшего часа, кратного 3
+        // Если текущее время 17:00, показываем 15:00 (округляем вниз)
+        // Если текущее время 18:30, показываем 18:00 (округляем вверх)
+        let roundedHour = Math.floor(hours / 3) * 3
+        
+        // Если мы прошли больше половины интервала (>= 1.5 часа), показываем следующий час
+        const remainder = hours % 3
+        if (remainder >= 2 || (remainder === 1 && minutes >= 30)) {
+          roundedHour = (Math.floor(hours / 3) + 1) * 3
+        }
+        
+        // Обрабатываем переход через полночь
+        roundedHour = roundedHour % 24
         
         return (
           <g transform={`translate(${x},${y})`}>

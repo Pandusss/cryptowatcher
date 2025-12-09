@@ -24,104 +24,6 @@ import {
   
   import styles from './CoinDetailsPage.module.scss'
   
-  // Генерируем даты для текущего дня
-  const getTodayDate = () => {
-    const today = new Date()
-    return today.toISOString().split('T')[0] // YYYY-MM-DD
-  }
-
-  // Mock data for chart - более детальные данные для плавного графика с объемом
-  const MOCK_CHART_DATA = {
-    '1d': (() => {
-      const today = getTodayDate()
-      return [
-        { date: `${today} 00:00`, price: 11270, volume: 45000000000 },
-        { date: `${today} 01:00`, price: 11272, volume: 43000000000 },
-        { date: `${today} 02:00`, price: 11275, volume: 42000000000 },
-        { date: `${today} 03:00`, price: 11273, volume: 44000000000 },
-        { date: `${today} 04:00`, price: 11280, volume: 48000000000 },
-        { date: `${today} 05:00`, price: 11278, volume: 46000000000 },
-        { date: `${today} 06:00`, price: 11272, volume: 44000000000 },
-        { date: `${today} 07:00`, price: 11274, volume: 45000000000 },
-        { date: `${today} 08:00`, price: 11278, volume: 46000000000 },
-        { date: `${today} 09:00`, price: 11280, volume: 47000000000 },
-        { date: `${today} 10:00`, price: 11285, volume: 50000000000 },
-        { date: `${today} 11:00`, price: 11283, volume: 48000000000 },
-        { date: `${today} 12:00`, price: 11282, volume: 47000000000 },
-        { date: `${today} 13:00`, price: 11284, volume: 47500000000 },
-        { date: `${today} 14:00`, price: 11288, volume: 49000000000 },
-        { date: `${today} 15:00`, price: 11287, volume: 48500000000 },
-        { date: `${today} 16:00`, price: 11290, volume: 51000000000 },
-        { date: `${today} 17:00`, price: 11289, volume: 49500000000 },
-        { date: `${today} 18:00`, price: 11287, volume: 48000000000 },
-        { date: `${today} 19:00`, price: 11289, volume: 49000000000 },
-        { date: `${today} 20:00`, price: 11292, volume: 52000000000 },
-        { date: `${today} 21:00`, price: 11293, volume: 51000000000 },
-        { date: `${today} 22:00`, price: 11295, volume: 50000000000 },
-        { date: `${today} 23:00`, price: 11297, volume: 49500000000 },
-        { date: `${today} 23:59`, price: 11298, volume: 49000000000 },
-      ]
-    })(),
-    '7d': (() => {
-      const dates: string[] = []
-      const today = new Date()
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date(today)
-        date.setDate(date.getDate() - i)
-        const dateStr = date.toISOString().split('T')[0]
-        dates.push(`${dateStr} 00:00`, `${dateStr} 04:00`, `${dateStr} 08:00`, `${dateStr} 12:00`, `${dateStr} 16:00`, `${dateStr} 20:00`)
-      }
-      const prices = [11250, 11252, 11254, 11255, 11257, 11259, 11260, 11259, 11258, 11258, 11257, 11256, 11255, 11256, 11257, 11257, 11258, 11259, 11270, 11271, 11272, 11272, 11273, 11274, 11275, 11276, 11277, 11277, 11278, 11279, 11280, 11281, 11282, 11282, 11283, 11284, 11290, 11291, 11292, 11292, 11293, 11294]
-      const volumes = [45000000000, 45200000000, 45400000000, 46000000000, 45800000000, 46200000000, 46000000000, 45900000000, 45800000000, 45500000000, 45600000000, 45700000000, 44000000000, 44200000000, 44400000000, 44500000000, 44600000000, 44700000000, 48000000000, 48200000000, 48400000000, 48500000000, 48600000000, 48700000000, 47000000000, 47200000000, 47400000000, 47500000000, 47600000000, 47700000000, 49000000000, 49200000000, 49400000000, 49500000000, 49600000000, 49700000000, 50000000000, 50200000000, 50400000000, 50500000000, 50600000000, 50700000000]
-      return dates.map((date, index) => ({
-        date,
-        price: prices[index] || 11250,
-        volume: volumes[index] || 45000000000,
-      }))
-    })(),
-    '30d': (() => {
-      const dates: string[] = []
-      const today = new Date()
-      for (let i = 29; i >= 0; i--) {
-        const date = new Date(today)
-        date.setDate(date.getDate() - i)
-        const dateStr = date.toISOString().split('T')[0]
-        dates.push(`${dateStr} 00:00`)
-      }
-      const prices = [11200, 11205, 11210, 11208, 11212, 11215, 11218, 11220, 11222, 11225, 11228, 11230, 11232, 11235, 11238, 11240, 11242, 11245, 11248, 11250, 11252, 11255, 11258, 11260, 11262, 11265, 11268, 11270, 11272, 11275]
-      const volumes = [45000000000, 45200000000, 45400000000, 45300000000, 45600000000, 45800000000, 46000000000, 46000000000, 46200000000, 46400000000, 46600000000, 46800000000, 47000000000, 47200000000, 47400000000, 47600000000, 47800000000, 48000000000, 48200000000, 48400000000, 48600000000, 48800000000, 49000000000, 49200000000, 49400000000, 49600000000, 49800000000, 50000000000, 50200000000, 50400000000]
-      return dates.map((date, index) => ({
-        date,
-        price: prices[index] || 11200,
-        volume: volumes[index] || 45000000000,
-      }))
-    })(),
-    '1y': (() => {
-      const dates: string[] = []
-      const today = new Date()
-      const currentYear = today.getFullYear()
-      
-      // Генерируем даты каждые пол месяца за последний год
-      for (let month = 0; month < 12; month++) {
-        const date1 = new Date(currentYear, month, 1)
-        const date2 = new Date(currentYear, month, 15)
-        dates.push(
-          `${date1.toISOString().split('T')[0]} 00:00`,
-          `${date2.toISOString().split('T')[0]} 00:00`
-        )
-      }
-      
-      const prices = [11000, 11025, 11050, 11075, 11100, 11090, 11080, 11100, 11120, 11135, 11150, 11165, 11180, 11190, 11200, 11210, 11220, 11230, 11240, 11250, 11260, 11270, 11280, 11290]
-      const volumes = [40000000000, 40500000000, 41000000000, 41250000000, 42000000000, 41750000000, 41500000000, 42000000000, 42500000000, 42750000000, 43000000000, 43250000000, 43500000000, 43750000000, 44000000000, 44250000000, 44500000000, 44750000000, 45000000000, 45250000000, 45500000000, 45750000000, 46000000000, 46250000000]
-      
-      return dates.map((date, index) => ({
-        date,
-        price: prices[index] || 11000,
-        volume: volumes[index] || 40000000000,
-      }))
-    })(),
-  }
-  
   const PERIOD_OPTIONS = [
     { label: '1D', value: '1d' },
     { label: '7D', value: '7d' },
@@ -177,13 +79,6 @@ import {
             }
           } catch (error) {
             console.error('Failed to fetch coin details:', error)
-            // Fallback to mock data
-            setCoin({
-              id: id,
-              symbol: 'BTC',
-              name: 'Bitcoin',
-              currentPrice: 11273540.23,
-            })
           }
         }
       }
@@ -199,29 +94,13 @@ import {
             const apiData = await apiService.getCoinChart(coin.id, selectedPeriod)
             
             if (apiData && apiData.length > 0) {
-              // Если API вернул данные, используем их
               setChartData(apiData)
             } else {
-              // Если API не вернул данные (CoinMarketCap бесплатный план не предоставляет историю),
-              // используем mock данные, масштабированные относительно текущей цены
-              const baseData = MOCK_CHART_DATA[selectedPeriod as keyof typeof MOCK_CHART_DATA] || []
-              const scaledData = baseData.map((item) => ({
-                ...item,
-                price: (item.price / 11290) * coin.currentPrice,
-                volume: item.volume || 0,
-              }))
-              setChartData(scaledData)
+              setChartData([])
             }
           } catch (error) {
             console.error('Error fetching chart data:', error)
-            // В случае ошибки используем mock данные
-            const baseData = MOCK_CHART_DATA[selectedPeriod as keyof typeof MOCK_CHART_DATA] || []
-            const scaledData = baseData.map((item) => ({
-              ...item,
-              price: (item.price / 11290) * coin.currentPrice,
-              volume: item.volume || 0,
-            }))
-            setChartData(scaledData)
+            setChartData([])
           }
         }
         
@@ -277,7 +156,7 @@ import {
     }
   
     const currentPrice = coin ? `$${formatPrice(coin.currentPrice)}` : '-'
-    const priceChange = coin?.priceChangePercent24h ?? 5.23 // Mock value if not available
+    const priceChange = coin?.priceChangePercent24h ?? 0
     const isPriceRising = priceChange >= 0
     
     // Определяем цвет графика на основе тренда (сравниваем первую и последнюю цену)
@@ -535,26 +414,33 @@ import {
     const getXAxisTicks = () => {
       if (chartData.length === 0) return undefined
       
-      // Для 1D таймфрейма выбираем точки каждые 4 часа
+      // Для 1D таймфрейма показываем фиксированные временные метки каждые 3 часа
       if (selectedPeriod === '1d') {
-        const ticks: string[] = []
-        const fourHoursInMs = 4 * 60 * 60 * 1000 // 4 часа в миллисекундах
-        
         if (chartData.length === 0) return undefined
+        
+        const ticks: string[] = []
+        const threeHoursInMs = 3 * 60 * 60 * 1000 // 3 часа в миллисекундах
         
         const firstDate = new Date(chartData[0].date)
         const lastDate = new Date(chartData[chartData.length - 1].date)
+        const firstTime = firstDate.getTime()
+        const lastTime = lastDate.getTime()
         
-        // Округляем первую дату до ближайшего часа, кратного 4 (0, 4, 8, 12, 16, 20)
+        // Находим первый час, кратный 3, который >= первой даты
         const firstHour = firstDate.getHours()
-        const roundedFirstHour = Math.floor(firstHour / 4) * 4
-        const roundedFirstDate = new Date(firstDate)
-        roundedFirstDate.setHours(roundedFirstHour, 0, 0, 0)
+        const firstRoundedHour = Math.floor(firstHour / 3) * 3
+        const startTick = new Date(firstDate)
+        startTick.setHours(firstRoundedHour, 0, 0, 0)
         
-        // Находим ближайшую точку данных к округленной дате
-        let currentTick = roundedFirstDate.getTime()
+        // Если округленный час меньше текущего часа, добавляем 3 часа
+        if (startTick.getTime() < firstTime) {
+          startTick.setHours(startTick.getHours() + 3)
+        }
         
-        while (currentTick <= lastDate.getTime()) {
+        // Генерируем фиксированные временные метки каждые 3 часа
+        let currentTick = startTick.getTime()
+        
+        while (currentTick <= lastTime) {
           // Находим ближайшую точку данных к текущему тику
           let closestIndex = 0
           let minDiff = Math.abs(new Date(chartData[0].date).getTime() - currentTick)
@@ -567,46 +453,14 @@ import {
             }
           }
           
-          // Добавляем тик, если он еще не добавлен и достаточно далеко от предыдущего
+          // Добавляем тик, если он еще не добавлен
           const tickDate = chartData[closestIndex].date
-          const tickTime = new Date(tickDate).getTime()
-          const twoHoursInMs = 2 * 60 * 60 * 1000 // 2 часа в миллисекундах
-          
           if (!ticks.includes(tickDate)) {
-            // Проверяем расстояние до последнего добавленного тика
-            if (ticks.length === 0) {
-              ticks.push(tickDate)
-            } else {
-              const lastTickTime = new Date(ticks[ticks.length - 1]).getTime()
-              const timeDiff = Math.abs(tickTime - lastTickTime)
-              
-              // Добавляем только если расстояние больше 2 часов
-              if (timeDiff > twoHoursInMs) {
-                ticks.push(tickDate)
-              }
-            }
+            ticks.push(tickDate)
           }
           
-          // Переходим к следующему 4-часовому интервалу
-          currentTick += fourHoursInMs
-        }
-        
-        // Добавляем последнюю точку только если она достаточно далеко от последнего тика
-        const lastTick = chartData[chartData.length - 1].date
-        const lastTickTime = new Date(lastTick).getTime()
-        
-        if (ticks.length > 0) {
-          const lastAddedTickTime = new Date(ticks[ticks.length - 1]).getTime()
-          const timeDiff = Math.abs(lastTickTime - lastAddedTickTime)
-          const twoHoursInMs = 2 * 60 * 60 * 1000 // 2 часа в миллисекундах
-          
-          // Добавляем последнюю точку только если она достаточно далеко от последнего тика
-          if (!ticks.includes(lastTick) && timeDiff > twoHoursInMs) {
-            ticks.push(lastTick)
-          }
-        } else {
-          // Если тиков нет, добавляем последнюю точку
-          ticks.push(lastTick)
+          // Переходим к следующему 3-часовому интервалу
+          currentTick += threeHoursInMs
         }
         
         return ticks.length > 0 ? ticks : undefined
@@ -746,8 +600,20 @@ import {
         
         switch (selectedPeriod) {
           case '1d':
-            // Показываем только время (HH:00) - округленное до часа, кратного 4 (0, 4, 8, 12, 16, 20)
-            const roundedHour = Math.floor(roundedTime.h / 4) * 4
+            // Показываем фиксированное время (HH:00) - округленное до часа, кратного 3 (0, 3, 6, 9, 12, 15, 18, 21)
+            // Если текущее время 17:00, показываем 15:00 (округляем вниз)
+            // Если текущее время 18:30, показываем 18:00 (округляем вверх)
+            let roundedHour = Math.floor(roundedTime.h / 3) * 3
+            
+            // Если мы прошли больше половины интервала (>= 1.5 часа), показываем следующий час
+            const remainder = roundedTime.h % 3
+            if (remainder >= 2 || (remainder === 1 && roundedTime.m >= 30)) {
+              roundedHour = (Math.floor(roundedTime.h / 3) + 1) * 3
+            }
+            
+            // Обрабатываем переход через полночь
+            roundedHour = roundedHour % 24
+            
             return `${String(roundedHour).padStart(2, '0')}:00`
           case '7d':
             // Показываем только месяц и день (MMM DD) - короткий формат

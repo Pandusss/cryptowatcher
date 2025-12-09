@@ -533,7 +533,7 @@ class CoinGeckoService:
         except Exception as e:
             print(f"[get_crypto_chart] Ошибка при получении исторических данных: {str(e)}")
             print(f"[get_crypto_chart] Тип ошибки: {type(e).__name__}")
-            chart_data = []  # Возвращаем пустой список, фронтенд использует mock данные
+            chart_data = []
         
         # Кэшируем результат на 1 минуту (если Redis доступен)
         if redis and chart_data:
@@ -545,7 +545,7 @@ class CoinGeckoService:
                 pass
         
         if not chart_data:
-            print(f"[get_crypto_chart] Исторические данные недоступны. Фронтенд будет использовать mock данные.")
+            print(f"[get_crypto_chart] Исторические данные недоступны.")
         
         return chart_data
 
