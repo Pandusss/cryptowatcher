@@ -81,7 +81,8 @@ class NotificationChecker:
     
     async def _get_crypto_price(self, crypto_id: str) -> Optional[float]:
         """
-        Получить текущую цену криптовалюты с использованием Redis кэша
+        Получить текущую цену криптовалюты ИЗ КЭША Redis (coin_price:{crypto_id})
+        Цены обновляются каждые 10 секунд в фоновом режиме
         
         Args:
             crypto_id: ID криптовалюты
@@ -90,43 +91,30 @@ class NotificationChecker:
             Текущая цена или None если не удалось получить
         """
         redis = await get_redis()
-        cache_key = f"crypto_price:{crypto_id}"
         
-        # Пытаемся получить цену из кэша
+        # ВСЕГДА берем цену из кэша Redis (coin_price:{crypto_id})
         if redis:
             try:
-                cached_price = await redis.get(cache_key)
-                if cached_price:
-                    price = float(cached_price)
-                    print(f"[NotificationChecker] Цена {crypto_id} из кэша: ${price}")
-                    return price
+                price_cache_key = f"coin_price:{crypto_id}"
+                cached_price_data = await redis.get(price_cache_key)
+                if cached_price_data:
+                    import json
+                    price_data = json.loads(cached_price_data)
+                    price = price_data.get("price", 0)
+                    if price > 0:
+                        print(f"[NotificationChecker] ✅ Цена {crypto_id} из кэша Redis: ${price}")
+                        return price
+                    else:
+                        print(f"[NotificationChecker] ⚠️ Цена {crypto_id} в кэше равна 0")
+                        return None
+                else:
+                    print(f"[NotificationChecker] ⚠️ Цена {crypto_id} не найдена в кэше Redis")
+                    return None
             except Exception as e:
-                print(f"[NotificationChecker] Ошибка чтения из Redis кэша: {e}")
-        
-        # Если в кэше нет, запрашиваем у API
-        try:
-            coin_details = await self.coingecko_service.get_crypto_details(crypto_id)
-            
-            if not coin_details or not coin_details.get("currentPrice"):
-                print(f"[NotificationChecker] Не удалось получить цену для {crypto_id}")
+                print(f"[NotificationChecker] Ошибка чтения цены из Redis кэша: {e}")
                 return None
-            
-            current_price = coin_details["currentPrice"]
-            
-            # Сохраняем в кэш
-            if redis:
-                try:
-                    await redis.setex(cache_key, self.price_cache_ttl, str(current_price))
-                    print(f"[NotificationChecker] Цена {crypto_id} сохранена в кэш: ${current_price}")
-                except Exception as e:
-                    print(f"[NotificationChecker] Ошибка записи в Redis кэш: {e}")
-            
-            return current_price
-        
-        except Exception as e:
-            import traceback
-            print(f"[NotificationChecker] Ошибка при получении цены для {crypto_id}: {str(e)}")
-            print(f"[NotificationChecker] Traceback: {traceback.format_exc()}")
+        else:
+            print(f"[NotificationChecker] ⚠️ Redis недоступен, не можем получить цену {crypto_id}")
             return None
     
     async def _check_and_process_notification(
