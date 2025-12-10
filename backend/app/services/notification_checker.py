@@ -170,15 +170,17 @@ class NotificationChecker:
                     value_type=notification.value_type.value,
                 )
                 
+                # Помечаем уведомление как сработавшее и деактивируем в любом случае
+                # (чтобы не спамить, если пользователь не запустил бота или заблокировал его)
+                notification.triggered_at = datetime.utcnow()
+                notification.is_active = False  # Деактивируем после срабатывания
+                db.commit()
+                
                 if success:
-                    # Помечаем уведомление как сработавшее
-                    notification.triggered_at = datetime.utcnow()
-                    notification.is_active = False  # Деактивируем после срабатывания
-                    db.commit()
                     print(f"[NotificationChecker] Уведомление {notification.id} отправлено и деактивировано")
                     return True
                 else:
-                    print(f"[NotificationChecker] Ошибка отправки уведомления {notification.id}")
+                    print(f"[NotificationChecker] ⚠️ Уведомление {notification.id} деактивировано, но отправка не удалась (возможно, пользователь не запустил бота)")
                     return False
             
             return False

@@ -7,7 +7,7 @@ import {
   PageLayout,
   Text,
 } from '@components'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { ROUTES_NAME } from '../../constants/routes'
@@ -22,19 +22,29 @@ export const ChooseCoinPage = () => {
   const [coins, setCoins] = useState<CoinListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const hasFetchedRef = useRef(false)
 
   // Управление кнопкой "Назад" в Telegram Mini App
   useTelegramBackButton()
 
   useEffect(() => {
+    // Защита от повторных запросов в StrictMode
+    if (hasFetchedRef.current) {
+      return
+    }
+    hasFetchedRef.current = true
+
     const fetchCoins = async () => {
       try {
         setLoading(true)
-        const coinsList = await apiService.getCoinsList(100, 1)
-        setCoins(coinsList)
+        
+        // Загружаем все данные из кэша (статика + цены) - быстро
+        // Цены обновляются каждые 10 секунд в фоновом режиме, поэтому всегда актуальны
+        const coins = await apiService.getCoinsListStatic(100, 1)
+        setCoins(coins)
+        setLoading(false) // Показываем список сразу
       } catch (error) {
         console.error('Failed to fetch coins:', error)
-      } finally {
         setLoading(false)
       }
     }
@@ -180,7 +190,10 @@ export const ChooseCoinPage = () => {
                 description={coin.symbol}
                 after={
                   <Text type="text" color="secondary">
-                    ${formatPrice(coin.quote.USD.price, coin)}
+                    {coin.quote.USD.price > 0 
+                      ? `$${formatPrice(coin.quote.USD.price, coin)}`
+                      : '...'
+                    }
                   </Text>
                 }
                 chevron

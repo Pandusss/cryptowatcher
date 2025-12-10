@@ -170,6 +170,37 @@ class ApiService {
     }
   }
 
+  async getCoinsListStatic(limit: number = 100, start: number = 1): Promise<CoinListItem[]> {
+    try {
+      const response = await this.fetch<CoinsListResponse>(
+        `/api/v1/coins/list/static?limit=${limit}&start=${start}`
+      )
+      return response.data || []
+    } catch (error) {
+      console.error('Failed to fetch coins list static:', error)
+      return []
+    }
+  }
+
+  async getCoinsListPrices(coinIds: string[]): Promise<Record<string, { price: number; percent_change_24h: number; volume_24h: number; priceDecimals: number }>> {
+    try {
+      const response = await this.fetch<{ data: Record<string, { price: number; percent_change_24h: number; volume_24h: number; priceDecimals: number }> }>(
+        `/api/v1/coins/list/prices`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(coinIds),
+        }
+      )
+      return response.data || {}
+    } catch (error) {
+      console.error('Failed to fetch coins prices:', error)
+      return {}
+    }
+  }
+
   // Notifications API
   async getNotifications(userId: number): Promise<NotificationResponse[]> {
     try {

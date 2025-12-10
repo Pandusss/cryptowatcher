@@ -5,7 +5,7 @@ import {
   PageLayout,
   Text,
 } from '@components'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   Area,
@@ -88,26 +88,107 @@ export const CoinDetailsPage = () => {
   }, [location.state, id])
 
   useEffect(() => {
-    if (coin && coin.id) {
-      const fetchChartData = async () => {
-        try {
-          // Пытаемся получить данные из API
-          const apiData = await apiService.getCoinChart(coin.id, selectedPeriod)
-          
-          if (apiData && apiData.length > 0) {
-            setChartData(apiData)
-          } else {
-            setChartData([])
-          }
-        } catch (error) {
-          console.error('Error fetching chart data:', error)
+    if (!coin || !coin.id) {
+      console.log('[CoinDetailsPage] Монета не загружена, пропускаем инициализацию')
+      return
+    }
+
+    const coinId = coin.id // Сохраняем ID в локальную переменную для использования в замыкании
+
+    // Полная загрузка графика (при первой загрузке или смене периода)
+    const fetchChartData = async () => {
+      try {
+        console.log(`[CoinDetailsPage] Загрузка полного графика для ${coinId}, период: ${selectedPeriod}`)
+        const apiData = await apiService.getCoinChart(coinId, selectedPeriod)
+        
+        if (apiData && apiData.length > 0) {
+          console.log(`[CoinDetailsPage] Загружено ${apiData.length} точек графика`)
+          setChartData(apiData)
+        } else {
+          console.warn('[CoinDetailsPage] График пуст')
           setChartData([])
         }
+      } catch (error) {
+        console.error('[CoinDetailsPage] Ошибка загрузки графика:', error)
+        setChartData([])
       }
-      
-      fetchChartData()
     }
-  }, [coin, selectedPeriod])
+
+    // Обновление только последней точки графика и текущей цены
+    const updateLastPoint = async () => {
+      try {
+        console.log(`[CoinDetailsPage] Обновление последней точки для ${coinId}...`)
+        
+        // Получаем текущую цену монеты
+        const coinDetails = await apiService.getCoinDetails(coinId)
+        if (coinDetails && coinDetails.currentPrice) {
+          const newPrice = coinDetails.currentPrice
+          console.log(`[CoinDetailsPage] Получена новая цена: $${newPrice}`)
+          
+          // Обновляем текущую цену монеты
+          setCoin(prevCoin => {
+            if (!prevCoin || prevCoin.id !== coinId) {
+              console.warn(`[CoinDetailsPage] Пропуск обновления: prevCoin=${!!prevCoin}, id совпадает=${prevCoin?.id === coinId}`)
+              return prevCoin
+            }
+            const updatedCoin = {
+              ...prevCoin,
+              currentPrice: newPrice,
+              priceChange24h: coinDetails.priceChange24h,
+              priceChangePercent24h: coinDetails.priceChangePercent24h,
+              priceDecimals: coinDetails.priceDecimals || prevCoin.priceDecimals,
+            }
+            console.log(`[CoinDetailsPage] ✅ Обновлена цена монеты: $${prevCoin.currentPrice} → $${newPrice}`)
+            return updatedCoin
+          })
+
+          // Обновляем только последнюю точку графика
+          setChartData(prevData => {
+            if (prevData.length === 0) {
+              console.log('[CoinDetailsPage] Нет данных графика для обновления, загружаем полный график...')
+              // Если данных нет, загружаем полный график
+              fetchChartData()
+              return prevData
+            }
+            
+            const updatedData = [...prevData]
+            const lastIndex = updatedData.length - 1
+            const now = new Date().toISOString()
+            
+            // Обновляем последнюю точку: цену, дату и объем (если есть)
+            updatedData[lastIndex] = {
+              ...updatedData[lastIndex],
+              price: newPrice,
+              date: now,
+              // Объем оставляем как есть, так как его нельзя получить из getCoinDetails
+            }
+            
+            console.log(`[CoinDetailsPage] ✅ Обновлена последняя точка графика: цена $${newPrice}`)
+            return updatedData
+          })
+        } else {
+          console.warn(`[CoinDetailsPage] Не удалось получить данные монеты ${coinId}`)
+        }
+      } catch (error) {
+        console.error('[CoinDetailsPage] Ошибка обновления последней точки:', error)
+      }
+    }
+
+    // Загружаем полный график сразу
+    fetchChartData()
+
+    // Обновляем последнюю точку каждые 10 секунд
+    console.log(`[CoinDetailsPage] ✅ Запуск интервала обновления каждые 10 секунд для ${coinId}`)
+    const intervalId = setInterval(() => {
+      updateLastPoint()
+    }, 10000) // 10000 мс = 10 секунд
+
+    // Очищаем интервал при размонтировании или изменении зависимостей
+    return () => {
+      console.log(`[CoinDetailsPage] Очистка интервала обновления для ${coinId}`)
+      clearInterval(intervalId)
+    }
+  }, [coin?.id, selectedPeriod])
 
   const handleChooseCoin = () => {
     if (coin) {
@@ -137,7 +218,11 @@ export const CoinDetailsPage = () => {
     return `${formattedInteger},${decimalPart}`
   }
 
-  const currentPrice = coin ? `$${formatPrice(coin.currentPrice)}` : '-'
+  // Используем useMemo для пересчета при изменении coin.currentPrice
+  const currentPrice = useMemo(() => {
+    return coin ? `$${formatPrice(coin.currentPrice)}` : '-'
+  }, [coin?.currentPrice, coin?.priceDecimals])
+  
   const priceChange = coin?.priceChangePercent24h ?? 0
   const isPriceRising = priceChange >= 0
   

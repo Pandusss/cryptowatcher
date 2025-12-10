@@ -67,7 +67,24 @@ class TelegramService:
                     
         except httpx.HTTPStatusError as e:
             error_detail = f"HTTP {e.response.status_code}: {e.response.text}"
-            print(f"[TelegramService] Ошибка HTTP при отправке сообщения: {error_detail}")
+            
+            # Проверяем специфичные ошибки Telegram API
+            if e.response.status_code == 400:
+                try:
+                    error_data = e.response.json()
+                    error_code = error_data.get("error_code")
+                    description = error_data.get("description", "")
+                    
+                    if "chat not found" in description.lower():
+                        print(f"[TelegramService] ⚠️ Пользователь {chat_id} не найден (не запустил бота или заблокировал его)")
+                    elif error_code == 403:
+                        print(f"[TelegramService] ⚠️ Пользователь {chat_id} заблокировал бота")
+                    else:
+                        print(f"[TelegramService] Ошибка HTTP при отправке сообщения: {error_detail}")
+                except:
+                    print(f"[TelegramService] Ошибка HTTP при отправке сообщения: {error_detail}")
+            else:
+                print(f"[TelegramService] Ошибка HTTP при отправке сообщения: {error_detail}")
             return False
         except Exception as e:
             print(f"[TelegramService] Ошибка при отправке сообщения: {str(e)}")

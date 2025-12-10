@@ -14,14 +14,14 @@ class CoinGeckoService:
     
     # Константы для кэширования
     CACHE_TTL_TOP3000 = 3600  # 1 час в секундах
-    CACHE_TTL_COIN_DATA = 3600  # 1 час в секундах
+    CACHE_TTL_COIN_STATIC = 3600  # 1 час в секундах (статические данные: id, name, symbol, imageUrl)
+    CACHE_TTL_COIN_PRICE = 10  # 10 секунд (цены везде: список монет и детали монеты)
     CACHE_TTL_IMAGE_URL = 604800  # 7 дней в секундах
     CACHE_TTL_PRICE_DECIMALS = 86400  # 1 день в секундах
     CACHE_TTL_CHART = 60  # 1 минута в секундах
     
     # Константы для пагинации
-    PER_PAGE_MAX = 250  # Максимум монет на страницу
-    TOP_COINS_PAGES = 12  # Количество страниц для топ-3000
+    BATCH_PRICE_SIZE = 100  # Максимум монет в одном batch запросе цен
     
     @staticmethod
     def get_price_decimals(price: float) -> int:
@@ -248,6 +248,76 @@ class CoinGeckoService:
         except Exception as e:
             print(f"[refresh_top3000_cache] Ошибка при обновлении кэша топ-3000: {e}")
     
+    async def get_batch_prices(self, coin_ids: List[str]) -> Dict[str, Dict[str, Any]]:
+        """
+        Получить цены для нескольких монет за один запрос через batch API
+        Использует /simple/price endpoint CoinGecko
+        
+        Args:
+            coin_ids: Список ID монет (например, ['bitcoin', 'ethereum'])
+            
+        Returns:
+            Словарь вида {'bitcoin': {'usd': 50000.0, 'usd_24h_change': 2.5, 'usd_24h_vol': 1000000}, ...}
+        """
+        if not coin_ids:
+            print("[get_batch_prices] Список монет пуст")
+            return {}
+        
+        print(f"[get_batch_prices] Запрашиваем цены для {len(coin_ids)} монет через batch API...")
+        
+        try:
+            all_prices = {}
+            total_batches = (len(coin_ids) + self.BATCH_PRICE_SIZE - 1) // self.BATCH_PRICE_SIZE
+            
+            if total_batches == 1:
+                print(f"[get_batch_prices] ✅ ОДИН запрос для всех {len(coin_ids)} монет (лимит: {self.BATCH_PRICE_SIZE})")
+            else:
+                print(f"[get_batch_prices] Разбиваем на {total_batches} батчей (лимит: {self.BATCH_PRICE_SIZE} монет на батч)")
+            
+            # Разбиваем на батчи, если монет больше BATCH_PRICE_SIZE
+            for i in range(0, len(coin_ids), self.BATCH_PRICE_SIZE):
+                batch = coin_ids[i:i + self.BATCH_PRICE_SIZE]
+                batch_num = i // self.BATCH_PRICE_SIZE + 1
+                ids_param = ','.join(batch)
+                
+                print(f"[get_batch_prices] Батч {batch_num}/{total_batches}: отправляем запрос для {len(batch)} монет...")
+                print(f"[get_batch_prices] URL параметр ids: {ids_param[:100]}{'...' if len(ids_param) > 100 else ''}")
+                
+                try:
+                    data = await self._make_request(
+                        "/simple/price",
+                        params={
+                            "ids": ids_param,
+                            "vs_currencies": "usd",
+                            "include_24hr_change": "true",
+                            "include_24hr_vol": "true",
+                        },
+                    )
+                    
+                    # Обрабатываем ответ
+                    batch_count = 0
+                    for coin_id, price_data in data.items():
+                        if price_data and 'usd' in price_data:
+                            all_prices[coin_id] = {
+                                'usd': price_data.get('usd', 0),
+                                'usd_24h_change': price_data.get('usd_24h_change', 0),
+                                'usd_24h_vol': price_data.get('usd_24h_vol', 0),
+                            }
+                            batch_count += 1
+                    
+                    print(f"[get_batch_prices] Батч {batch_num}/{total_batches}: получено {batch_count} цен")
+                    
+                except Exception as e:
+                    print(f"[get_batch_prices] Ошибка при получении батча {batch_num}: {e}")
+                    continue
+            
+            print(f"[get_batch_prices] Всего получено цен: {len(all_prices)} из {len(coin_ids)} запрошенных")
+            return all_prices
+            
+        except Exception as e:
+            print(f"[get_batch_prices] Критическая ошибка при получении batch цен: {e}")
+            return {}
+    
     async def get_crypto_list(
         self,
         limit: int = 100,
@@ -269,18 +339,49 @@ class CoinGeckoService:
         formatted_coins = []
         coins_to_fetch = []  # Монеты, которых нет в кэше
         
-        print(f"[get_crypto_list] Проверяем кэш для {len(config_coins)} монет из конфига...")
+        print(f"\n[get_crypto_list] ===== НАЧАЛО ОБРАБОТКИ =====")
+        print(f"[get_crypto_list] Всего монет в конфиге: {len(config_coins)}")
+        print(f"[get_crypto_list] Проверяем кэш для каждой монеты...")
+        
+        coins_with_full_cache = 0
+        coins_with_static_only = 0
+        coins_with_no_cache = 0
         
         for coin_id in config_coins:
             cached_coin = None
             
-            # Проверяем индивидуальный кэш для монеты (если не требуется принудительное обновление)
+            # Проверяем кэш статических данных и цен отдельно
             if redis and not force_refresh:
                 try:
-                    cache_key = f"coin_data:{coin_id}"
-                    cached = await redis.get(cache_key)
-                    if cached:
-                        cached_coin = json.loads(cached)
+                    # Проверяем статические данные (1 час)
+                    static_cache_key = f"coin_static:{coin_id}"
+                    cached_static = await redis.get(static_cache_key)
+                    
+                    # Проверяем цены (5 минут)
+                    price_cache_key = f"coin_price:{coin_id}"
+                    cached_price = await redis.get(price_cache_key)
+                    
+                    if cached_static:
+                        cached_coin = json.loads(cached_static)
+                        
+                        # Если есть кэш цен, обновляем цены в объекте
+                        if cached_price:
+                            price_data = json.loads(cached_price)
+                            cached_coin["quote"] = {
+                                "USD": {
+                                    "price": price_data.get("price", 0),
+                                    "percent_change_24h": price_data.get("percent_change_24h"),
+                                    "volume_24h": price_data.get("volume_24h"),
+                                }
+                            }
+                            cached_coin["priceDecimals"] = price_data.get("priceDecimals", self.get_price_decimals(price_data.get("price", 0)))
+                            coins_with_full_cache += 1
+                        else:
+                            # Если цен нет, но статические данные есть - нужно обновить только цены
+                            coins_with_static_only += 1
+                            coins_to_fetch.append(coin_id)
+                            continue
+                        
                         # Проверяем и добавляем priceDecimals, если его нет
                         if "priceDecimals" not in cached_coin:
                             price = cached_coin.get("quote", {}).get("USD", {}).get("price", 0)
@@ -292,118 +393,335 @@ class CoinGeckoService:
                 formatted_coins.append(cached_coin)
             else:
                 # Монета не найдена в кэше, нужно запросить из API
+                coins_with_no_cache += 1
                 coins_to_fetch.append(coin_id)
         
-        print(f"[get_crypto_list] Найдено в кэше: {len(formatted_coins)}, нужно загрузить: {len(coins_to_fetch)}")
+        print(f"[get_crypto_list] === РЕЗУЛЬТАТЫ ПРОВЕРКИ КЭША ===")
+        print(f"[get_crypto_list] Полностью в кэше (статика + цены): {coins_with_full_cache}")
+        print(f"[get_crypto_list] Только статика в кэше (нужны цены): {coins_with_static_only}")
+        print(f"[get_crypto_list] Нет в кэше (нужны все данные): {coins_with_no_cache}")
+        print(f"[get_crypto_list] Всего нужно загрузить: {len(coins_to_fetch)}")
         
-        # Если есть монеты, которых нет в кэше, запрашиваем их из API
-        if coins_to_fetch:
-            # Проверяем кэш топ-3000 монет
-            all_coins_dict = {}
-            top3000_cache_key = "coins_list:top3000"
+        # Если есть монеты, которым нужны цены (даже если статика есть в кэше)
+        coins_needing_prices = []
+        for coin_id in config_coins:
+            price_cache_key = f"coin_price:{coin_id}"
+            if not redis or not await redis.get(price_cache_key) or force_refresh:
+                coins_needing_prices.append(coin_id)
+        
+        # Получаем цены через batch API для всех монет из конфига, которым нужны цены
+        if coins_needing_prices:
+            print(f"\n[get_crypto_list] === ОБНОВЛЕНИЕ ЦЕН ЧЕРЕЗ BATCH API ===")
+            print(f"[get_crypto_list] Монет для обновления цен: {len(coins_needing_prices)}")
+            print(f"[get_crypto_list] Список монет: {', '.join(coins_needing_prices[:10])}{'...' if len(coins_needing_prices) > 10 else ''}")
+            batch_prices = await self.get_batch_prices(coins_needing_prices)
+            print(f"[get_crypto_list] Получено цен из batch API: {len(batch_prices)}")
             
-            if redis and not force_refresh:
-                try:
-                    cached_top3000 = await redis.get(top3000_cache_key)
-                    if cached_top3000:
-                        cached_data = json.loads(cached_top3000)
-                        # Преобразуем список в словарь для быстрого поиска
-                        for coin_data in cached_data:
-                            coin_id = coin_data.get("id", "")
-                            if coin_id:
-                                all_coins_dict[coin_id] = coin_data
-                        print(f"[get_crypto_list] Топ-3000 монет загружены из кэша: {len(all_coins_dict)} монет")
-                except Exception as e:
-                    print(f"[get_crypto_list] Ошибка при чтении кэша топ-3000: {e}")
-            
-            # Если кэша нет или требуется обновление, запрашиваем топ-3000 из API
-            if not all_coins_dict:
-                per_page = self.PER_PAGE_MAX
-                total_pages = self.TOP_COINS_PAGES
-                
-                print(f"[get_crypto_list] Получаем топ-3000 монет из CoinGecko API...")
-                all_coins_list = []  # Список для кэширования
-                
-                for page_num in range(1, total_pages + 1):
+            # Обновляем кэш цен и добавляем монеты с обновленными ценами
+            updated_prices_count = 0
+            if redis:
+                for coin_id, price_info in batch_prices.items():
                     try:
-                        data = await self._make_request(
-                            "/coins/markets",
-                            params={
-                                "vs_currency": "usd",
-                                "order": "market_cap_desc",
-                                "per_page": per_page,
-                                "page": page_num,
-                                "sparkline": False,
-                            },
-                        )
-                        
-                        # Добавляем монеты в словарь и список
-                        for coin_data in data:
-                            coin_id = coin_data.get("id", "")
-                            if coin_id:
-                                all_coins_dict[coin_id] = coin_data
-                                all_coins_list.append(coin_data)
-                        
-                        print(f"[get_crypto_list] Получено {len(data)} монет со страницы {page_num}")
-                        
-                        # Если получили меньше монет, чем ожидалось, значит достигли конца списка
-                        if len(data) < per_page:
-                            break
+                        price = price_info.get('usd', 0)
+                        if price > 0:
+                            price_data = {
+                                "price": price,
+                                "percent_change_24h": price_info.get('usd_24h_change', 0),
+                                "volume_24h": price_info.get('usd_24h_vol', 0),
+                                "priceDecimals": self.get_price_decimals(price),
+                            }
+                            price_cache_key = f"coin_price:{coin_id}"
+                            await redis.setex(price_cache_key, self.CACHE_TTL_COIN_PRICE, json.dumps(price_data))
                             
+                            # Если монета уже есть в formatted_coins (из кэша статики), обновляем цены
+                            existing_coin = next((c for c in formatted_coins if c.get("id") == coin_id), None)
+                            if existing_coin:
+                                existing_coin["quote"] = {
+                                    "USD": {
+                                        "price": price_data["price"],
+                                        "percent_change_24h": price_data["percent_change_24h"],
+                                        "volume_24h": price_data["volume_24h"],
+                                    }
+                                }
+                                existing_coin["priceDecimals"] = price_data["priceDecimals"]
+                                updated_prices_count += 1
                     except Exception as e:
-                        print(f"[get_crypto_list] Ошибка при получении страницы {page_num}: {e}")
-                        break
+                        print(f"[get_crypto_list] Ошибка при сохранении цены для {coin_id}: {e}")
+            
+            print(f"[get_crypto_list] Обновлено цен в кэше: {updated_prices_count}")
+        
+        # Если есть монеты, которых нет в кэше (нужны статические данные), запрашиваем их из API
+        if coins_to_fetch:
+            print(f"\n[get_crypto_list] === ЗАГРУЗКА СТАТИЧЕСКИХ ДАННЫХ ===")
+            print(f"[get_crypto_list] Монет для загрузки: {len(coins_to_fetch)}")
+            print(f"[get_crypto_list] Список монет: {', '.join(coins_to_fetch[:10])}{'...' if len(coins_to_fetch) > 10 else ''}")
+            
+            try:
+                # CoinGecko позволяет передать ids через запятую в /coins/markets
+                ids_param = ','.join(coins_to_fetch)
+                print(f"[get_crypto_list] Отправляем запрос к /coins/markets с ids параметром...")
+                coins_data = await self._make_request(
+                    "/coins/markets",
+                    params={
+                        "vs_currency": "usd",
+                        "ids": ids_param,
+                        "order": "market_cap_desc",
+                        "per_page": len(coins_to_fetch),
+                        "sparkline": False,
+                    },
+                )
                 
-                print(f"[get_crypto_list] Всего получено {len(all_coins_dict)} уникальных монет из API")
+                # Преобразуем в словарь для быстрого поиска
+                coins_dict = {coin_data.get("id"): coin_data for coin_data in coins_data if coin_data.get("id")}
+                print(f"[get_crypto_list] Получено статических данных: {len(coins_dict)} из {len(coins_to_fetch)} запрошенных")
                 
-                # Кэшируем топ-3000 на 1 час
-                if redis and all_coins_list:
-                    try:
-                        await redis.setex(top3000_cache_key, self.CACHE_TTL_TOP3000, json.dumps(all_coins_list))
-                        print(f"[get_crypto_list] Топ-3000 монет сохранены в кэш на 1 час")
-                    except Exception as e:
-                        print(f"[get_crypto_list] Ошибка при сохранении топ-3000 в кэш: {e}")
+            except Exception as e:
+                print(f"[get_crypto_list] Ошибка при получении статических данных через batch: {e}")
+                coins_dict = {}
             
             # Обрабатываем монеты, которые нужно было загрузить
+            saved_static_count = 0
+            saved_prices_count = 0
             for coin_id in coins_to_fetch:
-                if coin_id in all_coins_dict:
-                    coin_data = all_coins_dict[coin_id]
+                if coin_id in coins_dict:
+                    coin_data = coins_dict[coin_id]
                     formatted_coin = self._format_coin_data(coin_data, coin_id)
                     formatted_coins.append(formatted_coin)
                     
-                    # Кэшируем монету на 1 час
+                    # Сохраняем статические данные в кэш
                     if redis:
                         try:
-                            cache_key = f"coin_data:{coin_id}"
-                            await redis.setex(cache_key, self.CACHE_TTL_COIN_DATA, json.dumps(formatted_coin))
-                            
-                            # Сохраняем иконку в долгосрочный кэш (7 дней)
-                            image_url = formatted_coin.get("imageUrl", "")
-                            if image_url:
-                                image_cache_key = f"coin_image_url:{coin_id}"
-                                existing = await redis.get(image_cache_key)
-                                if not existing:
-                                    await redis.setex(image_cache_key, self.CACHE_TTL_IMAGE_URL, image_url)
-                            
-                            # Сохраняем price_decimals в кэш на 1 день
-                            price_decimals = formatted_coin.get("priceDecimals")
-                            if price_decimals is not None:
-                                decimals_cache_key = f"coin_price_decimals:{coin_id}"
-                                await redis.setex(decimals_cache_key, self.CACHE_TTL_PRICE_DECIMALS, str(price_decimals))
+                            static_data = {
+                                "id": formatted_coin.get("id"),
+                                "name": formatted_coin.get("name"),
+                                "symbol": formatted_coin.get("symbol"),
+                                "slug": formatted_coin.get("slug"),
+                                "imageUrl": formatted_coin.get("imageUrl"),
+                            }
+                            static_cache_key = f"coin_static:{coin_id}"
+                            await redis.setex(static_cache_key, self.CACHE_TTL_COIN_STATIC, json.dumps(static_data))
+                            saved_static_count += 1
                         except Exception as e:
-                            print(f"[get_crypto_list] Ошибка при сохранении {coin_id} в кэш: {e}")
+                            print(f"[get_crypto_list] Ошибка при сохранении статики для {coin_id}: {e}")
+                    
+                    # Если цены еще не были получены через batch API выше, используем цены из coin_data
+                    price_cache_key = f"coin_price:{coin_id}"
+                    if not redis or not await redis.get(price_cache_key):
+                        # Сохраняем цены из coin_data
+                        if redis:
+                            try:
+                                price = formatted_coin.get("quote", {}).get("USD", {}).get("price", 0)
+                                if price > 0:
+                                    price_data = {
+                                        "price": price,
+                                        "percent_change_24h": formatted_coin.get("quote", {}).get("USD", {}).get("percent_change_24h", 0),
+                                        "volume_24h": formatted_coin.get("quote", {}).get("USD", {}).get("volume_24h", 0),
+                                        "priceDecimals": formatted_coin.get("priceDecimals"),
+                                    }
+                                    await redis.setex(price_cache_key, self.CACHE_TTL_COIN_PRICE, json.dumps(price_data))
+                                    saved_prices_count += 1
+                            except Exception as e:
+                                print(f"[get_crypto_list] Ошибка при сохранении цены из coin_data для {coin_id}: {e}")
                 else:
-                    print(f"[get_crypto_list] Монета {coin_id} из конфига не найдена в топ-1000")
+                    print(f"[get_crypto_list] ⚠️ Монета {coin_id} не найдена в ответе API")
+            
+            print(f"[get_crypto_list] Сохранено статических данных в кэш: {saved_static_count}")
+            print(f"[get_crypto_list] Сохранено цен в кэш: {saved_prices_count}")
         
         # Сортируем монеты по порядку из конфига
         coin_order = {coin_id: idx for idx, coin_id in enumerate(config_coins)}
         formatted_coins.sort(key=lambda x: coin_order.get(x.get("id"), 9999))
         
-        print(f"[get_crypto_list] Итого отформатировано {len(formatted_coins)} монет")
+        print(f"\n[get_crypto_list] === ИТОГОВЫЕ РЕЗУЛЬТАТЫ ===")
+        print(f"[get_crypto_list] Итого отформатировано монет: {len(formatted_coins)}")
+        print(f"[get_crypto_list] Ожидалось монет из конфига: {len(config_coins)}")
         if formatted_coins:
-            print(f"[get_crypto_list] Первая монета: {formatted_coins[0].get('name')}")
+            first_coin_price = formatted_coins[0].get('quote', {}).get('USD', {}).get('price', 0)
+            print(f"[get_crypto_list] Первая монета: {formatted_coins[0].get('name')} (${first_coin_price})")
+        print(f"[get_crypto_list] ===== КОНЕЦ ОБРАБОТКИ =====\n")
         
         return formatted_coins
+    
+    async def get_crypto_list_static_only(
+        self,
+        limit: int = 100,
+        page: int = 1,
+        force_refresh: bool = False,
+    ) -> List[Dict]:
+        """Получить данные монет из кэша (статика + цены) - для быстрой загрузки"""
+        config_coins, config_hash = self._load_coins_config()
+        
+        if not config_coins:
+            return []
+        
+        redis = await get_redis()
+        formatted_coins = []
+        coins_to_fetch = []
+        
+        print(f"\n[get_crypto_list_static_only] Загружаем данные из кэша для {len(config_coins)} монет...")
+        
+        # Проверяем кэш статических данных И цен
+        for coin_id in config_coins:
+            cached_static = None
+            cached_price = None
+            
+            if redis and not force_refresh:
+                try:
+                    # Проверяем статические данные
+                    static_cache_key = f"coin_static:{coin_id}"
+                    cached_static_data = await redis.get(static_cache_key)
+                    if cached_static_data:
+                        cached_static = json.loads(cached_static_data)
+                    
+                    # Проверяем цены
+                    price_cache_key = f"coin_price:{coin_id}"
+                    cached_price_data = await redis.get(price_cache_key)
+                    if cached_price_data:
+                        cached_price = json.loads(cached_price_data)
+                except Exception as e:
+                    print(f"[get_crypto_list_static_only] Ошибка чтения кэша для {coin_id}: {e}")
+            
+            if cached_static:
+                # Формируем монету из кэша
+                coin_data = {
+                    "id": cached_static.get("id", coin_id),
+                    "name": cached_static.get("name", ""),
+                    "symbol": cached_static.get("symbol", ""),
+                    "imageUrl": cached_static.get("imageUrl", ""),
+                    "quote": {
+                        "USD": {
+                            "price": cached_price.get("price", 0) if cached_price else 0,
+                            "percent_change_24h": cached_price.get("percent_change_24h", 0) if cached_price else 0,
+                            "volume_24h": cached_price.get("volume_24h", 0) if cached_price else 0,
+                        }
+                    },
+                    "priceDecimals": cached_price.get("priceDecimals") if cached_price else self.get_price_decimals(cached_price.get("price", 0) if cached_price else 0),
+                }
+                formatted_coins.append(coin_data)
+            else:
+                # Если статики нет в кэше, нужно загрузить из API
+                coins_to_fetch.append(coin_id)
+        
+        print(f"[get_crypto_list_static_only] Из кэша: {len(formatted_coins)} монет (статика + цены), нужно загрузить: {len(coins_to_fetch)}")
+        
+        # Если все данные в кэше, возвращаем немедленно
+        if formatted_coins and not coins_to_fetch:
+            coin_order = {coin_id: idx for idx, coin_id in enumerate(config_coins)}
+            formatted_coins.sort(key=lambda x: coin_order.get(x.get("id"), 9999))
+            print(f"[get_crypto_list_static_only] ✅ Все {len(formatted_coins)} монет из кэша (статика + цены), возвращаем немедленно")
+            return formatted_coins
+        
+        # Если есть недостающие данные (статика), загружаем их из API
+        # Но цены все равно берем из кэша (если есть), так как они обновляются каждые 10 секунд
+        if coins_to_fetch:
+            try:
+                ids_param = ','.join(coins_to_fetch)
+                coins_data = await self._make_request(
+                    "/coins/markets",
+                    params={
+                        "vs_currency": "usd",
+                        "ids": ids_param,
+                        "order": "market_cap_desc",
+                        "per_page": len(coins_to_fetch),
+                        "sparkline": False,
+                    },
+                )
+                
+                coins_dict = {coin_data.get("id"): coin_data for coin_data in coins_data if coin_data.get("id")}
+                
+                # Добавляем недостающие монеты в правильном порядке
+                for coin_id in config_coins:
+                    if coin_id in coins_to_fetch and coin_id in coins_dict:
+                        coin_data = coins_dict[coin_id]
+                        image_url = coin_data.get("image", "")
+                        
+                        # Проверяем, есть ли цена в кэше
+                        cached_price = None
+                        if redis:
+                            try:
+                                price_cache_key = f"coin_price:{coin_id}"
+                                cached_price_data = await redis.get(price_cache_key)
+                                if cached_price_data:
+                                    cached_price = json.loads(cached_price_data)
+                            except Exception:
+                                pass
+                        
+                        static_coin = {
+                            "id": coin_id,
+                            "name": coin_data.get("name", ""),
+                            "symbol": coin_data.get("symbol", "").upper(),
+                            "imageUrl": image_url,
+                            "quote": {
+                                "USD": {
+                                    "price": cached_price.get("price", 0) if cached_price else 0,
+                                    "percent_change_24h": cached_price.get("percent_change_24h", 0) if cached_price else 0,
+                                    "volume_24h": cached_price.get("volume_24h", 0) if cached_price else 0,
+                                }
+                            },
+                            "priceDecimals": cached_price.get("priceDecimals") if cached_price else self.get_price_decimals(cached_price.get("price", 0) if cached_price else 0),
+                        }
+                        # Вставляем в правильную позицию
+                        coin_index = config_coins.index(coin_id)
+                        formatted_coins.insert(coin_index, static_coin)
+                        
+                        # Сохраняем статику в кэш
+                        if redis:
+                            try:
+                                static_data = {
+                                    "id": coin_id,
+                                    "name": static_coin["name"],
+                                    "symbol": static_coin["symbol"],
+                                    "imageUrl": image_url,
+                                }
+                                static_cache_key = f"coin_static:{coin_id}"
+                                await redis.setex(static_cache_key, self.CACHE_TTL_COIN_STATIC, json.dumps(static_data))
+                            except Exception:
+                                pass
+            except Exception as e:
+                print(f"[get_crypto_list_static_only] Ошибка при загрузке статических данных: {e}")
+        
+        # Убеждаемся, что порядок соответствует конфигу
+        coin_order = {coin_id: idx for idx, coin_id in enumerate(config_coins)}
+        formatted_coins.sort(key=lambda x: coin_order.get(x.get("id"), 9999))
+        
+        print(f"[get_crypto_list_static_only] ✅ Возвращаем {len(formatted_coins)} монет из кэша (статика + цены)")
+        return formatted_coins
+    
+    async def get_crypto_list_prices(self, coin_ids: List[str]) -> Dict[str, Dict]:
+        """Получить только цены для списка монет - для обновления после загрузки статики"""
+        if not coin_ids:
+            return {}
+        
+        print(f"\n[get_crypto_list_prices] Загружаем цены для {len(coin_ids)} монет...")
+        
+        # Получаем цены через batch API
+        batch_prices = await self.get_batch_prices(coin_ids)
+        
+        # Форматируем результат
+        prices_dict = {}
+        redis = await get_redis()
+        
+        for coin_id, price_info in batch_prices.items():
+            price = price_info.get('usd', 0)
+            if price > 0:
+                price_data = {
+                    "price": price,
+                    "percent_change_24h": price_info.get('usd_24h_change', 0),
+                    "volume_24h": price_info.get('usd_24h_vol', 0),
+                    "priceDecimals": self.get_price_decimals(price),
+                }
+                prices_dict[coin_id] = price_data
+                
+                # Сохраняем в кэш
+                if redis:
+                    try:
+                        price_cache_key = f"coin_price:{coin_id}"
+                        await redis.setex(price_cache_key, self.CACHE_TTL_COIN_PRICE, json.dumps(price_data))
+                    except Exception:
+                        pass
+        
+        print(f"[get_crypto_list_prices] Получено цен: {len(prices_dict)} из {len(coin_ids)} запрошенных")
+        return prices_dict
     
     async def get_crypto_details(self, coin_id: str) -> Dict:
         """Получить детали криптовалюты"""
@@ -487,14 +805,15 @@ class CoinGeckoService:
         
         print(f"\n[get_crypto_details] Final coin data: {coin}")
         
-        # Кэшируем на 30 секунд (если Redis доступен)
+        # Кэшируем на 1 минуту (цены обновляются часто, используем CACHE_TTL_COIN_PRICE)
         if redis:
             try:
-                cache_key = f"coin_details:{coin_id}"
                 import json
-                await redis.setex(cache_key, 30, json.dumps(coin))  # 30 секунд
-            except Exception:
-                pass  # Пропускаем кэширование если ошибка
+                cache_key = f"coin_details:{coin_id}"
+                await redis.setex(cache_key, self.CACHE_TTL_COIN_PRICE, json.dumps(coin))
+                print(f"[get_crypto_details] Данные сохранены в кэш Redis на {self.CACHE_TTL_COIN_PRICE} секунд")
+            except Exception as e:
+                print(f"[get_crypto_details] Ошибка сохранения в кэш: {e}")
         
         return coin
     
