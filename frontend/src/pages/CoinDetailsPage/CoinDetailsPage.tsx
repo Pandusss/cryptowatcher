@@ -40,6 +40,8 @@ export const CoinDetailsPage = () => {
   const [coin, setCoin] = useState<CryptoCurrency | null>(null)
   const [chartData, setChartData] = useState<any[]>([])
   const [selectedPeriod, setSelectedPeriod] = useState('7d')
+  const [priceUpdated, setPriceUpdated] = useState(false) // Флаг для анимации обновления цены
+  const [priceDirection, setPriceDirection] = useState<'up' | 'down' | null>(null) // Направление изменения цены
 
   // Управление кнопкой "Назад" в Telegram Mini App
   useTelegramBackButton()
@@ -131,6 +133,18 @@ export const CoinDetailsPage = () => {
               console.warn(`[CoinDetailsPage] Пропуск обновления: prevCoin=${!!prevCoin}, id совпадает=${prevCoin?.id === coinId}`)
               return prevCoin
             }
+            
+            // Запускаем анимацию подсветки только если цена действительно изменилась
+            if (prevCoin.currentPrice !== newPrice) {
+              setPriceDirection(newPrice > prevCoin.currentPrice ? 'up' : 'down')
+              setPriceUpdated(true)
+              // Убираем класс через 800ms (длительность анимации)
+              setTimeout(() => {
+                setPriceUpdated(false)
+                setPriceDirection(null)
+              }, 800)
+            }
+            
             const updatedCoin = {
               ...prevCoin,
               currentPrice: newPrice,
@@ -153,13 +167,21 @@ export const CoinDetailsPage = () => {
             
             const updatedData = [...prevData]
             const lastIndex = updatedData.length - 1
-            const now = new Date().toISOString()
+            
+            // Форматируем дату в формате "YYYY-MM-DD HH:MM" (как в API)
+            const now = new Date()
+            const year = now.getFullYear()
+            const month = String(now.getMonth() + 1).padStart(2, '0')
+            const day = String(now.getDate()).padStart(2, '0')
+            const hours = String(now.getHours()).padStart(2, '0')
+            const minutes = String(now.getMinutes()).padStart(2, '0')
+            const formattedDate = `${year}-${month}-${day} ${hours}:${minutes}`
             
             // Обновляем последнюю точку: цену, дату и объем (если есть)
             updatedData[lastIndex] = {
               ...updatedData[lastIndex],
               price: newPrice,
-              date: now,
+              date: formattedDate,
               // Объем оставляем как есть, так как его нельзя получить из getCoinDetails
             }
             
@@ -177,11 +199,11 @@ export const CoinDetailsPage = () => {
     // Загружаем полный график сразу
     fetchChartData()
 
-    // Обновляем последнюю точку каждые 10 секунд
-    console.log(`[CoinDetailsPage] ✅ Запуск интервала обновления каждые 10 секунд для ${coinId}`)
+    // Обновляем последнюю точку и цену каждые 5 секунд из кэша Redis
+    console.log(`[CoinDetailsPage] ✅ Запуск интервала обновления каждые 5 секунд для ${coinId}`)
     const intervalId = setInterval(() => {
       updateLastPoint()
-    }, 10000) // 10000 мс = 10 секунд
+    }, 5000) // 5000 мс = 5 секунд
 
     // Очищаем интервал при размонтировании или изменении зависимостей
     return () => {
@@ -773,7 +795,11 @@ export const CoinDetailsPage = () => {
               </Text>
             </div>
           )}
-          <Text type="title" color="primary">
+          <Text 
+            type="title" 
+            color="primary"
+            className={priceUpdated ? (priceDirection === 'up' ? styles.priceUpdatedUp : styles.priceUpdatedDown) : ''}
+          >
             {currentPrice}
           </Text>
           <span style={{ color: isPriceRising ? 'var(--color-state-success)' : undefined }}>

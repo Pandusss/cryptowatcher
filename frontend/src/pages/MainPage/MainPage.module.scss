@@ -1,8 +1,8 @@
 // Container для списка уведомлений с ограничением высоты и прокруткой
 .notificationsContainer {
   // Вычитаем примерную высоту всех элементов выше списка и кнопки снизу
-  // Заголовок (~120px) + Source (~60px) + DND (~60px) + отступы (~100px) + кнопка (~80px) + safe area
-  max-height: calc(100vh - 420px - env(safe-area-inset-bottom, 0px));
+  // Заголовок (~120px) + DND (~60px) + отступы (~100px) + кнопка (~80px) + safe area
+  max-height: calc(100vh - 360px - env(safe-area-inset-bottom, 0px));
   min-height: 200px; // Минимальная высота для удобства
   overflow-y: auto;
   overflow-x: hidden;
@@ -30,7 +30,7 @@
   
   // На мобильных устройствах используем более точный расчет
   @media (max-height: 800px) {
-    max-height: calc(100vh - 380px - env(safe-area-inset-bottom, 0px));
+    max-height: calc(100vh - 320px - env(safe-area-inset-bottom, 0px));
   }
 }
 

@@ -5,6 +5,5 @@ export const ROUTES_NAME = {
   COIN_DETAILS: '/coin-details/:id',
   EDIT_NOTIFICATION: '/edit-notification/:id',
   DND_SETTINGS: '/dnd-settings',
-  SOURCE_SETTINGS: '/source-settings',
 }
 

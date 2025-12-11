@@ -5,7 +5,6 @@ import { CreateNotificationPage } from '@pages'
 import { ChooseCoinPage } from '@pages'
 import { CoinDetailsPage } from '@pages'
 import { DndSettingsPage } from '@pages'
-import { SourceSettingsPage } from '@pages'
 
 import { ROUTES_NAME } from './constants/routes'
 
@@ -24,7 +23,6 @@ const Routes = () => {
         element={<CreateNotificationPage />}
       />
       <Route path={ROUTES_NAME.DND_SETTINGS} element={<DndSettingsPage />} />
-      <Route path={ROUTES_NAME.SOURCE_SETTINGS} element={<SourceSettingsPage />} />
     </RouterRoutes>
   )
 }

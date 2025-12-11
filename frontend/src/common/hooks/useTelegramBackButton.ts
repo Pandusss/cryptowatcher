@@ -47,11 +47,6 @@ const getBackRoute = (currentPath: string): string | null => {
     return ROUTES_NAME.MAIN
   }
 
-  // Source Settings - назад на главную
-  if (currentPath === ROUTES_NAME.SOURCE_SETTINGS) {
-    return ROUTES_NAME.MAIN
-  }
-
   // По умолчанию - на главную
   return ROUTES_NAME.MAIN
 }

@@ -17,12 +17,15 @@ async def get_notifications(
     user_id: int,
     db: Session = Depends(get_db),
 ):
-    """Получить список уведомлений пользователя"""
+    """Получить список активных уведомлений пользователя"""
     # Выполняем синхронный DB запрос в отдельном потоке, чтобы не блокировать event loop
     loop = asyncio.get_event_loop()
     notifications = await loop.run_in_executor(
         None,
-        lambda: db.query(Notification).filter(Notification.user_id == user_id).all()
+        lambda: db.query(Notification)
+            .filter(Notification.user_id == user_id)
+            .filter(Notification.is_active == True)  # Показываем только активные уведомления
+            .all()
     )
     
     # Получаем imageUrl для каждой монеты из CoinGecko (с долгосрочным кэшированием)

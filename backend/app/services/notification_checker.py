@@ -12,7 +12,7 @@ from app.core.database import SessionLocal
 from app.core.redis_client import get_redis
 from app.models.notification import Notification, NotificationDirection, NotificationTrigger, NotificationValueType
 from app.models.user import User
-from app.services.coingecko import CoinGeckoService
+from app.services.aggregation_service import aggregation_service
 from app.services.telegram import telegram_service
 
 
@@ -20,7 +20,7 @@ class NotificationChecker:
     """Сервис для проверки и обработки уведомлений"""
     
     def __init__(self):
-        self.coingecko_service = CoinGeckoService()
+        self.aggregation_service = aggregation_service
         self.running = False
         self.check_interval = 60  # Проверяем каждые 60 секунд
         self.price_cache_ttl = 10  # Кэшируем цены на 10 секунд для актуальности
@@ -81,40 +81,29 @@ class NotificationChecker:
     
     async def _get_crypto_price(self, crypto_id: str) -> Optional[float]:
         """
-        Получить текущую цену криптовалюты ИЗ КЭША Redis (coin_price:{crypto_id})
-        Цены обновляются каждые 10 секунд в фоновом режиме
+        Получить текущую цену криптовалюты через AggregationService
         
         Args:
-            crypto_id: ID криптовалюты
+            crypto_id: Внутренний ID криптовалюты
         
         Returns:
             Текущая цена или None если не удалось получить
         """
-        redis = await get_redis()
-        
-        # ВСЕГДА берем цену из кэша Redis (coin_price:{crypto_id})
-        if redis:
-            try:
-                price_cache_key = f"coin_price:{crypto_id}"
-                cached_price_data = await redis.get(price_cache_key)
-                if cached_price_data:
-                    import json
-                    price_data = json.loads(cached_price_data)
-                    price = price_data.get("price", 0)
-                    if price > 0:
-                        print(f"[NotificationChecker] ✅ Цена {crypto_id} из кэша Redis: ${price}")
-                        return price
-                    else:
-                        print(f"[NotificationChecker] ⚠️ Цена {crypto_id} в кэше равна 0")
-                        return None
+        try:
+            price_data = await self.aggregation_service.get_coin_price(crypto_id)
+            if price_data:
+                price = price_data.get("price", 0)
+                if price > 0:
+                    print(f"[NotificationChecker] ✅ Цена {crypto_id} через AggregationService: ${price}")
+                    return price
                 else:
-                    print(f"[NotificationChecker] ⚠️ Цена {crypto_id} не найдена в кэше Redis")
+                    print(f"[NotificationChecker] ⚠️ Цена {crypto_id} равна 0")
                     return None
-            except Exception as e:
-                print(f"[NotificationChecker] Ошибка чтения цены из Redis кэша: {e}")
+            else:
+                print(f"[NotificationChecker] ⚠️ Цена {crypto_id} не найдена")
                 return None
-        else:
-            print(f"[NotificationChecker] ⚠️ Redis недоступен, не можем получить цену {crypto_id}")
+        except Exception as e:
+            print(f"[NotificationChecker] Ошибка получения цены через AggregationService: {e}")
             return None
     
     async def _check_and_process_notification(
@@ -306,6 +295,11 @@ class NotificationChecker:
         """Остановить проверку уведомлений"""
         self.running = False
         print("[NotificationChecker] ⏹️ Остановлена проверка уведомлений")
+    
+    async def close(self):
+        """Закрыть HTTP клиент CoinGeckoService для освобождения ресурсов"""
+        # AggregationService не требует закрытия
+        pass
 
 
 # Глобальный экземпляр

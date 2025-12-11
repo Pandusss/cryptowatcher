@@ -1,2 +1,0 @@
-export { SourceSettingsPage } from './SourceSettingsPage'
-

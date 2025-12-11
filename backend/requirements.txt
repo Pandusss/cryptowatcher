@@ -16,6 +16,9 @@ redis==5.0.1
 httpx==0.25.1
 aiohttp==3.9.1
 
+# WebSocket клиент для Binance
+websockets==12.0
+
 # Переменные окружения
 python-dotenv==1.0.0
 
@@ -26,6 +29,7 @@ pydantic-settings==2.1.0
 # Утилиты
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
+pyyaml==6.0.1
 
 # Логирование
 loguru==0.7.2

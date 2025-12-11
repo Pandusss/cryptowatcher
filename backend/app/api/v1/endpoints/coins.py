@@ -30,12 +30,13 @@ async def get_coins_list_static(
     start: int = 1,
     force_refresh: bool = False,
 ):
-    """Получить только статические данные монет (id, name, symbol, imageUrl) без цен - для быстрой загрузки"""
+    """Получить список монет (статика + цены из кэша) - для быстрой загрузки"""
     print(f"\n[API Endpoint] GET /coins/list/static - limit={limit}, start={start}, force_refresh={force_refresh}")
     service = CoinGeckoService()
     try:
-        coins = await service.get_crypto_list_static_only(limit=limit, page=start, force_refresh=force_refresh)
-        print(f"[API Endpoint] Возвращаем {len(coins)} монет со статическими данными клиенту")
+        # Используем единый метод get_crypto_list (объединена логика с get_crypto_list_static_only)
+        coins = await service.get_crypto_list(limit=limit, page=start, force_refresh=force_refresh)
+        print(f"[API Endpoint] Возвращаем {len(coins)} монет клиенту")
         return {"data": coins}
     except Exception as e:
         print(f"[API Endpoint] Ошибка: {str(e)}")

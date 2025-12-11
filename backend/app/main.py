@@ -6,8 +6,10 @@ from app.core.config import settings
 from app.api.v1.router import api_router
 from app.services.bot_polling import bot_polling
 from app.services.notification_checker import notification_checker
-from app.services.coins_cache_updater import coins_cache_updater
-from app.services.prices_updater import prices_updater
+# Устаревшие сервисы удалены:
+# - prices_updater.py - заменен на Binance WebSocket
+# - coins_cache_updater.py - больше не нужен
+from app.providers.binance_websocket import binance_websocket_worker
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -47,8 +49,11 @@ async def startup_event():
     # Запускаем проверку уведомлений
     asyncio.create_task(notification_checker.start())
     
-    # Запускаем фоновое обновление цен каждые 10 секунд
-    asyncio.create_task(prices_updater.start())
+    # Запускаем Binance WebSocket для real-time цен (заменяет CoinGecko polling)
+    asyncio.create_task(binance_websocket_worker.start())
+    
+    # Отключено: CoinGecko polling заменен на Binance WebSocket для real-time обновлений
+    # asyncio.create_task(prices_updater.start())
     
     # Отключено: больше не нужна фоновая задача для топ-3000, используем batch API для монет из конфига
     # asyncio.create_task(coins_cache_updater.start())
@@ -59,6 +64,12 @@ async def shutdown_event():
     """Остановка фоновых задач при выключении приложения"""
     bot_polling.stop()
     notification_checker.stop()
-    prices_updater.stop()
+    binance_websocket_worker.stop()  # Останавливаем Binance WebSocket
+    # prices_updater.stop()  # Отключено (заменен на Binance WebSocket)
     # coins_cache_updater.stop()  # Отключено
+    
+    # Закрываем HTTP клиенты и WebSocket соединения для предотвращения утечек памяти
+    await notification_checker.close()
+    await binance_websocket_worker.close()
+    # await prices_updater.close()  # Отключено
 

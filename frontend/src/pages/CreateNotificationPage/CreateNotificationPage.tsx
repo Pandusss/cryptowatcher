@@ -95,6 +95,8 @@ export const CreateNotificationPage = () => {
   const [chartData, setChartData] = useState<ChartDataPoint[]>([])
   const [chartLoading, setChartLoading] = useState(false)
   const [selectedPeriod, setSelectedPeriod] = useState('7d') // Таймфрейм для графика
+  const [priceUpdated, setPriceUpdated] = useState(false) // Флаг для анимации обновления цены
+  const [priceDirection, setPriceDirection] = useState<'up' | 'down' | null>(null) // Направление изменения цены
 
   // Dropdown states
   const [directionDropdownOpen, setDirectionDropdownOpen] = useState(false)
@@ -254,6 +256,104 @@ export const CreateNotificationPage = () => {
       setChartData([])
     }
   }, [crypto?.id, selectedPeriod])
+
+  // Обновляем цену каждые 5 секунд из кэша Redis
+  useEffect(() => {
+    if (!crypto?.id) {
+      return
+    }
+
+    const coinId = crypto.id // Сохраняем ID в локальную переменную для использования в замыкании
+
+    // Функция обновления цены и последней точки графика
+    const updatePrice = async () => {
+      try {
+        console.log(`[CreateNotificationPage] Обновление цены для ${coinId}...`)
+        
+        // Получаем текущую цену монеты из кэша
+        const coinDetails = await apiService.getCoinDetails(coinId)
+        if (coinDetails && coinDetails.currentPrice) {
+          const newPrice = coinDetails.currentPrice
+          console.log(`[CreateNotificationPage] Получена новая цена: $${newPrice}`)
+          
+          // Обновляем текущую цену монеты
+          setCrypto(prevCrypto => {
+            if (!prevCrypto || prevCrypto.id !== coinId) {
+              console.warn(`[CreateNotificationPage] Пропуск обновления: prevCrypto=${!!prevCrypto}, id совпадает=${prevCrypto?.id === coinId}`)
+              return prevCrypto
+            }
+            
+            // Запускаем анимацию подсветки только если цена действительно изменилась
+            if (prevCrypto.price !== newPrice) {
+              setPriceDirection(newPrice > prevCrypto.price ? 'up' : 'down')
+              setPriceUpdated(true)
+              // Убираем класс через 800ms (длительность анимации)
+              setTimeout(() => {
+                setPriceUpdated(false)
+                setPriceDirection(null)
+              }, 800)
+            }
+            
+            const updatedCrypto = {
+              ...prevCrypto,
+              price: newPrice,
+              priceDecimals: coinDetails.priceDecimals || prevCrypto.priceDecimals,
+            }
+            console.log(`[CreateNotificationPage] ✅ Обновлена цена: $${prevCrypto.price} → $${newPrice}`)
+            return updatedCrypto
+          })
+
+          // Обновляем только последнюю точку графика
+          setChartData(prevData => {
+            if (prevData.length === 0) {
+              return prevData
+            }
+            
+            const updatedData = [...prevData]
+            const lastIndex = updatedData.length - 1
+            
+            // Форматируем дату в формате "YYYY-MM-DD HH:MM" (как в API)
+            const now = new Date()
+            const year = now.getFullYear()
+            const month = String(now.getMonth() + 1).padStart(2, '0')
+            const day = String(now.getDate()).padStart(2, '0')
+            const hours = String(now.getHours()).padStart(2, '0')
+            const minutes = String(now.getMinutes()).padStart(2, '0')
+            const formattedDate = `${year}-${month}-${day} ${hours}:${minutes}`
+            
+            // Обновляем последнюю точку: цену и дату
+            updatedData[lastIndex] = {
+              ...updatedData[lastIndex],
+              price: newPrice,
+              date: formattedDate,
+            }
+            
+            console.log(`[CreateNotificationPage] ✅ Обновлена последняя точка графика: цена $${newPrice}`)
+            return updatedData
+          })
+        } else {
+          console.warn(`[CreateNotificationPage] Не удалось получить данные монеты ${coinId}`)
+        }
+      } catch (error) {
+        console.error('[CreateNotificationPage] Ошибка обновления цены:', error)
+      }
+    }
+
+    // Обновляем цену сразу при монтировании
+    updatePrice()
+
+    // Обновляем цену каждые 5 секунд
+    console.log(`[CreateNotificationPage] ✅ Запуск интервала обновления каждые 5 секунд для ${coinId}`)
+    const intervalId = setInterval(() => {
+      updatePrice()
+    }, 5000) // 5000 мс = 5 секунд
+
+    // Очищаем интервал при размонтировании или изменении зависимостей
+    return () => {
+      console.log(`[CreateNotificationPage] Очистка интервала обновления для ${coinId}`)
+      clearInterval(intervalId)
+    }
+  }, [crypto?.id])
 
   const handleCreate = async () => {
     if (!crypto || !value) return
@@ -881,7 +981,11 @@ export const CreateNotificationPage = () => {
           <GroupItem
             text="Current Price"
             after={
-              <Text type="text" color="primary">
+              <Text 
+                type="text" 
+                color="primary"
+                className={priceUpdated ? (priceDirection === 'up' ? styles.priceUpdatedUp : styles.priceUpdatedDown) : ''}
+              >
                 {crypto ? `$${formatPrice(crypto.price)}` : '-'}
               </Text>
             }

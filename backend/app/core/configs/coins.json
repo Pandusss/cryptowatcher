@@ -1,0 +1,985 @@
+{
+  "version": "1.0",
+  "coins": {
+    "bitcoin": {
+      "id": "bitcoin",
+      "name": "Bitcoin",
+      "symbol": "BTC",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "bitcoin",
+        "binance": "BTCUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "ethereum": {
+      "id": "ethereum",
+      "name": "Ethereum",
+      "symbol": "ETH",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "ethereum",
+        "binance": "ETHUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "binancecoin": {
+      "id": "binancecoin",
+      "name": "Binance Coin",
+      "symbol": "BNB",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "binancecoin",
+        "binance": "BNBUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "solana": {
+      "id": "solana",
+      "name": "Solana",
+      "symbol": "SOL",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "solana",
+        "binance": "SOLUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "ripple": {
+      "id": "ripple",
+      "name": "Ripple",
+      "symbol": "XRP",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "ripple",
+        "binance": "XRPUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "cardano": {
+      "id": "cardano",
+      "name": "Cardano",
+      "symbol": "ADA",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "cardano",
+        "binance": "ADAUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "dogecoin": {
+      "id": "dogecoin",
+      "name": "Dogecoin",
+      "symbol": "DOGE",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "dogecoin",
+        "binance": "DOGEUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "avalanche-2": {
+      "id": "avalanche-2",
+      "name": "Avalanche",
+      "symbol": "AVAX",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "avalanche-2",
+        "binance": "AVAXUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "shiba-inu": {
+      "id": "shiba-inu",
+      "name": "Shiba Inu",
+      "symbol": "SHIB",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "shiba-inu",
+        "binance": "SHIBUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "polkadot": {
+      "id": "polkadot",
+      "name": "Polkadot",
+      "symbol": "DOT",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "polkadot",
+        "binance": "DOTUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "chainlink": {
+      "id": "chainlink",
+      "name": "Chainlink",
+      "symbol": "LINK",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "chainlink",
+        "binance": "LINKUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "polygon": {
+      "id": "polygon",
+      "name": "Polygon",
+      "symbol": "MATIC",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "polygon",
+        "binance": "MATICUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "litecoin": {
+      "id": "litecoin",
+      "name": "Litecoin",
+      "symbol": "LTC",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "litecoin",
+        "binance": "LTCUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "bitcoin-cash": {
+      "id": "bitcoin-cash",
+      "name": "Bitcoin Cash",
+      "symbol": "BCH",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "bitcoin-cash",
+        "binance": "BCHUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "near": {
+      "id": "near",
+      "name": "NEAR Protocol",
+      "symbol": "NEAR",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "near",
+        "binance": "NEARUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "uniswap": {
+      "id": "uniswap",
+      "name": "Uniswap",
+      "symbol": "UNI",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "uniswap",
+        "binance": "UNIUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "ethereum-classic": {
+      "id": "ethereum-classic",
+      "name": "Ethereum Classic",
+      "symbol": "ETC",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "ethereum-classic",
+        "binance": "ETCUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "cosmos": {
+      "id": "cosmos",
+      "name": "Cosmos",
+      "symbol": "ATOM",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "cosmos",
+        "binance": "ATOMUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "tron": {
+      "id": "tron",
+      "name": "Tron",
+      "symbol": "TRX",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "tron",
+        "binance": "TRXUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "the-open-network": {
+      "id": "the-open-network",
+      "name": "The Open Network",
+      "symbol": "TON",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "the-open-network",
+        "binance": "TONUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "okb": {
+      "id": "okb",
+      "name": "OKB",
+      "symbol": "OKB",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "okb",
+        "binance": "OKBUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "monero": {
+      "id": "monero",
+      "name": "Monero",
+      "symbol": "XMR",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "monero",
+        "binance": "XMRUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "stellar": {
+      "id": "stellar",
+      "name": "Stellar",
+      "symbol": "XLM",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "stellar",
+        "binance": "XLMUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "internet-computer": {
+      "id": "internet-computer",
+      "name": "Internet Computer",
+      "symbol": "ICP",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "internet-computer",
+        "binance": "ICPUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "filecoin": {
+      "id": "filecoin",
+      "name": "Filecoin",
+      "symbol": "FIL",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "filecoin",
+        "binance": "FILUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "aptos": {
+      "id": "aptos",
+      "name": "Aptos",
+      "symbol": "APT",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "aptos",
+        "binance": "APTUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "hedera-hashgraph": {
+      "id": "hedera-hashgraph",
+      "name": "Hedera Hashgraph",
+      "symbol": "HBAR",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "hedera-hashgraph",
+        "binance": "HBARUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "arbitrum": {
+      "id": "arbitrum",
+      "name": "Arbitrum",
+      "symbol": "ARB",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "arbitrum",
+        "binance": "ARBUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "cronos": {
+      "id": "cronos",
+      "name": "Cronos",
+      "symbol": "CRO",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "cronos",
+        "binance": "CROUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "vechain": {
+      "id": "vechain",
+      "name": "VeChain",
+      "symbol": "VET",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "vechain",
+        "binance": "VETUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "immutable-x": {
+      "id": "immutable-x",
+      "name": "Immutable X",
+      "symbol": "IMX",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "immutable-x",
+        "binance": "IMXUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "the-graph": {
+      "id": "the-graph",
+      "name": "The Graph",
+      "symbol": "GRT",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "the-graph",
+        "binance": "GRTUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "optimism": {
+      "id": "optimism",
+      "name": "Optimism",
+      "symbol": "OP",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "optimism",
+        "binance": "OPUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "aave": {
+      "id": "aave",
+      "name": "Aave",
+      "symbol": "AAVE",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "aave",
+        "binance": "AAVEUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "maker": {
+      "id": "maker",
+      "name": "Maker",
+      "symbol": "MKR",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "maker",
+        "binance": "MKRUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "algorand": {
+      "id": "algorand",
+      "name": "Algorand",
+      "symbol": "ALGO",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "algorand",
+        "binance": "ALGOUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "the-sandbox": {
+      "id": "the-sandbox",
+      "name": "The Sandbox",
+      "symbol": "SAND",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "the-sandbox",
+        "binance": "SANDUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "eos": {
+      "id": "eos",
+      "name": "EOS",
+      "symbol": "EOS",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "eos",
+        "binance": "EOSUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "apecoin": {
+      "id": "apecoin",
+      "name": "ApeCoin",
+      "symbol": "APE",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "apecoin",
+        "binance": "APEUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "theta-token": {
+      "id": "theta-token",
+      "name": "Theta Token",
+      "symbol": "THETA",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "theta-token",
+        "binance": "THETAUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "axie-infinity": {
+      "id": "axie-infinity",
+      "name": "Axie Infinity",
+      "symbol": "AXS",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "axie-infinity",
+        "binance": "AXSUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "pancakeswap-token": {
+      "id": "pancakeswap-token",
+      "name": "PancakeSwap",
+      "symbol": "CAKE",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "pancakeswap-token",
+        "binance": "CAKEUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "flow": {
+      "id": "flow",
+      "name": "Flow",
+      "symbol": "FLOW",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "flow",
+        "binance": "FLOWUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "gala": {
+      "id": "gala",
+      "name": "Gala",
+      "symbol": "GALA",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "gala",
+        "binance": "GALAUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "chiliz": {
+      "id": "chiliz",
+      "name": "Chiliz",
+      "symbol": "CHZ",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "chiliz",
+        "binance": "CHZUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "decentraland": {
+      "id": "decentraland",
+      "name": "Decentraland",
+      "symbol": "MANA",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "decentraland",
+        "binance": "MANAUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "enjincoin": {
+      "id": "enjincoin",
+      "name": "Enjin Coin",
+      "symbol": "ENJ",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "enjincoin",
+        "binance": "ENJUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "curve-dao-token": {
+      "id": "curve-dao-token",
+      "name": "Curve DAO Token",
+      "symbol": "CRV",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "curve-dao-token",
+        "binance": "CRVUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "rocket-pool-eth": {
+      "id": "rocket-pool-eth",
+      "name": "Rocket Pool ETH",
+      "symbol": "RETH",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "rocket-pool-eth",
+        "binance": "RETHUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "render-token": {
+      "id": "render-token",
+      "name": "Render Token",
+      "symbol": "RENDER",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "render-token",
+        "binance": "RENDERUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "multiversx-egld": {
+      "id": "multiversx-egld",
+      "name": "MultiversX",
+      "symbol": "EGLD",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "multiversx-egld",
+        "binance": "EGLDUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "fantom": {
+      "id": "fantom",
+      "name": "Fantom",
+      "symbol": "FTM",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "fantom",
+        "binance": "FTMUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "mina-protocol": {
+      "id": "mina-protocol",
+      "name": "Mina Protocol",
+      "symbol": "MINA",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "mina-protocol",
+        "binance": "MINAUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "thorchain": {
+      "id": "thorchain",
+      "name": "THORChain",
+      "symbol": "RUNE",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "thorchain",
+        "binance": "RUNEUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "celo": {
+      "id": "celo",
+      "name": "Celo",
+      "symbol": "CELO",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "celo",
+        "binance": "CELOUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "dydx": {
+      "id": "dydx",
+      "name": "dYdX",
+      "symbol": "DYDX",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "dydx",
+        "binance": "DYDXUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "injective-protocol": {
+      "id": "injective-protocol",
+      "name": "Injective Protocol",
+      "symbol": "INJ",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "injective-protocol",
+        "binance": "INJUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "sui": {
+      "id": "sui",
+      "name": "Sui",
+      "symbol": "SUI",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "sui",
+        "binance": "SUIUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "sei-network": {
+      "id": "sei-network",
+      "name": "Sei Network",
+      "symbol": "SEI",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "sei-network",
+        "binance": "SEIUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "mantle": {
+      "id": "mantle",
+      "name": "Mantle",
+      "symbol": "MNT",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "mantle",
+        "binance": "MNTUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "layerzero": {
+      "id": "layerzero",
+      "name": "LayerZero",
+      "symbol": "ZRO",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "layerzero",
+        "binance": "ZROUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "pepe": {
+      "id": "pepe",
+      "name": "Pepe",
+      "symbol": "PEPE",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "pepe",
+        "binance": "PEPEUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "floki": {
+      "id": "floki",
+      "name": "Floki",
+      "symbol": "FLOKI",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "floki",
+        "binance": "FLOKIUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "bonk": {
+      "id": "bonk",
+      "name": "Bonk",
+      "symbol": "BONK",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "bonk",
+        "binance": "BONKUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "wif": {
+      "id": "wif",
+      "name": "dogwifhat",
+      "symbol": "WIF",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "wif",
+        "binance": "WIFUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "bittensor": {
+      "id": "bittensor",
+      "name": "Bittensor",
+      "symbol": "TAO",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "bittensor",
+        "binance": "TAOUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "fetch-ai": {
+      "id": "fetch-ai",
+      "name": "Fetch.ai",
+      "symbol": "FET",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "fetch-ai",
+        "binance": "FETUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "oasis-network": {
+      "id": "oasis-network",
+      "name": "Oasis Network",
+      "symbol": "ROSE",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "oasis-network",
+        "binance": "ROSEUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "golem": {
+      "id": "golem",
+      "name": "Golem",
+      "symbol": "GLM",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "golem",
+        "binance": "GLMUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "akash-network": {
+      "id": "akash-network",
+      "name": "Akash Network",
+      "symbol": "AKT",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "akash-network",
+        "binance": "AKTUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "pyth-network": {
+      "id": "pyth-network",
+      "name": "Pyth Network",
+      "symbol": "PYTH",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "pyth-network",
+        "binance": "PYTHUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "echelon-prime": {
+      "id": "echelon-prime",
+      "name": "Echelon Prime",
+      "symbol": "PRIME",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "echelon-prime",
+        "binance": "PRIMEUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "pendle": {
+      "id": "pendle",
+      "name": "Pendle",
+      "symbol": "PENDLE",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "pendle",
+        "binance": "PENDLEUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "singularitynet": {
+      "id": "singularitynet",
+      "name": "SingularityNET",
+      "symbol": "AGIX",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "singularitynet",
+        "binance": "AGIXUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "artificial-superintelligence-alliance": {
+      "id": "artificial-superintelligence-alliance",
+      "name": "ASI Alliance",
+      "symbol": "ASI",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "artificial-superintelligence-alliance",
+        "binance": "ASIUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "0x0-ai-ai-smart-contract": {
+      "id": "0x0-ai-ai-smart-contract",
+      "name": "0x0.ai",
+      "symbol": "0X0",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "0x0-ai-ai-smart-contract",
+        "binance": "0X0USDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "ethena": {
+      "id": "ethena",
+      "name": "Ethena",
+      "symbol": "ENA",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "ethena",
+        "binance": "ENAUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "etherfi": {
+      "id": "etherfi",
+      "name": "Ether.fi",
+      "symbol": "ETHFI",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "etherfi",
+        "binance": "ETHFIUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "worldcoin-wld": {
+      "id": "worldcoin-wld",
+      "name": "Worldcoin",
+      "symbol": "WLD",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "worldcoin-wld",
+        "binance": "WLDUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "jito-governance-token": {
+      "id": "jito-governance-token",
+      "name": "Jito",
+      "symbol": "JTO",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "jito-governance-token",
+        "binance": "JTOUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "notcoin": {
+      "id": "notcoin",
+      "name": "Notcoin",
+      "symbol": "NOT",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "notcoin",
+        "binance": "NOTUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "wormhole": {
+      "id": "wormhole",
+      "name": "Wormhole",
+      "symbol": "W",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "wormhole",
+        "binance": "WUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "io-net": {
+      "id": "io-net",
+      "name": "IO.net",
+      "symbol": "IO",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "io-net",
+        "binance": "IONETUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "zksync": {
+      "id": "zksync",
+      "name": "zkSync",
+      "symbol": "ZK",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "zksync",
+        "binance": "ZKUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "eigenlayer": {
+      "id": "eigenlayer",
+      "name": "EigenLayer",
+      "symbol": "EIGEN",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "eigenlayer",
+        "binance": "EIGENUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "tensor": {
+      "id": "tensor",
+      "name": "Tensor",
+      "symbol": "TNSR",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "tensor",
+        "binance": "TNSRUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "pixelverse": {
+      "id": "pixelverse",
+      "name": "Pixelverse",
+      "symbol": "PIXEL",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "pixelverse",
+        "binance": "PIXELUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "pengu": {
+      "id": "pengu",
+      "name": "Pengu",
+      "symbol": "PENGU",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "pengu",
+        "binance": "PENGUUSDT"
+      },
+      "price_priority": ["binance"]
+    },
+    "catizen": {
+      "id": "catizen",
+      "name": "Catizen",
+      "symbol": "CATI",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "catizen",
+        "binance": "CATIUSDT"
+      },
+      "price_priority": ["binance"]
+    }
+  }
+}
+

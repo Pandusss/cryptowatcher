@@ -5,7 +5,6 @@ import {
   Group,
   GroupItem,
   PageLayout,
-  SourceIcon,
   Text,
 } from '@components'
 import { useEffect, useState } from 'react'
@@ -26,8 +25,6 @@ export const MainPage = () => {
   const [dndDisplay, setDndDisplay] = useState('Always')
   const [dndStartTime, setDndStartTime] = useState<string | null>(null)
   const [dndEndTime, setDndEndTime] = useState<string | null>(null)
-  // Состояние для источника данных
-  const [sourceDisplay, setSourceDisplay] = useState('CoinGecko')
   const [notifications, setNotifications] = useState<NotificationResponse[]>([])
   const [loading, setLoading] = useState(true)
   const [logoAnimation, setLogoAnimation] = useState<any>(null)
@@ -46,10 +43,6 @@ export const MainPage = () => {
       setDndDisplay(location.state.dndSettings.display)
       setDndStartTime(location.state.dndSettings.startTime || null)
       setDndEndTime(location.state.dndSettings.endTime || null)
-    }
-    // Получаем настройки Source из location state
-    if (location.state?.sourceDisplay) {
-      setSourceDisplay(location.state.sourceDisplay)
     }
   }, [location.state])
 
@@ -108,38 +101,42 @@ export const MainPage = () => {
   }, []) // Запускаем только один раз при монтировании
 
   useEffect(() => {
-    // Загружаем список уведомлений
-    const loadNotifications = async () => {
-      const userId = getTelegramUserId()
-      if (!userId) {
-        setLoading(false)
-        return
-      }
+    const userId = getTelegramUserId()
+    if (!userId) {
+      setLoading(false)
+      return
+    }
 
+    // Загружаем список уведомлений
+    const loadNotifications = async (showLoading = true) => {
       try {
-        setLoading(true)
+        if (showLoading) {
+          setLoading(true)
+        }
         const data = await apiService.getNotifications(userId)
         setNotifications(data)
       } catch (error) {
         console.error('Failed to load notifications:', error)
       } finally {
-        setLoading(false)
+        if (showLoading) {
+          setLoading(false)
+        }
       }
     }
 
-    loadNotifications()
-  }, [location.pathname, location.key]) // Обновляем при изменении пути или ключа (возврат на главную)
+    // Загружаем сразу при монтировании или изменении пути (с индикатором загрузки)
+    loadNotifications(true)
 
-  // Преобразуем sourceDisplay в sourceId для иконки
-  const getSourceId = (display: string): string => {
-    const mapping: Record<string, string> = {
-      'CoinGecko': 'coingecko',
-      'Binance': 'binance',
-      'CoinMarketCap': 'cmc',
-      'Coinbase': 'coinbase',
+    // Обновляем список каждые 30 секунд в фоне (без индикатора загрузки)
+    const intervalId = setInterval(() => {
+      loadNotifications(false)
+    }, 30000) // 30 секунд
+
+    // Очищаем интервал при размонтировании
+    return () => {
+      clearInterval(intervalId)
     }
-    return mapping[display] || 'coingecko'
-  }
+  }, [location.pathname, location.key]) // Обновляем при изменении пути или ключа (возврат на главную)
 
   // Форматируем описание уведомления для отображения
   const formatNotificationDescription = (notification: NotificationResponse) => {
@@ -209,35 +206,6 @@ export const MainPage = () => {
         <Text type="text" color="secondary" align="center">
           Create any notification in a seconds
         </Text>
-      </Block>
-
-      {/* Source - отдельный островок */}
-      <Block margin="top" marginValue={12}>
-        <Group>
-          <GroupItem
-            text="Source"
-            after={
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <SourceIcon
-                  sourceId={location.state?.source || getSourceId(sourceDisplay)}
-                  size={20}
-                />
-                <Text type="text" color="secondary">
-                  {sourceDisplay}
-                </Text>
-              </div>
-            }
-            chevron
-            chevronType="single"
-            onClick={() => {
-              navigate(ROUTES_NAME.SOURCE_SETTINGS, {
-                state: {
-                  source: location.state?.source || 'coingecko',
-                },
-              })
-            }}
-          />
-        </Group>
       </Block>
 
       {/* Don't Disturb - отдельный островок */}
