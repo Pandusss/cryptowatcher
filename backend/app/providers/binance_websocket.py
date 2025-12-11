@@ -161,6 +161,7 @@ class BinanceWebSocketWorker:
             skipped_not_in_map = 0
             skipped_not_tracked = 0
             skipped_zero_price = 0
+            skipped_wrong_priority = 0
             current_time = asyncio.get_event_loop().time()
             total_tickers = len(tickers)
             
@@ -183,6 +184,13 @@ class BinanceWebSocketWorker:
                 
                 if coin_id not in self._tracked_coins:
                     skipped_not_tracked += 1
+                    continue
+                
+                # Проверяем price_priority: Binance должен быть первым приоритетом
+                # Если Binance не является первым приоритетом, не записываем цену в Redis
+                price_priority = coin.price_priority
+                if not price_priority or price_priority[0] != "binance":
+                    skipped_wrong_priority += 1
                     continue
                 
                 # Извлекаем данные о цене из Binance тикера
@@ -248,7 +256,7 @@ class BinanceWebSocketWorker:
                     coins_not_in_binance = len(self._tracked_coins) - coins_with_binance
                     
                     print(f"[BinanceWebSocket] 💰 Обновлено цен: {updated_count} монет из {total_tickers} тикеров в этом сообщении")
-                    print(f"[BinanceWebSocket] 📊 Статистика сообщения: пропущено (нет в маппинге: {skipped_not_in_map}, не отслеживаем: {skipped_not_tracked}, цена=0: {skipped_zero_price})")
+                    print(f"[BinanceWebSocket] 📊 Статистика сообщения: пропущено (нет в маппинге: {skipped_not_in_map}, не отслеживаем: {skipped_not_tracked}, не приоритет Binance: {skipped_wrong_priority}, цена=0: {skipped_zero_price})")
                     print(f"[BinanceWebSocket] 📈 Всего отслеживаем: {len(self._tracked_coins)} монет | В Binance: {coins_with_binance} | Не в Binance: {coins_not_in_binance}")
                     print(f"[BinanceWebSocket] ✅ Уникальных монет с обновлениями за последние 5 сек: {len(self._coins_with_updates)}")
                     

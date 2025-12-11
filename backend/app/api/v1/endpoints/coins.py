@@ -78,13 +78,17 @@ async def get_coin_chart(
     coin_id: str,
     period: str = "7d",  # 1d, 7d, 30d, 1y
 ):
-    """Получить данные графика для криптовалюты"""
+    """Получить данные графика для криптовалюты с учетом приоритетов провайдеров"""
     print(f"\n[API Endpoint] GET /coins/{coin_id}/chart - period={period}")
-    service = CoinGeckoService()
+    from app.services.aggregation_service import aggregation_service
     try:
-        chart_data = await service.get_crypto_chart(coin_id, period)
-        print(f"[API Endpoint] Возвращаем {len(chart_data)} точек графика клиенту")
-        return {"data": chart_data}
+        chart_data = await aggregation_service.get_coin_chart(coin_id, period)
+        if chart_data:
+            print(f"[API Endpoint] Возвращаем {len(chart_data)} точек графика клиенту")
+            return {"data": chart_data}
+        else:
+            print(f"[API Endpoint] График не найден для {coin_id}")
+            return {"data": []}
     except Exception as e:
         print(f"[API Endpoint] Ошибка: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

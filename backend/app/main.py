@@ -10,6 +10,7 @@ from app.services.notification_checker import notification_checker
 # - prices_updater.py - заменен на Binance WebSocket
 # - coins_cache_updater.py - больше не нужен
 from app.providers.binance_websocket import binance_websocket_worker
+from app.providers.okx_websocket import okx_websocket_worker
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -52,6 +53,9 @@ async def startup_event():
     # Запускаем Binance WebSocket для real-time цен (заменяет CoinGecko polling)
     asyncio.create_task(binance_websocket_worker.start())
     
+    # Запускаем OKX WebSocket как fallback для монет, которых нет на Binance
+    asyncio.create_task(okx_websocket_worker.start())
+    
     # Отключено: CoinGecko polling заменен на Binance WebSocket для real-time обновлений
     # asyncio.create_task(prices_updater.start())
     
@@ -65,11 +69,13 @@ async def shutdown_event():
     bot_polling.stop()
     notification_checker.stop()
     binance_websocket_worker.stop()  # Останавливаем Binance WebSocket
+    okx_websocket_worker.stop()  # Останавливаем OKX WebSocket
     # prices_updater.stop()  # Отключено (заменен на Binance WebSocket)
     # coins_cache_updater.stop()  # Отключено
     
     # Закрываем HTTP клиенты и WebSocket соединения для предотвращения утечек памяти
     await notification_checker.close()
     await binance_websocket_worker.close()
+    await okx_websocket_worker.close()
     # await prices_updater.close()  # Отключено
 

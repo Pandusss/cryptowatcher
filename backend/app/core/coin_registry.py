@@ -5,6 +5,8 @@ CoinRegistry - централизованный реестр монет с ма�
 для работы с монетами и их маппингом на внешние источники.
 """
 import json
+import hashlib
+import os
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 from dataclasses import dataclass
@@ -26,32 +28,59 @@ class CoinRegistry:
     
     _instance: Optional['CoinRegistry'] = None
     _coins: Dict[str, CoinConfig] = {}
+    _coin_order: List[str] = []  # Порядок монет из конфига
+    _config_path: Optional[Path] = None
+    _last_modified: Optional[float] = None  # Время последней модификации файла
+    _config_hash: Optional[str] = None  # Хеш всего содержимого конфига
     
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
+            cls._instance._coin_order = []  # Инициализируем порядок
+            cls._instance._config_path = Path(__file__).parent / "configs" / "coins.json"
             cls._instance._load_config()
         return cls._instance
+    
+    def _check_and_reload(self):
+        """Проверить, изменился ли файл конфига, и перезагрузить при необходимости"""
+        if not self._config_path or not self._config_path.exists():
+            return
+        
+        try:
+            current_mtime = os.path.getmtime(self._config_path)
+            if self._last_modified is None or current_mtime > self._last_modified:
+                print(f"[CoinRegistry] 🔄 Обнаружены изменения в конфиге, перезагружаем...")
+                self._load_config()
+        except Exception as e:
+            print(f"[CoinRegistry] ⚠️ Ошибка при проверке изменений конфига: {e}")
     
     def _load_config(self):
         """Загрузить конфигурацию из coins.json"""
         try:
-            # Путь к конфигу относительно core/coin_registry.py
-            config_path = Path(__file__).parent / "configs" / "coins.json"
+            if not self._config_path:
+                self._config_path = Path(__file__).parent / "configs" / "coins.json"
             
-            if not config_path.exists():
-                print(f"[CoinRegistry] ⚠️ Конфиг-файл не найден: {config_path}")
+            if not self._config_path.exists():
+                print(f"[CoinRegistry] ⚠️ Конфиг-файл не найден: {self._config_path}")
                 return
             
-            with open(config_path, 'r', encoding='utf-8') as f:
-                config_data = json.load(f)
+            with open(self._config_path, 'r', encoding='utf-8') as f:
+                config_content = f.read()
+                config_data = json.loads(config_content)
             
             if not config_data or 'coins' not in config_data:
                 print(f"[CoinRegistry] ⚠️ Неверный формат конфига")
                 return
             
+            # Вычисляем хеш всего содержимого конфига (для обнаружения любых изменений)
+            # Сортируем ключи для стабильности хеша
+            normalized_content = json.dumps(config_data, sort_keys=True, ensure_ascii=False)
+            new_config_hash = hashlib.md5(normalized_content.encode('utf-8')).hexdigest()
+            
             coins_data = config_data['coins']
+            old_coin_ids = set(self._coins.keys())
             self._coins = {}
+            self._coin_order = []  # Сохраняем порядок из JSON
             
             for coin_key, coin_data in coins_data.items():
                 coin_config = CoinConfig(
@@ -63,11 +92,34 @@ class CoinRegistry:
                     price_priority=coin_data.get('price_priority', [])
                 )
                 self._coins[coin_config.id] = coin_config
+                self._coin_order.append(coin_config.id)  # Сохраняем порядок
             
-            print(f"[CoinRegistry] ✅ Загружено {len(self._coins)} монет из конфига")
+            # Обновляем время модификации и хеш
+            self._last_modified = os.path.getmtime(self._config_path)
+            old_config_hash = self._config_hash
+            self._config_hash = new_config_hash
+            
+            new_coin_ids = set(self._coins.keys())
+            removed_coins = old_coin_ids - new_coin_ids
+            added_coins = new_coin_ids - old_coin_ids
+            config_changed = old_config_hash != new_config_hash
+            
+            if removed_coins or added_coins:
+                print(f"[CoinRegistry] ✅ Перезагружено {len(self._coins)} монет из конфига")
+                if removed_coins:
+                    print(f"[CoinRegistry]   - Удалено монет: {len(removed_coins)} ({', '.join(list(removed_coins)[:5])}{'...' if len(removed_coins) > 5 else ''})")
+                if added_coins:
+                    print(f"[CoinRegistry]   - Добавлено монет: {len(added_coins)} ({', '.join(list(added_coins)[:5])}{'...' if len(added_coins) > 5 else ''})")
+            elif config_changed:
+                print(f"[CoinRegistry] ✅ Перезагружено {len(self._coins)} монет из конфига (обнаружены изменения в данных монет)")
+                print(f"[CoinRegistry]   - Хеш конфига изменился: {old_config_hash[:8] if old_config_hash else 'N/A'}... -> {new_config_hash[:8]}...")
+            else:
+                print(f"[CoinRegistry] ✅ Загружено {len(self._coins)} монет из конфига")
             
         except Exception as e:
             print(f"[CoinRegistry] ❌ Ошибка загрузки конфига: {e}")
+            import traceback
+            traceback.print_exc()
     
     def get_coin(self, coin_id: str) -> Optional[CoinConfig]:
         """Получить конфигурацию монеты по ID"""
@@ -81,9 +133,29 @@ class CoinRegistry:
         return coins
     
     def get_coin_ids(self, enabled_only: bool = True) -> List[str]:
-        """Получить список всех ID монет"""
-        coins = self.get_all_coins(enabled_only)
-        return [c.id for c in coins]
+        """
+        Получить список всех ID монет в порядке из конфига
+        
+        Args:
+            enabled_only: Только включенные монеты
+            
+        Returns:
+            Список ID монет в порядке из конфига
+        """
+        # Проверяем, изменился ли конфиг
+        self._check_and_reload()
+        
+        if enabled_only:
+            # Фильтруем по enabled и сохраняем порядок из конфига
+            result = []
+            for coin_id in self._coin_order:
+                coin = self._coins.get(coin_id)
+                if coin and coin.enabled:
+                    result.append(coin_id)
+            return result
+        else:
+            # Возвращаем все в порядке из конфига
+            return self._coin_order.copy()
     
     def get_external_id(self, coin_id: str, source: str) -> Optional[str]:
         """
@@ -150,6 +222,10 @@ class CoinRegistry:
     def reload(self):
         """Перезагрузить конфигурацию из файла"""
         self._load_config()
+    
+    def get_config_hash(self) -> Optional[str]:
+        """Получить хеш текущего конфига"""
+        return self._config_hash
 
 
 # Глобальный экземпляр реестра

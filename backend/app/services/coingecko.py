@@ -160,11 +160,11 @@ class CoinService:
         try:
             from app.core.coin_registry import coin_registry
             
-            # Получаем все включенные монеты из реестра
+            # Получаем все включенные монеты из реестра (автоматически перезагрузит конфиг при изменении)
             coin_ids = coin_registry.get_coin_ids(enabled_only=True)
             
-            # Вычисляем хеш для проверки изменений (используем количество монет как простой хеш)
-            config_hash = hashlib.md5(str(len(coin_ids)).encode()).hexdigest()
+            # Используем хеш всего конфига из CoinRegistry (учитывает все изменения, включая содержимое монет)
+            config_hash = coin_registry.get_config_hash() or hashlib.md5(','.join(coin_ids).encode()).hexdigest()
             
             print(f"[CoinService] Загружено {len(coin_ids)} монет из CoinRegistry (хеш: {config_hash[:8]}...)")
             return coin_ids, config_hash
@@ -175,14 +175,20 @@ class CoinService:
             return [], ""
     
     def _format_coin_data(self, coin_data: Dict, coin_id: str) -> Dict:
-        """Форматировать данные монеты для фронтенда"""
+        """
+        Форматировать данные монеты для фронтенда
+        
+        Args:
+            coin_data: Данные от CoinGecko API (содержит CoinGecko ID)
+            coin_id: Внутренний ID монеты (из конфига)
+        """
         price = coin_data.get("current_price", 0)
         
         return {
-            "id": coin_data.get("id", coin_id),
+            "id": coin_id,  # Всегда используем внутренний ID из конфига
             "name": coin_data.get("name", ""),
             "symbol": coin_data.get("symbol", "").upper(),
-            "slug": coin_data.get("id", coin_id),
+            "slug": coin_id,  # Используем внутренний ID для slug
             "imageUrl": coin_data.get("image", ""),
             "quote": {
                 "USD": {
@@ -344,6 +350,42 @@ class CoinService:
             print("[CoinService.get_crypto_list] Конфиг-файл пустой, возвращаем пустой список")
             return []
         
+        # Проверяем, изменился ли конфиг (по хешу)
+        redis = await get_redis()
+        if redis:
+            cached_hash_key = "coins_list:config_hash"
+            cached_hash_raw = await redis.get(cached_hash_key)
+            
+            # Обрабатываем данные из Redis (могут быть bytes или str)
+            cached_hash = None
+            if cached_hash_raw:
+                if isinstance(cached_hash_raw, bytes):
+                    cached_hash = cached_hash_raw.decode('utf-8')
+                else:
+                    cached_hash = str(cached_hash_raw)
+            
+            if cached_hash and cached_hash != config_hash:
+                print(f"[CoinService.get_crypto_list] 🔄 Обнаружено изменение конфига (хеш: {cached_hash[:8]}... -> {config_hash[:8]}...)")
+                print(f"[CoinService.get_crypto_list] Очищаем кэш списка монет и статики...")
+                # Очищаем кэш списка монет
+                await redis.delete("coins_list:filtered")
+                # Очищаем кэш статики для всех монет (чтобы изменения отразились)
+                # Используем паттерн для удаления всех ключей coin_static:*
+                try:
+                    keys_to_delete = []
+                    async for key in redis.scan_iter(match="coin_static:*"):
+                        keys_to_delete.append(key)
+                    if keys_to_delete:
+                        await redis.delete(*keys_to_delete)
+                        print(f"[CoinService.get_crypto_list]   - Удалено {len(keys_to_delete)} ключей статики из кэша")
+                except Exception as e:
+                    print(f"[CoinService.get_crypto_list] ⚠️ Ошибка при очистке кэша статики: {e}")
+                # Обновляем хеш
+                await redis.set(cached_hash_key, config_hash)
+            elif not cached_hash:
+                # Первый запуск - сохраняем хеш
+                await redis.set(cached_hash_key, config_hash)
+        
         print(f"\n[CoinService.get_crypto_list] ===== НАЧАЛО ОБРАБОТКИ =====")
         print(f"[CoinService.get_crypto_list] Всего монет в конфиге: {len(config_coins)}")
         print(f"[CoinService.get_crypto_list] Проверяем кэш для каждой монеты...")
@@ -365,6 +407,10 @@ class CoinService:
                     
                     if cached_static:
                         cached_coin = cached_static.copy()
+                        
+                        # Убеждаемся, что ID правильный (внутренний, а не CoinGecko)
+                        cached_coin["id"] = coin_id
+                        cached_coin["slug"] = coin_id
                         
                         if cached_price:
                             cached_coin["quote"] = {
@@ -413,24 +459,55 @@ class CoinService:
             print(f"[CoinService.get_crypto_list] Монет для загрузки: {len(coins_to_fetch)}")
             
             try:
-                ids_param = ','.join(coins_to_fetch)
-                print(f"[CoinService.get_crypto_list] Отправляем запрос к /coins/markets...")
-                coins_data = await self.client.get(
-                    "/coins/markets",
-                    params={
-                        "vs_currency": "usd",
-                        "ids": ids_param,
-                        "order": "market_cap_desc",
-                        "per_page": len(coins_to_fetch),
-                        "sparkline": False,
-                    },
-                )
+                # Преобразуем внутренние ID в CoinGecko ID
+                from app.core.coin_registry import coin_registry
                 
-                coins_dict = {coin_data.get("id"): coin_data for coin_data in coins_data if coin_data.get("id")}
-                print(f"[CoinService.get_crypto_list] Получено статических данных: {len(coins_dict)} из {len(coins_to_fetch)}")
+                coingecko_ids = []
+                coingecko_to_internal = {}  # coingecko_id -> internal_id
+                
+                for internal_id in coins_to_fetch:
+                    coin = coin_registry.get_coin(internal_id)
+                    if coin:
+                        coingecko_id = coin.external_ids.get("coingecko")
+                        if coingecko_id:
+                            coingecko_ids.append(coingecko_id)
+                            coingecko_to_internal[coingecko_id] = internal_id
+                        else:
+                            print(f"[CoinService.get_crypto_list] ⚠️ Монета {internal_id} не имеет CoinGecko ID в external_ids.coingecko")
+                    else:
+                        print(f"[CoinService.get_crypto_list] ⚠️ Монета {internal_id} не найдена в реестре")
+                
+                if not coingecko_ids:
+                    print(f"[CoinService.get_crypto_list] ⚠️ Нет CoinGecko ID для загрузки")
+                    coins_dict = {}
+                else:
+                    ids_param = ','.join(coingecko_ids)
+                    print(f"[CoinService.get_crypto_list] Отправляем запрос к /coins/markets с CoinGecko ID: {ids_param[:100]}...")
+                    coins_data = await self.client.get(
+                        "/coins/markets",
+                        params={
+                            "vs_currency": "usd",
+                            "ids": ids_param,
+                            "order": "market_cap_desc",
+                            "per_page": len(coingecko_ids),
+                            "sparkline": False,
+                        },
+                    )
+                    
+                    # Создаем словарь: internal_id -> coin_data
+                    coins_dict = {}
+                    for coin_data in coins_data:
+                        coingecko_id = coin_data.get("id")
+                        if coingecko_id in coingecko_to_internal:
+                            internal_id = coingecko_to_internal[coingecko_id]
+                            coins_dict[internal_id] = coin_data
+                    
+                    print(f"[CoinService.get_crypto_list] Получено статических данных: {len(coins_dict)} из {len(coins_to_fetch)}")
                 
             except Exception as e:
                 print(f"[CoinService.get_crypto_list] Ошибка при получении статических данных: {e}")
+                import traceback
+                print(f"[CoinService.get_crypto_list] Traceback: {traceback.format_exc()}")
                 coins_dict = {}
             
             # Обрабатываем загруженные данные
