@@ -1,6 +1,8 @@
 from typing import List
 from fastapi import APIRouter, HTTPException, Body
 
+# TODO: В будущем можно заменить CoinGeckoService на aggregation_service напрямую
+# Сейчас используется для обратной совместимости
 from app.services.coingecko import CoinGeckoService
 
 router = APIRouter()

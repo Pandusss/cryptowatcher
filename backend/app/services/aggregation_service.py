@@ -13,6 +13,7 @@ from app.providers.binance_price import binance_price_adapter
 from app.providers.okx_price import okx_price_adapter
 from app.providers.binance_chart import binance_chart_adapter
 from app.providers.okx_chart import okx_chart_adapter
+from app.providers.coingecko_chart import coingecko_chart_adapter
 from app.utils.cache import CoinCacheManager
 
 
@@ -35,6 +36,7 @@ class AggregationService:
         self.chart_providers = {
             "binance": binance_chart_adapter,
             "okx": okx_chart_adapter,
+            "coingecko": coingecko_chart_adapter,
         }
     
     async def get_coin_static_data(self, coin_id: str) -> Optional[Dict]:
@@ -201,21 +203,19 @@ class AggregationService:
             # Пытаемся получить график
             chart_data = await provider.get_chart_data(external_id, period)
             if chart_data:
-                # Сохраняем в кэш
+                # Сохраняем в кэш (если провайдер еще не сохранил)
                 await self.cache.set_chart(coin_id, period, chart_data)
                 return chart_data
         
-        # Fallback на CoinGecko если есть
+        # Fallback на CoinGecko если есть (теперь через адаптер)
         coingecko_id = coin.external_ids.get("coingecko")
         if coingecko_id:
-            # Fallback на CoinGecko графики (если нужно добавить провайдер)
-            # Пока используем старый метод из CoinService для совместимости
-            from app.services.coingecko import CoinService
-            coin_service = CoinService()
-            chart_data = await coin_service._fetch_crypto_chart_data(coingecko_id, period)
-            if chart_data:
-                await self.cache.set_chart(coin_id, period, chart_data)
-                return chart_data
+            coingecko_provider = self.chart_providers.get("coingecko")
+            if coingecko_provider and coingecko_provider.is_available(coingecko_id):
+                chart_data = await coingecko_provider.get_chart_data(coingecko_id, period)
+                if chart_data:
+                    await self.cache.set_chart(coin_id, period, chart_data)
+                    return chart_data
         
         return None
     

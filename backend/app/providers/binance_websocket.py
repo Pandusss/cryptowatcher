@@ -12,6 +12,7 @@ from pathlib import Path
 
 from app.core.redis_client import get_redis
 from app.core.coin_registry import coin_registry
+from app.utils.formatters import get_price_decimals
 
 
 class BinanceWebSocketWorker:
@@ -45,16 +46,6 @@ class BinanceWebSocketWorker:
             print(f"[BinanceWebSocket] Ошибка загрузки монет из реестра: {e}")
             return []
     
-    def _get_price_decimals(self, price: float) -> int:
-        """Определить количество знаков после запятой для цены"""
-        if price >= 1:
-            return 2
-        elif price >= 0.01:
-            return 4
-        elif price >= 0.0001:
-            return 6
-        else:
-            return 8
     
     async def start(self):
         """Запустить WebSocket worker"""
@@ -211,7 +202,7 @@ class BinanceWebSocketWorker:
                     "price": price,
                     "percent_change_24h": price_change_24h,
                     "volume_24h": volume_24h,
-                    "priceDecimals": self._get_price_decimals(price),
+                    "priceDecimals": get_price_decimals(price),
                 }
                 
                 # Сохраняем в Redis с тем же ключом, что использовал CoinGecko

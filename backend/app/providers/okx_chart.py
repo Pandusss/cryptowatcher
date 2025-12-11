@@ -4,7 +4,6 @@ OKX Chart Provider
 Провайдер графиков из OKX REST API.
 """
 from typing import Dict, List, Optional
-import httpx
 from datetime import datetime
 
 from app.providers.base import BaseChartAdapter
@@ -50,31 +49,29 @@ class OKXChartAdapter(BaseChartAdapter):
             # Получаем исторические данные из OKX REST API
             # OKX API: GET /api/v5/market/candles
             # Параметры: instId, bar (интервал), limit
-            async with httpx.AsyncClient(timeout=30.0, verify=True) as client:
-                headers = {
-                    "Accept": "application/json",
-                    "Content-Type": "application/json",
-                }
-                url = f"{self.BASE_URL}/market/candles"
-                params = {
-                    "instId": coin_id,
-                    "bar": config["bar"],
-                    "limit": config["limit"],
-                }
-                
-                response = await client.get(url, params=params, headers=headers)
-                response.raise_for_status()
-                data = response.json()
-                
-                # OKX формат ответа: {"code": "0", "data": [[timestamp, open, high, low, close, volume, ...], ...]}
-                if data.get("code") != "0":
-                    print(f"[OKXChartAdapter] Ошибка API OKX: {data.get('msg', 'Unknown error')}")
-                    return None
-                
-                candles = data.get("data", [])
-                if not candles:
-                    print(f"[OKXChartAdapter] Пустой ответ от OKX для {coin_id}")
-                    return None
+            from app.utils.http_client import SharedHTTPClient
+            client = SharedHTTPClient.get_client()
+            
+            url = f"{self.BASE_URL}/market/candles"
+            params = {
+                "instId": coin_id,
+                "bar": config["bar"],
+                "limit": config["limit"],
+            }
+            
+            response = await client.get(url, params=params, timeout=30.0)
+            response.raise_for_status()
+            data = response.json()
+            
+            # OKX формат ответа: {"code": "0", "data": [[timestamp, open, high, low, close, volume, ...], ...]}
+            if data.get("code") != "0":
+                print(f"[OKXChartAdapter] Ошибка API OKX: {data.get('msg', 'Unknown error')}")
+                return None
+            
+            candles = data.get("data", [])
+            if not candles:
+                print(f"[OKXChartAdapter] Пустой ответ от OKX для {coin_id}")
+                return None
             
             # Преобразуем данные OKX candle в наш формат
             # Формат OKX candle: [timestamp, open, high, low, close, volume, volCcy, volCcyQuote, confirm]
@@ -111,9 +108,6 @@ class OKXChartAdapter(BaseChartAdapter):
             print(f"[OKXChartAdapter] ✅ Получено {len(chart_data)} точек из OKX для {coin_id} ({period})")
             return chart_data
             
-        except httpx.HTTPError as e:
-            print(f"[OKXChartAdapter] Ошибка HTTP при получении данных из OKX для {coin_id}: {e}")
-            return None
         except Exception as e:
             print(f"[OKXChartAdapter] Ошибка получения данных из OKX для {coin_id}: {e}")
             import traceback

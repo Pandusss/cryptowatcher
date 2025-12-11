@@ -261,7 +261,7 @@
         "okx": "LTC-USDT"
       },
       "price_priority": [
-        "binance"
+        "okx"
       ]
     },
     "sei": {

@@ -19,9 +19,11 @@ app = FastAPI(
 )
 
 # CORS middleware
+# Парсим ALLOWED_ORIGINS из строки в список (формат: "http://localhost:5173,http://localhost:3000")
+allowed_origins = [origin.strip() for origin in settings.ALLOWED_ORIGINS.split(",") if origin.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.get_allowed_origins_list(),
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -73,9 +75,12 @@ async def shutdown_event():
     # prices_updater.stop()  # Отключено (заменен на Binance WebSocket)
     # coins_cache_updater.stop()  # Отключено
     
-    # Закрываем HTTP клиенты и WebSocket соединения для предотвращения утечек памяти
-    await notification_checker.close()
+    # Закрываем WebSocket соединения для предотвращения утечек памяти
     await binance_websocket_worker.close()
     await okx_websocket_worker.close()
+    
+    # Закрываем общий HTTP клиент
+    from app.utils.http_client import SharedHTTPClient
+    await SharedHTTPClient.close()
     # await prices_updater.close()  # Отключено
 

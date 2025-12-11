@@ -4,7 +4,6 @@ Binance Chart Provider
 Провайдер графиков из Binance REST API.
 """
 from typing import Dict, List, Optional
-import httpx
 from datetime import datetime
 
 from app.providers.base import BaseChartAdapter
@@ -47,17 +46,19 @@ class BinanceChartAdapter(BaseChartAdapter):
                 return None
             
             # Получаем исторические данные из Binance REST API
-            async with httpx.AsyncClient() as client:
-                url = f"{self.BASE_URL}/klines"
-                params = {
-                    "symbol": coin_id,
-                    "interval": config["interval"],
-                    "limit": config["limit"],
-                }
-                
-                response = await client.get(url, params=params, timeout=10.0)
-                response.raise_for_status()
-                klines = response.json()
+            from app.utils.http_client import SharedHTTPClient
+            client = SharedHTTPClient.get_client()
+            
+            url = f"{self.BASE_URL}/klines"
+            params = {
+                "symbol": coin_id,
+                "interval": config["interval"],
+                "limit": config["limit"],
+            }
+            
+            response = await client.get(url, params=params, timeout=10.0)
+            response.raise_for_status()
+            klines = response.json()
             
             # Преобразуем данные Binance kline в наш формат
             # Формат Binance kline: [timestamp, open, high, low, close, volume, ...]

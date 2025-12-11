@@ -20,6 +20,7 @@ from app.core.config import settings
 from app.core.redis_client import get_redis
 from app.providers.coingecko_client import CoinGeckoClient
 from app.utils.cache import CoinCacheManager
+from app.utils.formatters import get_price_decimals
 from functools import wraps
 
 
@@ -143,17 +144,6 @@ class CoinService:
         """Закрыть HTTP клиент"""
         await self.client.close()
     
-    @staticmethod
-    def get_price_decimals(price: float) -> int:
-        """Определить количество знаков после запятой для цены"""
-        if price >= 1:
-            return 2
-        elif price >= 0.01:
-            return 4
-        elif price >= 0.0001:
-            return 6
-        else:
-            return 8
     
     def _load_coins_config(self) -> tuple[List[str], str]:
         """Загрузить список монет из CoinRegistry"""
@@ -197,7 +187,7 @@ class CoinService:
                     "volume_24h": coin_data.get("total_volume", 0),
                 }
             },
-            "priceDecimals": self.get_price_decimals(price),
+            "priceDecimals": get_price_decimals(price),
         }
     
     async def _fetch_single_batch_prices(self, batch: List[str], batch_num: int, total_batches: int) -> Dict[str, Dict[str, Any]]:
@@ -321,7 +311,7 @@ class CoinService:
                     "price": price,
                     "percent_change_24h": price_info.get('usd_24h_change', 0),
                     "volume_24h": price_info.get('usd_24h_vol', 0),
-                    "priceDecimals": self.get_price_decimals(price),
+                    "priceDecimals": get_price_decimals(price),
                 }
                 prices_dict[coin_id] = price_data
                 
@@ -429,7 +419,7 @@ class CoinService:
                         
                         if "priceDecimals" not in cached_coin:
                             price = cached_coin.get("quote", {}).get("USD", {}).get("price", 0)
-                            cached_coin["priceDecimals"] = self.get_price_decimals(price)
+                            cached_coin["priceDecimals"] = get_price_decimals(price)
                             
                 except Exception as e:
                     print(f"[CoinService.get_crypto_list] Ошибка при чтении кэша для {coin_id}: {e}")
@@ -528,7 +518,7 @@ class CoinService:
                                 "volume_24h": cached_price.get("volume_24h", 0),
                             }
                         }
-                        formatted_coin["priceDecimals"] = cached_price.get("priceDecimals", self.get_price_decimals(cached_price.get("price", 0)))
+                        formatted_coin["priceDecimals"] = cached_price.get("priceDecimals", get_price_decimals(cached_price.get("price", 0)))
                     else:
                         formatted_coin["quote"] = {"USD": {"price": 0, "percent_change_24h": 0, "volume_24h": 0}}
                         formatted_coin["priceDecimals"] = 2
@@ -590,7 +580,7 @@ class CoinService:
                 "priceChange24h": cached_price.get("volume_24h", 0),
                 "priceChangePercent24h": cached_price.get("percent_change_24h", 0),
                 "imageUrl": cached_static.get("imageUrl", ""),
-                "priceDecimals": cached_price.get("priceDecimals", self.get_price_decimals(cached_price.get("price", 0))),
+                "priceDecimals": cached_price.get("priceDecimals", get_price_decimals(cached_price.get("price", 0))),
             }
             print(f"[CoinService.get_crypto_details] ✅ Все данные из кэша Redis")
             return coin
@@ -629,7 +619,7 @@ class CoinService:
         # Используем цену из кэша (если есть), иначе 0 (обновится через 10 секунд)
         price = cached_price.get("price", 0) if cached_price else 0
         price_change_24h = cached_price.get("percent_change_24h", 0) if cached_price else 0
-        price_decimals = cached_price.get("priceDecimals", self.get_price_decimals(price)) if cached_price else self.get_price_decimals(price)
+        price_decimals = cached_price.get("priceDecimals", get_price_decimals(price)) if cached_price else get_price_decimals(price)
         
         coin = {
             "id": cached_static.get("id", coin_id),
@@ -884,10 +874,6 @@ class CoinGeckoService:
         """Закрыть HTTP клиент"""
         await self._service.close()
     
-    @staticmethod
-    def get_price_decimals(price: float) -> int:
-        """Определить количество знаков после запятой (делегирует CoinService)"""
-        return CoinService.get_price_decimals(price)
     
     async def _make_request(
         self,
@@ -939,12 +925,6 @@ class CoinGeckoService:
     ) -> List[Dict]:
         """Получить данные графика для криптовалюты (делегирует CoinService)"""
         return await self._service.get_crypto_chart(coin_id, period)
-    
-    async def refresh_top3000_cache(self) -> None:
-        """Обновить кэш топ-3000 монет (устаревший метод, не используется)"""
-        # TODO: Удалить после проверки, что нигде не используется
-        print("[CoinGeckoService] refresh_top3000_cache устарел и не используется")
-        pass
 
 
 # Глобальный singleton экземпляр для переиспользования HTTP клиента

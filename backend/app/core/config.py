@@ -1,37 +1,39 @@
+"""
+Конфигурация приложения из переменных окружения (.env файл)
+
+Все переменные обязательны и должны быть указаны в .env файле.
+Pydantic автоматически валидирует типы и выдает ошибку при старте, если что-то не так.
+"""
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import List
 
 
 class Settings(BaseSettings):
     # Application
-    APP_NAME: str = "CryptoWatcher"
-    APP_VERSION: str = "0.1.0"
-    DEBUG: bool = True
+    APP_NAME: str = Field(default="CryptoWatcher") 
+    APP_VERSION: str = Field(default="0.1.0")
+    DEBUG: bool = Field(...) 
 
     # Database
-    DATABASE_URL: str = "postgresql://user:password@localhost:5432/cryptowatcher"
+    DATABASE_URL: str = Field(...)
 
     # Redis
-    REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_URL: str = Field(...)
 
-    # CoinGecko API (опционально, для увеличения лимитов)
-    COINGECKO_API_KEY: str = ""
+    # CoinGecko API 
+    COINGECKO_API_KEY: str = Field(default="")
 
     # Telegram Bot API
-    TELEGRAM_BOT_TOKEN: str = ""  # Токен бота от @BotFather
+    TELEGRAM_BOT_TOKEN: str = Field(...)
 
     # CORS - храним как строку, парсим в main.py
-    ALLOWED_ORIGINS: str = "http://localhost:5173"
+    ALLOWED_ORIGINS: str = Field(...)
 
     model_config = SettingsConfigDict(
-        env_file="../.env",  # Читаем общий .env из корня проекта
+        env_file="../.env", 
         case_sensitive=True,
-        extra="ignore",  # Игнорируем лишние поля из .env
+        extra="ignore", 
     )
-
-    def get_allowed_origins_list(self) -> List[str]:
-        """Парсит ALLOWED_ORIGINS из строки в список"""
-        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
 
 
 settings = Settings()

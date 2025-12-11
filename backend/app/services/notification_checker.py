@@ -296,10 +296,6 @@ class NotificationChecker:
         self.running = False
         print("[NotificationChecker] ⏹️ Остановлена проверка уведомлений")
     
-    async def close(self):
-        """Закрыть HTTP клиент CoinGeckoService для освобождения ресурсов"""
-        # AggregationService не требует закрытия
-        pass
 
 
 # Глобальный экземпляр
