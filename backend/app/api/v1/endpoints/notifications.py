@@ -8,6 +8,7 @@ from app.models.notification import Notification
 from app.schemas.notification import NotificationCreate, NotificationUpdate, NotificationResponse
 from app.services.user_service import get_or_create_user
 from app.services.coingecko import CoinGeckoService
+from app.core.coin_registry import coin_registry
 
 router = APIRouter()
 
@@ -40,10 +41,25 @@ async def get_notifications(
     # Получаем imageUrl для каждой монеты параллельно (используем оптимизированный метод)
     async def get_image_url(crypto_id: str):
         try:
-            image_url = await coingecko_service.get_coin_image_url(crypto_id)
+            # Получаем CoinGecko ID из coin_registry
+            coin = coin_registry.get_coin(crypto_id)
+            if not coin:
+                print(f"[get_notifications] Монета {crypto_id} не найдена в реестре")
+                return crypto_id, None
+            
+            coingecko_id = coin.external_ids.get("coingecko")
+            if not coingecko_id:
+                print(f"[get_notifications] У монеты {crypto_id} нет CoinGecko ID")
+                return crypto_id, None
+            
+            # Используем aggregation_service для получения imageUrl (правильный способ)
+            from app.services.aggregation_service import aggregation_service
+            image_url = await aggregation_service.get_coin_image_url(crypto_id)
             return crypto_id, image_url
         except Exception as e:
             print(f"[get_notifications] Failed to get imageUrl for {crypto_id}: {e}")
+            import traceback
+            traceback.print_exc()
             return crypto_id, None
     
     # Запускаем параллельные запросы
@@ -96,13 +112,15 @@ async def get_notification(
     if not notification:
         raise HTTPException(status_code=404, detail="Notification not found")
     
-    # Получаем imageUrl из CoinGecko (с долгосрочным кэшированием)
-    coingecko_service = CoinGeckoService()
+    # Получаем imageUrl через aggregation_service (правильный способ с использованием coin_registry)
     image_url = None
     try:
-        image_url = await coingecko_service.get_coin_image_url(notification.crypto_id)
+        from app.services.aggregation_service import aggregation_service
+        image_url = await aggregation_service.get_coin_image_url(notification.crypto_id)
     except Exception as e:
         print(f"[get_notification] Failed to get imageUrl for {notification.crypto_id}: {e}")
+        import traceback
+        traceback.print_exc()
     
     # Создаем словарь из уведомления с imageUrl
     notification_dict = {
