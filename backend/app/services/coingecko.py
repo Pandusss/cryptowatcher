@@ -119,7 +119,7 @@ class CoinService:
             return [], ""
     
     def _format_coin_data(self, coin_data: Dict, coin_id: str) -> Dict:
-
+        
         price = coin_data.get("current_price", 0)
         
         return {
@@ -268,18 +268,18 @@ class CoinService:
         else:
             print("[CoinService.get_crypto_list_prices] ⚠️ Redis недоступен, используем CoinGecko API как fallback")
             # Fallback на CoinGecko API если Redis недоступен
-            batch_prices = await self.get_batch_prices(coin_ids)
-            
-            for coin_id, price_info in batch_prices.items():
-                price = price_info.get('usd', 0)
-                if price > 0:
-                    price_data = {
-                        "price": price,
-                        "percent_change_24h": price_info.get('usd_24h_change', 0),
-                        "volume_24h": price_info.get('usd_24h_vol', 0),
+        batch_prices = await self.get_batch_prices(coin_ids)
+        
+        for coin_id, price_info in batch_prices.items():
+            price = price_info.get('usd', 0)
+            if price > 0:
+                price_data = {
+                    "price": price,
+                    "percent_change_24h": price_info.get('usd_24h_change', 0),
+                    "volume_24h": price_info.get('usd_24h_vol', 0),
                         "priceDecimals": get_price_decimals(price),
-                    }
-                    prices_dict[coin_id] = price_data
+                }
+                prices_dict[coin_id] = price_data
         
         print(f"[CoinService.get_crypto_list_prices] Получено цен: {len(prices_dict)} из {len(coin_ids)} запрошенных")
         return prices_dict
@@ -290,7 +290,7 @@ class CoinService:
         page: int = 1,
         force_refresh: bool = False,
     ) -> List[Dict]:
-
+        
         config_coins, config_hash = self._load_coins_config()
         
         if not config_coins:
@@ -343,14 +343,18 @@ class CoinService:
         coins_with_static_only = 0
         coins_with_no_cache = 0
         
-        # Проверяем кэш для каждой монеты
-        for coin_id in config_coins:
-            cached_coin = None
-            
-            if not force_refresh:
-                try:
-                    cached_static = await self.cache.get_static(coin_id)
-                    cached_price = await self.cache.get_price(coin_id)
+        # Оптимизированная проверка кэша через Redis pipeline (batch запрос)
+        if not force_refresh:
+            try:
+                # Получаем все данные одним batch запросом через pipeline
+                cached_data = await self.cache.get_static_and_prices_batch(config_coins)
+                
+                # Обрабатываем результаты
+                for coin_id in config_coins:
+                    cached_coin = None
+                    coin_cache = cached_data.get(coin_id, {"static": None, "price": None})
+                    cached_static = coin_cache.get("static")
+                    cached_price = coin_cache.get("price")
                     
                     if cached_static:
                         cached_coin = cached_static.copy()
@@ -377,15 +381,22 @@ class CoinService:
                         if "priceDecimals" not in cached_coin:
                             price = cached_coin.get("quote", {}).get("USD", {}).get("price", 0)
                             cached_coin["priceDecimals"] = get_price_decimals(price)
-                            
-                except Exception as e:
-                    print(f"[CoinService.get_crypto_list] Ошибка при чтении кэша для {coin_id}: {e}")
-            
-            if cached_coin:
-                formatted_coins.append(cached_coin)
-            else:
-                coins_with_no_cache += 1
-                coins_to_fetch.append(coin_id)
+                    
+                    if cached_coin:
+                        formatted_coins.append(cached_coin)
+                    else:
+                        coins_with_no_cache += 1
+                        coins_to_fetch.append(coin_id)
+                        
+            except Exception as e:
+                print(f"[CoinService.get_crypto_list] Ошибка при batch чтении кэша: {e}")
+                # В случае ошибки добавляем все монеты в список для загрузки
+                coins_to_fetch = config_coins.copy()
+                coins_with_no_cache = len(config_coins)
+        else:
+            # Если force_refresh, все монеты нужно загрузить заново
+            coins_to_fetch = config_coins.copy()
+            coins_with_no_cache = len(config_coins)
         
         print(f"[CoinService.get_crypto_list] === РЕЗУЛЬТАТЫ ПРОВЕРКИ КЭША ===")
         print(f"[CoinService.get_crypto_list] Полностью в кэше (статика + цены): {coins_with_full_cache}")
@@ -512,7 +523,7 @@ class CoinService:
         return formatted_coins
     
     async def get_crypto_details(self, coin_id: str) -> Dict:
-
+        
         # Сначала получаем статические данные (из кэша или API)
         cached_static = await self.cache.get_static(coin_id)
         
@@ -618,7 +629,7 @@ class CoinService:
             return None
     
     async def get_coin_image_url(self, coin_id: str) -> Optional[str]:
-
+        
         return await self._fetch_coin_image_url(coin_id)
     
     @cached_async(

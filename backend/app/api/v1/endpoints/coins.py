@@ -92,4 +92,3 @@ async def get_coin_chart(
     except Exception as e:
         print(f"[API Endpoint] Ошибка: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-

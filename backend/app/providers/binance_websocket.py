@@ -11,7 +11,7 @@ from pathlib import Path
 
 from app.core.redis_client import get_redis
 from app.core.coin_registry import coin_registry
-from app.utils.formatters import get_price_decimals
+from app.utils.websocket_price_handler import process_price_update
 
 
 class BinanceWebSocketWorker:
@@ -142,64 +142,48 @@ class BinanceWebSocketWorker:
             current_time = asyncio.get_event_loop().time()
             total_tickers = len(tickers)
             
+            # Функции для извлечения данных из Binance тикера
+            def symbol_extractor(t: Dict) -> Optional[str]:
+                return t.get("s")
+            
+            def price_extractor(t: Dict) -> float:
+                return float(t.get("c", 0))
+            
+            def price_change_extractor(t: Dict) -> float:
+                return float(t.get("P", 0))
+            
+            def volume_extractor(t: Dict) -> float:
+                return float(t.get("v", 0))
+            
             # Обрабатываем каждый тикер
             for ticker in tickers:
                 if not isinstance(ticker, dict):
                     continue
                 
-                symbol = ticker.get("s")  # Символ Binance (например, "BTCUSDT")
-                if not symbol:
-                    continue
+                status, coin_id = await process_price_update(
+                    ticker=ticker,
+                    source="binance",
+                    symbol_extractor=symbol_extractor,
+                    price_extractor=price_extractor,
+                    price_change_extractor=price_change_extractor,
+                    volume_extractor=volume_extractor,
+                    adapter_name="BinanceWebSocket",
+                    tracked_coins=self._tracked_coins,
+                    last_update_time=self._last_update_time,
+                    coins_with_updates=self._coins_with_updates,
+                    redis=redis,
+                )
                 
-                # Получаем внутренний ID монеты из CoinRegistry
-                coin = coin_registry.find_coin_by_external_id("binance", symbol)
-                if not coin:
-                    skipped_not_in_map += 1
-                    continue
-                
-                coin_id = coin.id  # Используем внутренний ID
-                
-                if coin_id not in self._tracked_coins:
-                    skipped_not_tracked += 1
-                    continue
-                
-                # Проверяем price_priority: Binance должен быть первым приоритетом
-                # Если Binance не является первым приоритетом, не записываем цену в Redis
-                price_priority = coin.price_priority
-                if not price_priority or price_priority[0] != "binance":
-                    skipped_wrong_priority += 1
-                    continue
-                
-                price = float(ticker.get("c", 0))  # Текущая цена
-                price_change_24h = float(ticker.get("P", 0))  # Изменение за 24ч в процентах
-                volume_24h = float(ticker.get("v", 0))  # Объем за 24ч
-                
-                if price <= 0:
-                    skipped_zero_price += 1
-                    continue
-                
-                price_data = {
-                    "price": price,
-                    "percent_change_24h": price_change_24h,
-                    "volume_24h": volume_24h,
-                    "priceDecimals": get_price_decimals(price),
-                }
-                
-                price_cache_key = f"coin_price:{coin_id}"
-                
-                try:
-                    await redis.setex(
-                        price_cache_key,
-                        60,  # TTL в секундах
-                        json.dumps(price_data)
-                    )
-                    
+                if status == "updated":
                     updated_count += 1
-                    self._last_update_time[coin_id] = current_time
-                    self._coins_with_updates.add(coin_id)  # Отслеживаем, какие монеты получили обновления
-                    
-                except Exception as e:
-                    print(f"[BinanceWebSocket] Ошибка записи в Redis для {coin_id}: {e}")
+                elif status == "skipped_not_in_map":
+                    skipped_not_in_map += 1
+                elif status == "skipped_not_tracked":
+                    skipped_not_tracked += 1
+                elif status == "skipped_wrong_priority":
+                    skipped_wrong_priority += 1
+                elif status == "skipped_zero_price":
+                    skipped_zero_price += 1
             
             should_log = (
                 current_time - getattr(self, '_last_log_time', 0) >= 5.0

@@ -7,7 +7,6 @@ WebSocket обновляет кэш в фоне, этот адаптер тол�
 from typing import Dict, List, Optional
 
 from app.providers.base import BasePriceAdapter
-from app.core.redis_client import get_redis
 from app.core.coin_registry import coin_registry
 
 
@@ -17,31 +16,7 @@ class OKXPriceAdapter(BasePriceAdapter):
         self.cache_ttl = 10  # TTL кэша цен в секундах
     
     async def get_price(self, coin_id: str) -> Optional[Dict]:
-        # Находим внутренний ID монеты по OKX символу
-        internal_coin = coin_registry.find_coin_by_external_id("okx", coin_id)
-        if not internal_coin:
-            return None
-        
-        # Читаем из Redis (ключ coin_price:{internal_id})
-        redis = await get_redis()
-        if not redis:
-            return None
-        
-        try:
-            cache_key = f"coin_price:{internal_coin.id}"
-            cached_data = await redis.get(cache_key)
-            
-            if cached_data:
-                import json
-                if isinstance(cached_data, bytes):
-                    cached_data = cached_data.decode('utf-8')
-                price_data = json.loads(cached_data)
-                return price_data
-                
-        except Exception as e:
-            print(f"[OKXPriceAdapter] Ошибка чтения цены для {coin_id}: {e}")
-        
-        return None
+        return await self._get_price_from_redis(coin_id, "okx", "OKXPriceAdapter")
     
     async def get_prices(self, coin_ids: List[str]) -> Dict[str, Dict]:
         result = {}
@@ -58,8 +33,7 @@ class OKXPriceAdapter(BasePriceAdapter):
         return result
     
     def is_available(self, coin_id: str) -> bool:
-        internal_coin = coin_registry.find_coin_by_external_id("okx", coin_id)
-        return internal_coin is not None
+        return coin_registry.find_coin_by_external_id("okx", coin_id) is not None
 
 okx_price_adapter = OKXPriceAdapter()
 

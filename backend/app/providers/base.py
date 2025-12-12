@@ -78,16 +78,55 @@ class BasePriceAdapter(ABC):
     
     @abstractmethod
     def is_available(self, coin_id: str) -> bool:
+        pass
+    
+    async def _get_price_from_redis(
+        self,
+        coin_id: str,
+        source: str,
+        adapter_name: str
+    ) -> Optional[Dict]:
         """
-        Проверить, доступна ли монета на этом провайдере
+        Общий метод для чтения цены из Redis кэша
         
         Args:
-            coin_id: Внешний ID монеты
+            coin_id: Внешний ID монеты (например, "BTCUSDT" для Binance)
+            source: Источник данных ("binance", "okx")
+            adapter_name: Имя адаптера для логирования (например, "BinancePriceAdapter")
             
         Returns:
-            True если доступна, False иначе
+            Словарь с данными цены или None
         """
-        pass
+        from app.core.coin_registry import coin_registry
+        from app.core.redis_client import get_redis
+        import json
+        
+        # Находим внутренний ID монеты по внешнему символу
+        internal_coin = coin_registry.find_coin_by_external_id(source, coin_id)
+        if not internal_coin:
+            return None
+        
+        # Получаем Redis клиент
+        redis = await get_redis()
+        if not redis:
+            return None
+        
+        try:
+            # Формируем ключ кэша
+            cache_key = f"coin_price:{internal_coin.id}"
+            cached_data = await redis.get(cache_key)
+            
+            if cached_data:
+                # Десериализуем JSON (обрабатываем bytes и str)
+                if isinstance(cached_data, bytes):
+                    cached_data = cached_data.decode('utf-8')
+                price_data = json.loads(cached_data)
+                return price_data
+                
+        except Exception as e:
+            print(f"[{adapter_name}] Ошибка чтения цены для {coin_id}: {e}")
+        
+        return None
 
 
 class BaseChartAdapter(ABC):

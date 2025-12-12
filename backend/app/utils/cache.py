@@ -143,4 +143,78 @@ class CoinCacheManager:
         except Exception as e:
             print(f"[CoinCacheManager] Ошибка записи URL для {coin_id}: {e}")
             return False
+    
+    async def get_static_and_prices_batch(
+        self, 
+        coin_ids: List[str]
+    ) -> Dict[str, Dict[str, Optional[Dict]]]:
+        """
+        Получить статику и цены для нескольких монет через Redis pipeline
+        
+        Args:
+            coin_ids: Список внутренних ID монет
+            
+        Returns:
+            Словарь {coin_id: {"static": Optional[Dict], "price": Optional[Dict]}}
+        """
+        redis = await get_redis()
+        if not redis:
+            return {coin_id: {"static": None, "price": None} for coin_id in coin_ids}
+        
+        result = {}
+        
+        try:
+            # Используем pipeline для batch запросов
+            async with redis.pipeline() as pipe:
+                # Добавляем все запросы в pipeline
+                for coin_id in coin_ids:
+                    pipe.get(self._get_static_key(coin_id))
+                    pipe.get(self._get_price_key(coin_id))
+                
+                # Выполняем все запросы одним round-trip
+                results = await pipe.execute()
+            
+            # Парсим результаты
+            # results[0] - статика для coin_ids[0]
+            # results[1] - цена для coin_ids[0]
+            # results[2] - статика для coin_ids[1]
+            # results[3] - цена для coin_ids[1]
+            # и т.д.
+            for i, coin_id in enumerate(coin_ids):
+                static_idx = i * 2
+                price_idx = i * 2 + 1
+                
+                static_data = results[static_idx]
+                price_data = results[price_idx]
+                
+                # Десериализуем JSON
+                static_dict = None
+                if static_data:
+                    try:
+                        if isinstance(static_data, bytes):
+                            static_data = static_data.decode('utf-8')
+                        static_dict = json.loads(static_data) if static_data else None
+                    except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                        print(f"[CoinCacheManager] Ошибка десериализации статики для {coin_id}: {e}")
+                
+                price_dict = None
+                if price_data:
+                    try:
+                        if isinstance(price_data, bytes):
+                            price_data = price_data.decode('utf-8')
+                        price_dict = json.loads(price_data) if price_data else None
+                    except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                        print(f"[CoinCacheManager] Ошибка десериализации цены для {coin_id}: {e}")
+                
+                result[coin_id] = {
+                    "static": static_dict,
+                    "price": price_dict
+                }
+            
+            return result
+            
+        except Exception as e:
+            print(f"[CoinCacheManager] Ошибка batch чтения кэша: {e}")
+            # В случае ошибки возвращаем None для всех монет
+            return {coin_id: {"static": None, "price": None} for coin_id in coin_ids}
 

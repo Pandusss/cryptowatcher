@@ -12,7 +12,6 @@ from app.utils.formatters import format_chart_date
 
 
 class BinanceChartAdapter(BaseChartAdapter):
-    """Адаптер для получения графиков из Binance REST API"""
     
     BASE_URL = "https://api.binance.com/api/v3"
     
@@ -29,16 +28,7 @@ class BinanceChartAdapter(BaseChartAdapter):
         coin_id: str,
         period: str = "7d",
     ) -> Optional[List[Dict]]:
-        """
-        Получить данные графика из Binance API
-        
-        Args:
-            coin_id: Binance символ (например, "BTCUSDT")
-            period: Период графика (1d, 7d, 30d, 1y)
-            
-        Returns:
-            Список точек графика [{"date": str, "price": float, "volume": float}] или None
-        """
+
         try:
             # Получаем конфигурацию периода
             config = self.PERIOD_MAP.get(period)
@@ -91,15 +81,6 @@ class BinanceChartAdapter(BaseChartAdapter):
             return None
     
     def is_available(self, coin_id: str) -> bool:
-        """
-        Проверить, доступна ли монета на Binance
-        
-        Args:
-            coin_id: Binance символ (например, "BTCUSDT")
-            
-        Returns:
-            True если монета есть в реестре с Binance маппингом
-        """
         internal_coin = coin_registry.find_coin_by_external_id("binance", coin_id)
         return internal_coin is not None
 

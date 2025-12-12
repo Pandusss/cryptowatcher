@@ -291,12 +291,12 @@ export const CreateNotificationPage = () => {
               // Цена не изменилась - серая анимация
               setPriceDirection('neutral')
             }
-            setPriceUpdated(true)
-            // Убираем класс через 800ms (длительность анимации)
-            setTimeout(() => {
-              setPriceUpdated(false)
-              setPriceDirection(null)
-            }, 800)
+              setPriceUpdated(true)
+              // Убираем класс через 800ms (длительность анимации)
+              setTimeout(() => {
+                setPriceUpdated(false)
+                setPriceDirection(null)
+              }, 800)
             
             const updatedCrypto = {
               ...prevCrypto,

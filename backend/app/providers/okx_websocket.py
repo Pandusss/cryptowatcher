@@ -12,7 +12,7 @@ from pathlib import Path
 
 from app.core.redis_client import get_redis
 from app.core.coin_registry import coin_registry
-from app.utils.formatters import get_price_decimals
+from app.utils.websocket_price_handler import process_price_update
 
 
 class OKXWebSocketWorker:
@@ -178,71 +178,53 @@ class OKXWebSocketWorker:
                 current_time = asyncio.get_event_loop().time()
                 total_tickers = len(tickers)
                 
+                # Функции для извлечения данных из OKX тикера
+                def symbol_extractor(t: Dict) -> Optional[str]:
+                    return t.get("instId")
+                
+                def price_extractor(t: Dict) -> float:
+                    return float(t.get("last", 0))
+                
+                def price_change_extractor(t: Dict) -> float:
+                    # Вычисляем изменение за 24ч в процентах
+                    price = float(t.get("last", 0))
+                    open_24h = float(t.get("open24h", 0))
+                    if open_24h > 0:
+                        return ((price - open_24h) / open_24h) * 100
+                    return 0.0
+                
+                def volume_extractor(t: Dict) -> float:
+                    return float(t.get("vol24h", 0))
+                
+                # Обрабатываем каждый тикер
                 for ticker in tickers:
                     if not isinstance(ticker, dict):
                         continue
                     
-                    # OKX формат: instId = "BTC-USDT", last = цена, open24h = цена 24ч назад, vol24h = объем
-                    inst_id = ticker.get("instId") 
-                    if not inst_id:
-                        continue
+                    status, coin_id = await process_price_update(
+                        ticker=ticker,
+                        source="okx",
+                        symbol_extractor=symbol_extractor,
+                        price_extractor=price_extractor,
+                        price_change_extractor=price_change_extractor,
+                        volume_extractor=volume_extractor,
+                        adapter_name="OKXWebSocket",
+                        tracked_coins=self._tracked_coins,
+                        last_update_time=self._last_update_time,
+                        coins_with_updates=self._coins_with_updates,
+                        redis=redis,
+                    )
                     
-                    coin = coin_registry.find_coin_by_external_id("okx", inst_id)
-                    if not coin:
-                        skipped_not_in_map += 1
-                        continue
-                    
-                    coin_id = coin.id
-                    
-                    if coin_id not in self._tracked_coins:
-                        skipped_not_tracked += 1
-                        continue
-                    
-                    # Проверяем price_priority: OKX должен быть первым приоритетом
-                    # Если OKX не является первым приоритетом, не записываем цену в Redis
-                    price_priority = coin.price_priority
-                    if not price_priority or price_priority[0] != "okx":
-                        skipped_wrong_priority += 1
-                        continue
-                    
-                    price = float(ticker.get("last", 0))  
-                    
-                    # Вычисляем изменение за 24ч в процентах
-                    open_24h = float(ticker.get("open24h", 0))
-                    if open_24h > 0:
-                        price_change_24h = ((price - open_24h) / open_24h) * 100
-                    else:
-                        price_change_24h = 0
-                    
-                    volume_24h = float(ticker.get("vol24h", 0))  # Объем за 24ч
-                    
-                    if price <= 0:
-                        skipped_zero_price += 1
-                        continue
-                    
-                    # Формируем данные для кэша
-                    price_data = {
-                        "price": price,
-                        "percent_change_24h": price_change_24h,
-                        "volume_24h": volume_24h,
-                        "priceDecimals": get_price_decimals(price),
-                    }
-                    
-                    price_cache_key = f"coin_price:{coin_id}"
-                    
-                    try:
-                        await redis.setex(
-                            price_cache_key,
-                            60, 
-                            json.dumps(price_data)
-                        )
-                        
+                    if status == "updated":
                         updated_count += 1
-                        self._last_update_time[coin_id] = current_time
-                        self._coins_with_updates.add(coin_id) 
-                        
-                    except Exception as e:
-                        print(f"[OKXWebSocket] Ошибка записи в Redis для {coin_id}: {e}")
+                    elif status == "skipped_not_in_map":
+                        skipped_not_in_map += 1
+                    elif status == "skipped_not_tracked":
+                        skipped_not_tracked += 1
+                    elif status == "skipped_wrong_priority":
+                        skipped_wrong_priority += 1
+                    elif status == "skipped_zero_price":
+                        skipped_zero_price += 1
                 
                 should_log = (
                     current_time - getattr(self, '_last_log_time', 0) >= 5.0
