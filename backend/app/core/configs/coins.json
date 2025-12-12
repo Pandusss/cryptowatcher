@@ -134,7 +134,8 @@
       "enabled": true,
       "external_ids": {
         "coingecko": "notcoin",
-        "okx": "NOT-USDT"
+        "okx": "NOT-USDT",
+        "binance": "NOTUSDT"
       },
       "price_priority": [
         "okx"
@@ -481,19 +482,6 @@
         "binance": "HBARUSDT",
         "coingecko": "hedera-hashgraph",
         "okx": "HBAR-USDT"
-      },
-      "price_priority": [
-        "binance"
-      ]
-    },
-    "bfusd": {
-      "id": "bfusd",
-      "name": "BFUSD",
-      "symbol": "BFUSD",
-      "enabled": true,
-      "external_ids": {
-        "binance": "BFUSDUSDT",
-        "coingecko": "bfusd"
       },
       "price_priority": [
         "binance"

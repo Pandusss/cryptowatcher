@@ -4,10 +4,12 @@
 Архитектура:
 - CoinGeckoClient: HTTP клиент для CoinGecko API запросов
 - CoinCacheManager: управление кэшем в Redis  
-- CoinService: бизнес-логика работы с монетами (использует CoinGecko для статики и изображений)
-- BinanceService: для графиков (используется через CoinService)
+- CoinService: бизнес-логика работы с монетами (использует CoinGecko ТОЛЬКО для статики и изображений)
 
-Примечание: Цены получаются из Binance WebSocket (binance_websocket.py)
+Примечания:
+- CoinGecko используется ТОЛЬКО для статических данных (id, name, symbol, imageUrl)
+- Цены получаются из Binance/OKX WebSocket (binance_websocket.py, okx_websocket.py)
+- Графики получаются из Binance/OKX (binance_chart.py, okx_chart.py)
 """
 import hashlib
 import json
@@ -20,7 +22,7 @@ from app.core.config import settings
 from app.core.redis_client import get_redis
 from app.providers.coingecko_client import CoinGeckoClient
 from app.utils.cache import CoinCacheManager
-from app.utils.formatters import get_price_decimals, format_chart_date
+from app.utils.formatters import get_price_decimals
 from functools import wraps
 
 
@@ -90,8 +92,6 @@ def cached_async(cache_key_func, ttl: int, serialize_func=None, deserialize_func
 
 class CoinService:
     
-    BATCH_PRICE_SIZE = 100  # Максимум монет в одном batch запросе
-    
     def __init__(self):
         self.client = CoinGeckoClient()  # Только для CoinGecko API
         self.cache = CoinCacheManager()   # Кэш в Redis
@@ -137,102 +137,6 @@ class CoinService:
             },
             "priceDecimals": get_price_decimals(price),
         }
-    
-    async def _fetch_single_batch_prices(self, batch: List[str], batch_num: int, total_batches: int) -> Dict[str, Dict[str, Any]]:
- 
-        ids_param = ','.join(batch)
-        
-        print(f"[CoinService._fetch_single_batch_prices] Батч {batch_num}/{total_batches}: отправляем запрос для {len(batch)} монет...")
-        
-        try:
-            data = await self.client.get(
-                "/simple/price",
-                params={
-                    "ids": ids_param,
-                    "vs_currencies": "usd",
-                    "include_24hr_change": "true",
-                    "include_24hr_vol": "true",
-                },
-            )
-            
-            batch_prices = {}
-            for coin_id, price_data in data.items():
-                if price_data and 'usd' in price_data:
-                    batch_prices[coin_id] = {
-                        'usd': price_data.get('usd', 0),
-                        'usd_24h_change': price_data.get('usd_24h_change', 0),
-                        'usd_24h_vol': price_data.get('usd_24h_vol', 0),
-                    }
-            
-            print(f"[CoinService._fetch_single_batch_prices] Батч {batch_num}/{total_batches}: получено {len(batch_prices)} цен")
-            return batch_prices
-            
-        except Exception as e:
-            print(f"[CoinService._fetch_single_batch_prices] Ошибка батча {batch_num}: {e}")
-            return {}
-    
-    async def get_batch_prices(self, coin_ids: List[str]) -> Dict[str, Dict[str, Any]]:
-
-        if not coin_ids:
-            return {}
-        
-        print(f"[CoinService.get_batch_prices] Запрашиваем цены для {len(coin_ids)} монет...")
-        
-        try:
-            total_batches = (len(coin_ids) + self.BATCH_PRICE_SIZE - 1) // self.BATCH_PRICE_SIZE
-            
-            if total_batches == 1:
-                print(f"[CoinService.get_batch_prices] ✅ ОДИН запрос для всех {len(coin_ids)} монет")
-                # Если один батч, выполняем напрямую
-                batch = coin_ids[0:self.BATCH_PRICE_SIZE]
-                return await self._fetch_single_batch_prices(batch, 1, 1)
-            
-            print(f"[CoinService.get_batch_prices] Разбиваем на {total_batches} батчей и выполняем ПАРАЛЛЕЛЬНО")
-            
-            # Создаем список задач для всех батчей
-            tasks = []
-            for i in range(0, len(coin_ids), self.BATCH_PRICE_SIZE):
-                batch = coin_ids[i:i + self.BATCH_PRICE_SIZE]
-                batch_num = i // self.BATCH_PRICE_SIZE + 1
-                # Создаем задачу для каждого батча (но не выполняем сразу)
-                tasks.append(self._fetch_single_batch_prices(batch, batch_num, total_batches))
-            
-            # Выполняем все батчи ПАРАЛЛЕЛЬНО с помощью asyncio.gather
-            # return_exceptions=True позволяет продолжить работу даже если один батч упал
-            print(f"[CoinService.get_batch_prices] 🚀 Запускаем {len(tasks)} параллельных запросов...")
-            start_time = asyncio.get_event_loop().time()
-            
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            
-            elapsed_time = asyncio.get_event_loop().time() - start_time
-            print(f"[CoinService.get_batch_prices] ⚡ Все {len(tasks)} батчей выполнены за {elapsed_time:.2f} секунд (параллельно)")
-            
-            # Объединяем результаты всех батчей
-            all_prices = {}
-            successful_batches = 0
-            failed_batches = 0
-            
-            for i, result in enumerate(results):
-                if isinstance(result, Exception):
-                    print(f"[CoinService.get_batch_prices] ❌ Батч {i+1} завершился с ошибкой: {result}")
-                    failed_batches += 1
-                elif isinstance(result, dict):
-                    all_prices.update(result)
-                    successful_batches += 1
-                else:
-                    print(f"[CoinService.get_batch_prices] ⚠️ Батч {i+1} вернул неожиданный тип: {type(result)}")
-                    failed_batches += 1
-            
-            print(f"[CoinService.get_batch_prices] ✅ Успешно: {successful_batches} батчей, ошибок: {failed_batches}")
-            print(f"[CoinService.get_batch_prices] Всего получено: {len(all_prices)} цен из {len(coin_ids)} запрошенных")
-            
-            return all_prices
-            
-        except Exception as e:
-            print(f"[CoinService.get_batch_prices] Критическая ошибка: {e}")
-            import traceback
-            print(f"[CoinService.get_batch_prices] Traceback: {traceback.format_exc()}")
-            return {}
     
     async def get_crypto_list_prices(self, coin_ids: List[str]) -> Dict[str, Dict]:
         """
@@ -624,92 +528,6 @@ class CoinService:
         
         return await self._fetch_coin_image_url(coin_id)
     
-    @cached_async(
-        lambda self, coin_id, period: CoinCacheManager._get_chart_key(coin_id, period),
-        ttl=CoinCacheManager.CACHE_TTL_CHART
-    )
-    async def _fetch_crypto_chart_data(
-        self,
-        coin_id: str,
-        period: str = "7d",
-    ) -> List[Dict]:
-
-        # Маппинг периодов на дни для CoinGecko API
-        days_map = {
-            "1d": 1,
-            "7d": 7,
-            "30d": 30,
-            "1y": 365,
-        }
-        days = days_map.get(period, 7)
-        
-        # coin_id - это всегда внутренний ID из конфига (например, "eth")
-        from app.core.coin_registry import coin_registry
-        
-        coin_config = coin_registry.get_coin(coin_id)
-        if not coin_config:
-            print(f"[CoinService._fetch_crypto_chart_data] ❌ Монета {coin_id} не найдена в реестре")
-            return []
-        
-        cg_coin_id = coin_config.external_ids.get("coingecko")
-        if not cg_coin_id:
-            print(f"[CoinService._fetch_crypto_chart_data] ❌ У монеты {coin_id} нет CoinGecko ID в конфиге")
-            return []
-        
-        print(f"[CoinService._fetch_crypto_chart_data] Используем CoinGecko ID из реестра: {coin_id} → {cg_coin_id}")
-        
-        try:
-            # Получаем исторические данные через CoinGecko market_chart endpoint
-            print(f"[CoinService._fetch_crypto_chart_data] Запрашиваем данные за {days} дней для CoinGecko ID: {cg_coin_id}")
-            
-            chart_data_response = await self.client.get(
-                f"/coins/{cg_coin_id}/market_chart",
-                params={
-                    "vs_currency": "usd",
-                    "days": days,
-                },
-            )
-            
-            print(f"[CoinService._fetch_crypto_chart_data] Ответ от market_chart API: {str(chart_data_response)[:500]}")
-            
-            prices = chart_data_response.get("prices", [])
-            volumes = chart_data_response.get("total_volumes", [])
-            
-            print(f"[CoinService._fetch_crypto_chart_data] Получено {len(prices)} точек цен, {len(volumes)} точек объемов")
-            
-            chart_data = []
-            
-            # Объединяем цены и объемы
-            for i, price_point in enumerate(prices):
-                timestamp_ms = price_point[0]  # Unix timestamp в миллисекундах
-                price = price_point[1]
-                
-                volume = 0
-                if volumes and i < len(volumes):
-                    volume = volumes[i][1] if len(volumes[i]) > 1 else 0
-                
-                timestamp_seconds = timestamp_ms / 1000
-                date_obj = datetime.fromtimestamp(timestamp_seconds)
-                date_str = format_chart_date(date_obj, period)
-                
-                chart_data.append({
-                    "date": date_str,
-                    "price": float(price),
-                    "volume": float(volume) if volume else 0,
-                })
-            
-            chart_data.sort(key=lambda x: x["date"])
-            
-            print(f"[CoinService._fetch_crypto_chart_data] Успешно получено {len(chart_data)} точек из CoinGecko API")
-            
-            return chart_data if chart_data else []
-            
-        except Exception as e:
-            print(f"[CoinService._fetch_crypto_chart_data] Ошибка при получении исторических данных: {str(e)}")
-            print(f"[CoinService._fetch_crypto_chart_data] Тип ошибки: {type(e).__name__}")
-            return []
-    
-    
     async def get_crypto_chart(
         self,
         coin_id: str,
@@ -733,11 +551,6 @@ class CoinService:
                 print(f"[CoinService.get_crypto_chart] ✅ Использованы данные из Binance для {coin_id} ({period})")
                 return binance_data
         
-
-        print(f"[CoinService.get_crypto_chart] Монета {coin_id} не найдена в Binance, используем CoinGecko")
-        chart_data = await self._fetch_crypto_chart_data(coin_id, period)
-        
-        if not chart_data:
-            print(f"[CoinService.get_crypto_chart] Исторические данные недоступны для {coin_id} ({period})")
-        
-        return chart_data
+        # Если Binance недоступен, возвращаем пустой список
+        print(f"[CoinService.get_crypto_chart] Монета {coin_id} не найдена в Binance, график недоступен")
+        return []

@@ -13,7 +13,6 @@ from app.providers.binance_price import binance_price_adapter
 from app.providers.okx_price import okx_price_adapter
 from app.providers.binance_chart import binance_chart_adapter
 from app.providers.okx_chart import okx_chart_adapter
-from app.providers.coingecko_chart import coingecko_chart_adapter
 from app.utils.cache import CoinCacheManager
 
 
@@ -35,7 +34,6 @@ class AggregationService:
         self.chart_providers = {
             "binance": binance_chart_adapter,
             "okx": okx_chart_adapter,
-            "coingecko": coingecko_chart_adapter,
         }
     
     async def get_coin_static_data(self, coin_id: str) -> Optional[Dict]:
@@ -138,6 +136,7 @@ class AggregationService:
         # Проверяем кэш
         cached_data = await self.cache.get_chart(coin_id, period)
         if cached_data:
+            print(f"[AggregationService.get_coin_chart] ✅ График загружен из КЭША для {coin_id} ({period}): {len(cached_data)} точек")
             return cached_data
         
         # Получаем список провайдеров в порядке приоритета
@@ -147,34 +146,70 @@ class AggregationService:
         for provider_name in providers:
             provider = self.chart_providers.get(provider_name)
             if not provider:
+                print(f"[AggregationService.get_coin_chart] Провайдер {provider_name} не найден для {coin_id}")
                 continue
             
             # Получаем внешний ID для этого провайдера
             external_id = coin.external_ids.get(provider_name)
             if not external_id:
+                print(f"[AggregationService.get_coin_chart] У монеты {coin_id} нет внешнего ID для провайдера {provider_name}")
                 continue
             
             # Проверяем доступность
             if not provider.is_available(external_id):
+                print(f"[AggregationService.get_coin_chart] Провайдер {provider_name} недоступен для {external_id}")
                 continue
             
             # Пытаемся получить график
-            chart_data = await provider.get_chart_data(external_id, period)
-            if chart_data:
-                # Сохраняем в кэш (если провайдер еще не сохранил)
-                await self.cache.set_chart(coin_id, period, chart_data)
-                return chart_data
+            print(f"[AggregationService.get_coin_chart] Пробуем получить график от {provider_name} для {coin_id} ({external_id})")
+            try:
+                chart_data = await provider.get_chart_data(external_id, period)
+                if chart_data:
+                    # Сохраняем в кэш (если провайдер еще не сохранил)
+                    await self.cache.set_chart(coin_id, period, chart_data)
+                    print(f"[AggregationService.get_coin_chart] ✅ График загружен с площадки {provider_name.upper()} для {coin_id} ({period}): {len(chart_data)} точек")
+                    return chart_data
+                else:
+                    print(f"[AggregationService.get_coin_chart] Провайдер {provider_name} вернул пустые данные для {coin_id}")
+            except Exception as e:
+                print(f"[AggregationService.get_coin_chart] ❌ Ошибка получения графика от {provider_name} для {coin_id}: {e}")
+                continue
         
-        # Fallback на CoinGecko если есть (теперь через адаптер)
-        coingecko_id = coin.external_ids.get("coingecko")
-        if coingecko_id:
-            coingecko_provider = self.chart_providers.get("coingecko")
-            if coingecko_provider and coingecko_provider.is_available(coingecko_id):
-                chart_data = await coingecko_provider.get_chart_data(coingecko_id, period)
+        # Если ни один провайдер из price_priority не вернул график, пробуем все доступные провайдеры как fallback
+        # (на случай если price_priority не содержит всех доступных провайдеров или основной провайдер недоступен)
+        print(f"[AggregationService.get_coin_chart] Пробуем fallback на все доступные провайдеры для {coin_id}")
+        # Динамически получаем список всех доступных провайдеров из chart_providers
+        all_available_providers = list(self.chart_providers.keys())
+        
+        for provider_name in all_available_providers:
+            # Пропускаем провайдеры, которые уже пробовали выше
+            if provider_name in providers:
+                continue
+            
+            provider = self.chart_providers.get(provider_name)
+            if not provider:
+                continue
+            
+            external_id = coin.external_ids.get(provider_name)
+            if not external_id:
+                continue
+            
+            if not provider.is_available(external_id):
+                continue
+            
+            print(f"[AggregationService.get_coin_chart] Fallback: пробуем получить график от {provider_name} для {coin_id} ({external_id})")
+            try:
+                chart_data = await provider.get_chart_data(external_id, period)
                 if chart_data:
                     await self.cache.set_chart(coin_id, period, chart_data)
+                    print(f"[AggregationService.get_coin_chart] ✅ Fallback успешен: график загружен с площадки {provider_name.upper()} для {coin_id} ({period}): {len(chart_data)} точек")
                     return chart_data
+            except Exception as e:
+                print(f"[AggregationService.get_coin_chart] ❌ Fallback ошибка от {provider_name} для {coin_id}: {e}")
+                continue
         
+        # Если ни один провайдер не вернул график, возвращаем None
+        print(f"[AggregationService.get_coin_chart] ❌ График не найден для {coin_id} ({period}) ни у одного провайдера")
         return None
     
     async def get_coin_image_url(self, coin_id: str) -> Optional[str]:
