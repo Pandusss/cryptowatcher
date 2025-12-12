@@ -235,12 +235,16 @@ class CoinService:
             return {}
     
     async def get_crypto_list_prices(self, coin_ids: List[str]) -> Dict[str, Dict]:
+        """
+        Получить цены для списка монет ТОЛЬКО из Redis (обновляются через Binance/OKX WebSocket).
+        CoinGecko НЕ используется для цен - только для статики (картинки, названия).
+        """
         if not coin_ids:
             return {}
         
         print(f"\n[CoinService.get_crypto_list_prices] Загружаем цены для {len(coin_ids)} монет из Redis...")
         
-        # Читаем цены из Redis кэша (обновляется через Binance/OKX WebSocket)
+        # Читаем цены ТОЛЬКО из Redis кэша (обновляется через Binance/OKX WebSocket)
         prices_dict = {}
         redis = await get_redis()
         
@@ -266,20 +270,8 @@ class CoinService:
                         "priceDecimals": cached_price.get("priceDecimals", get_price_decimals(cached_price.get("price", 0))),
                     }
         else:
-            print("[CoinService.get_crypto_list_prices] ⚠️ Redis недоступен, используем CoinGecko API как fallback")
-            # Fallback на CoinGecko API если Redis недоступен
-        batch_prices = await self.get_batch_prices(coin_ids)
-        
-        for coin_id, price_info in batch_prices.items():
-            price = price_info.get('usd', 0)
-            if price > 0:
-                price_data = {
-                    "price": price,
-                    "percent_change_24h": price_info.get('usd_24h_change', 0),
-                    "volume_24h": price_info.get('usd_24h_vol', 0),
-                        "priceDecimals": get_price_decimals(price),
-                }
-                prices_dict[coin_id] = price_data
+            print("[CoinService.get_crypto_list_prices] ⚠️ Redis недоступен, цены недоступны (CoinGecko НЕ используется для цен)")
+            # НЕ используем CoinGecko как fallback - цены должны приходить только из WebSocket
         
         print(f"[CoinService.get_crypto_list_prices] Получено цен: {len(prices_dict)} из {len(coin_ids)} запрошенных")
         return prices_dict

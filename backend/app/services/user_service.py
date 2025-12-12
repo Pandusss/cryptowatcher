@@ -51,4 +51,3 @@ def get_or_create_user(
             print(f"[UserService] Обновлен пользователь: {user_id}")
     
     return user
-
