@@ -71,19 +71,6 @@
         "binance"
       ]
     },
-    "fdusd": {
-      "id": "fdusd",
-      "name": "FDUSD",
-      "symbol": "FDUSD",
-      "enabled": true,
-      "external_ids": {
-        "binance": "FDUSDUSDT",
-        "coingecko": "first-digital-usd"
-      },
-      "price_priority": [
-        "binance"
-      ]
-    },
     "bnb": {
       "id": "bnb",
       "name": "BNB",
