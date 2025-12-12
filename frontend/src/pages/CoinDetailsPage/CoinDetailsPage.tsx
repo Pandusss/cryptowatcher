@@ -41,7 +41,7 @@ export const CoinDetailsPage = () => {
   const [chartData, setChartData] = useState<any[]>([])
   const [selectedPeriod, setSelectedPeriod] = useState('7d')
   const [priceUpdated, setPriceUpdated] = useState(false) // Флаг для анимации обновления цены
-  const [priceDirection, setPriceDirection] = useState<'up' | 'down' | null>(null) // Направление изменения цены
+  const [priceDirection, setPriceDirection] = useState<'up' | 'down' | 'neutral' | null>(null) // Направление изменения цены
 
   // Управление кнопкой "Назад" в Telegram Mini App
   useTelegramBackButton()
@@ -134,16 +134,20 @@ export const CoinDetailsPage = () => {
               return prevCoin
             }
             
-            // Запускаем анимацию подсветки только если цена действительно изменилась
+            // Запускаем анимацию подсветки
             if (prevCoin.currentPrice !== newPrice) {
+              // Цена изменилась - зеленая или красная анимация
               setPriceDirection(newPrice > prevCoin.currentPrice ? 'up' : 'down')
-              setPriceUpdated(true)
-              // Убираем класс через 800ms (длительность анимации)
-              setTimeout(() => {
-                setPriceUpdated(false)
-                setPriceDirection(null)
-              }, 800)
+            } else {
+              // Цена не изменилась - серая анимация
+              setPriceDirection('neutral')
             }
+            setPriceUpdated(true)
+            // Убираем класс через 800ms (длительность анимации)
+            setTimeout(() => {
+              setPriceUpdated(false)
+              setPriceDirection(null)
+            }, 800)
             
             const updatedCoin = {
               ...prevCoin,
@@ -798,7 +802,11 @@ export const CoinDetailsPage = () => {
           <Text 
             type="title" 
             color="primary"
-            className={priceUpdated ? (priceDirection === 'up' ? styles.priceUpdatedUp : styles.priceUpdatedDown) : ''}
+            className={priceUpdated ? (
+              priceDirection === 'up' ? styles.priceUpdatedUp : 
+              priceDirection === 'down' ? styles.priceUpdatedDown : 
+              styles.priceUpdatedNeutral
+            ) : ''}
           >
             {currentPrice}
           </Text>

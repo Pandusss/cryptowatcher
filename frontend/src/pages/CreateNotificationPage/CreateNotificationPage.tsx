@@ -96,7 +96,7 @@ export const CreateNotificationPage = () => {
   const [chartLoading, setChartLoading] = useState(false)
   const [selectedPeriod, setSelectedPeriod] = useState('7d') // Таймфрейм для графика
   const [priceUpdated, setPriceUpdated] = useState(false) // Флаг для анимации обновления цены
-  const [priceDirection, setPriceDirection] = useState<'up' | 'down' | null>(null) // Направление изменения цены
+  const [priceDirection, setPriceDirection] = useState<'up' | 'down' | 'neutral' | null>(null) // Направление изменения цены
 
   // Dropdown states
   const [directionDropdownOpen, setDirectionDropdownOpen] = useState(false)
@@ -283,16 +283,20 @@ export const CreateNotificationPage = () => {
               return prevCrypto
             }
             
-            // Запускаем анимацию подсветки только если цена действительно изменилась
+            // Запускаем анимацию подсветки
             if (prevCrypto.price !== newPrice) {
+              // Цена изменилась - зеленая или красная анимация
               setPriceDirection(newPrice > prevCrypto.price ? 'up' : 'down')
-              setPriceUpdated(true)
-              // Убираем класс через 800ms (длительность анимации)
-              setTimeout(() => {
-                setPriceUpdated(false)
-                setPriceDirection(null)
-              }, 800)
+            } else {
+              // Цена не изменилась - серая анимация
+              setPriceDirection('neutral')
             }
+            setPriceUpdated(true)
+            // Убираем класс через 800ms (длительность анимации)
+            setTimeout(() => {
+              setPriceUpdated(false)
+              setPriceDirection(null)
+            }, 800)
             
             const updatedCrypto = {
               ...prevCrypto,
@@ -984,7 +988,11 @@ export const CreateNotificationPage = () => {
               <Text 
                 type="text" 
                 color="primary"
-                className={priceUpdated ? (priceDirection === 'up' ? styles.priceUpdatedUp : styles.priceUpdatedDown) : ''}
+                className={priceUpdated ? (
+                  priceDirection === 'up' ? styles.priceUpdatedUp : 
+                  priceDirection === 'down' ? styles.priceUpdatedDown : 
+                  styles.priceUpdatedNeutral
+                ) : ''}
               >
                 {crypto ? `$${formatPrice(crypto.price)}` : '-'}
               </Text>

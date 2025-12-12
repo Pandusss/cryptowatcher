@@ -293,30 +293,52 @@ class CoinService:
             return {}
     
     async def get_crypto_list_prices(self, coin_ids: List[str]) -> Dict[str, Dict]:
-        """Получить только цены для списка монет"""
+        """Получить только цены для списка монет из Redis кэша (обновляется через WebSocket)"""
         if not coin_ids:
             return {}
         
-        print(f"\n[CoinService.get_crypto_list_prices] Загружаем цены для {len(coin_ids)} монет...")
+        print(f"\n[CoinService.get_crypto_list_prices] Загружаем цены для {len(coin_ids)} монет из Redis...")
         
-        # Получаем цены через batch API
-        batch_prices = await self.get_batch_prices(coin_ids)
-        
-        # Форматируем и сохраняем в кэш
+        # Читаем цены из Redis кэша (обновляется через Binance/OKX WebSocket)
         prices_dict = {}
-        for coin_id, price_info in batch_prices.items():
-            price = price_info.get('usd', 0)
-            if price > 0:
-                price_data = {
-                    "price": price,
-                    "percent_change_24h": price_info.get('usd_24h_change', 0),
-                    "volume_24h": price_info.get('usd_24h_vol', 0),
-                    "priceDecimals": get_price_decimals(price),
-                }
-                prices_dict[coin_id] = price_data
-                
-                # Сохраняем в кэш
-                await self.cache.set_price(coin_id, price_data)
+        redis = await get_redis()
+        
+        if redis:
+            # Читаем все цены параллельно из Redis
+            import asyncio
+            tasks = []
+            for coin_id in coin_ids:
+                tasks.append(self.cache.get_price(coin_id))
+            
+            cached_prices = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            for coin_id, cached_price in zip(coin_ids, cached_prices):
+                if isinstance(cached_price, Exception):
+                    print(f"[CoinService.get_crypto_list_prices] Ошибка чтения цены для {coin_id}: {cached_price}")
+                    continue
+                    
+                if cached_price and cached_price.get("price", 0) > 0:
+                    prices_dict[coin_id] = {
+                        "price": cached_price.get("price", 0),
+                        "percent_change_24h": cached_price.get("percent_change_24h", 0),
+                        "volume_24h": cached_price.get("volume_24h", 0),
+                        "priceDecimals": cached_price.get("priceDecimals", get_price_decimals(cached_price.get("price", 0))),
+                    }
+        else:
+            print("[CoinService.get_crypto_list_prices] ⚠️ Redis недоступен, используем CoinGecko API как fallback")
+            # Fallback на CoinGecko API если Redis недоступен
+            batch_prices = await self.get_batch_prices(coin_ids)
+            
+            for coin_id, price_info in batch_prices.items():
+                price = price_info.get('usd', 0)
+                if price > 0:
+                    price_data = {
+                        "price": price,
+                        "percent_change_24h": price_info.get('usd_24h_change', 0),
+                        "volume_24h": price_info.get('usd_24h_vol', 0),
+                        "priceDecimals": get_price_decimals(price),
+                    }
+                    prices_dict[coin_id] = price_data
         
         print(f"[CoinService.get_crypto_list_prices] Получено цен: {len(prices_dict)} из {len(coin_ids)} запрошенных")
         return prices_dict

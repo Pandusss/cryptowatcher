@@ -140,6 +140,19 @@
         "binance"
       ]
     },
+    "notcoin": {
+      "id": "notcoin",
+      "name": "NOT",
+      "symbol": "NOT",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "notcoin",
+        "okx": "NOT-USDT"
+      },
+      "price_priority": [
+        "okx"
+      ]
+    },
     "at": {
       "id": "at",
       "name": "AT",
@@ -333,6 +346,20 @@
         "binance"
       ]
     },
+    "dogs": {
+      "id": "dogs",
+      "name": "DOGS",
+      "symbol": "DOGS",
+      "enabled": true,
+      "external_ids": {
+        "binance": "DOGSUSDT",
+        "coingecko": "dogs-2",
+        "okx": "DOGS-USDT"
+      },
+      "price_priority": [
+        "binance"
+      ]
+    },
     "near": {
       "id": "near",
       "name": "NEAR",
@@ -342,18 +369,6 @@
         "binance": "NEARUSDT",
         "coingecko": "near",
         "okx": "NEAR-USDT"
-      },
-      "price_priority": [
-        "binance"
-      ]
-    },
-    "eur": {
-      "id": "eur",
-      "name": "EUR",
-      "symbol": "EUR",
-      "enabled": true,
-      "external_ids": {
-        "binance": "EURUSDT"
       },
       "price_priority": [
         "binance"

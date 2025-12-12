@@ -23,6 +23,10 @@ export const ChooseCoinPage = () => {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const hasFetchedRef = useRef(false)
+  // Состояние для анимации цен: Map<coinId, 'up' | 'down' | 'neutral' | null>
+  const [priceAnimations, setPriceAnimations] = useState<Map<string, 'up' | 'down' | 'neutral' | null>>(new Map())
+  // Ref для хранения текущего списка монет (чтобы избежать проблем с зависимостями)
+  const coinsRef = useRef<CoinListItem[]>([])
 
   // Управление кнопкой "Назад" в Telegram Mini App
   useTelegramBackButton()
@@ -42,6 +46,7 @@ export const ChooseCoinPage = () => {
         // Цены обновляются каждые 10 секунд в фоновом режиме, поэтому всегда актуальны
         const coins = await apiService.getCoinsListStatic(100, 1)
         setCoins(coins)
+        coinsRef.current = coins // Обновляем ref
         setLoading(false) // Показываем список сразу
       } catch (error) {
         console.error('Failed to fetch coins:', error)
@@ -51,6 +56,107 @@ export const ChooseCoinPage = () => {
 
     fetchCoins()
   }, [])
+
+  // Обновляем цены каждые 5 секунд
+  useEffect(() => {
+    if (coins.length === 0 || loading) {
+      return
+    }
+
+    const updatePrices = async () => {
+      try {
+        // Используем текущий список монет из ref
+        const currentCoins = coinsRef.current
+        if (currentCoins.length === 0) {
+          return
+        }
+
+        // Получаем все ID монет
+        const coinIds = currentCoins.map((coin) => coin.id)
+
+        // Делаем один batch запрос для получения всех цен
+        const pricesData = await apiService.getCoinsListPrices(coinIds)
+        
+        console.log(`[ChooseCoinPage] Получены цены для ${Object.keys(pricesData).length} монет из ${coinIds.length} запрошенных`)
+
+        // Обновляем цены для всех монет
+        const updatedCoins = currentCoins.map((coin) => {
+          const priceData = pricesData[coin.id]
+          if (priceData && priceData.price !== undefined && priceData.price > 0) {
+            const newPrice = priceData.price
+            const oldPrice = coin.quote.USD.price
+
+            // Определяем направление изменения цены (учитываем погрешность для float)
+            let direction: 'up' | 'down' | 'neutral' | null = null
+            const priceDiff = Math.abs(oldPrice - newPrice)
+            // Для цен > 1 используем погрешность 0.01, для меньших - относительную
+            const threshold = oldPrice >= 1 ? 0.01 : oldPrice * 0.0001
+            
+            if (priceDiff > threshold) {
+              direction = newPrice > oldPrice ? 'up' : 'down'
+              console.log(`[ChooseCoinPage] ${coin.symbol}: $${oldPrice.toFixed(4)} → $${newPrice.toFixed(4)} (${direction})`)
+            } else {
+              direction = 'neutral'
+              // Логируем даже если цена не изменилась, чтобы видеть что обновление работает
+              if (Math.random() < 0.1) { // Логируем 10% случаев чтобы не засорять консоль
+                console.log(`[ChooseCoinPage] ${coin.symbol}: цена не изменилась (${direction})`)
+              }
+            }
+
+            // ВСЕГДА запускаем анимацию (даже если neutral)
+            setPriceAnimations((prev) => {
+              const newMap = new Map(prev)
+              newMap.set(coin.id, direction)
+              return newMap
+            })
+
+            // Убираем анимацию через 800ms
+            setTimeout(() => {
+              setPriceAnimations((prev) => {
+                const newMap = new Map(prev)
+                newMap.set(coin.id, null)
+                return newMap
+              })
+            }, 800)
+
+            // Возвращаем обновленную монету
+            return {
+              ...coin,
+              quote: {
+                ...coin.quote,
+                USD: {
+                  ...coin.quote.USD,
+                  price: newPrice,
+                  percent_change_24h: priceData.percent_change_24h ?? coin.quote.USD.percent_change_24h,
+                },
+              },
+              priceDecimals: priceData.priceDecimals ?? coin.priceDecimals,
+            }
+          }
+          return coin
+        })
+
+        // Обновляем состояние и ref один раз после всех обновлений
+        setCoins(updatedCoins)
+        coinsRef.current = updatedCoins
+      } catch (error) {
+        console.error('[ChooseCoinPage] Ошибка обновления цен:', error)
+      }
+    }
+
+    // Первое обновление через 1 секунду после загрузки, затем каждые 5 секунд
+    const initialTimeout = setTimeout(() => {
+      updatePrices()
+    }, 1000)
+
+    const intervalId = setInterval(updatePrices, 5000)
+
+    return () => {
+      clearTimeout(initialTimeout)
+      clearInterval(intervalId)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]) // Запускаем только когда загрузка завершилась
 
   // Format price with spaces for thousands and comma for decimals
   const formatPrice = (price: number, coin?: CoinListItem) => {
@@ -189,7 +295,19 @@ export const ChooseCoinPage = () => {
                 text={coin.name}
                 description={coin.symbol}
                 after={
-                  <Text type="text" color="secondary">
+                  <Text 
+                    type="text" 
+                    color="secondary"
+                    className={
+                      priceAnimations.get(coin.id)
+                        ? priceAnimations.get(coin.id) === 'up'
+                          ? styles.priceUpdatedUp
+                          : priceAnimations.get(coin.id) === 'down'
+                          ? styles.priceUpdatedDown
+                          : styles.priceUpdatedNeutral
+                        : ''
+                    }
+                  >
                     {coin.quote.USD.price > 0 
                       ? `$${formatPrice(coin.quote.USD.price, coin)}`
                       : '...'
