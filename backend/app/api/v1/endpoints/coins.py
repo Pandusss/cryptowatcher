@@ -1,9 +1,7 @@
 from typing import List
 from fastapi import APIRouter, HTTPException, Body
 
-# TODO: В будущем можно заменить CoinGeckoService на aggregation_service напрямую
-# Сейчас используется для обратной совместимости
-from app.services.coingecko import CoinGeckoService
+from app.services.coingecko import CoinService
 
 router = APIRouter()
 
@@ -16,7 +14,7 @@ async def get_coins_list(
 ):
     """Получить список криптовалют"""
     print(f"\n[API Endpoint] GET /coins/list - limit={limit}, start={start}, force_refresh={force_refresh}")
-    service = CoinGeckoService()
+    service = CoinService()
     try:
         coins = await service.get_crypto_list(limit=limit, page=start, force_refresh=force_refresh)
         print(f"[API Endpoint] Возвращаем {len(coins)} монет клиенту")
@@ -34,7 +32,7 @@ async def get_coins_list_static(
 ):
     """Получить список монет (статика + цены из кэша) - для быстрой загрузки"""
     print(f"\n[API Endpoint] GET /coins/list/static - limit={limit}, start={start}, force_refresh={force_refresh}")
-    service = CoinGeckoService()
+    service = CoinService()
     try:
         # Используем единый метод get_crypto_list (объединена логика с get_crypto_list_static_only)
         coins = await service.get_crypto_list(limit=limit, page=start, force_refresh=force_refresh)
@@ -49,7 +47,7 @@ async def get_coins_list_static(
 async def get_coins_list_prices(coin_ids: List[str] = Body(...)):
     """Получить только цены для списка монет - для обновления после загрузки статики"""
     print(f"\n[API Endpoint] POST /coins/list/prices - запрошено цен для {len(coin_ids)} монет")
-    service = CoinGeckoService()
+    service = CoinService()
     try:
         prices = await service.get_crypto_list_prices(coin_ids)
         print(f"[API Endpoint] Возвращаем цены для {len(prices)} монет клиенту")
@@ -65,7 +63,7 @@ async def get_coin_details(
 ):
     """Получить детали криптовалюты"""
     print(f"\n[API Endpoint] GET /coins/{coin_id}")
-    service = CoinGeckoService()
+    service = CoinService()
     try:
         coin = await service.get_crypto_details(coin_id)
         print(f"[API Endpoint] Возвращаем данные монеты клиенту: {coin}")

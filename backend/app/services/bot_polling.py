@@ -12,7 +12,6 @@ from app.services.telegram import telegram_service
 
 
 class BotPolling:
-    """Простой polling сервис для Telegram бота"""
     
     BASE_URL = "https://api.telegram.org/bot"
     
@@ -25,11 +24,9 @@ class BotPolling:
             print("[BotPolling] WARNING: TELEGRAM_BOT_TOKEN не установлен")
     
     def _get_url(self, method: str) -> str:
-        """Получить URL для метода Telegram Bot API"""
         return f"{self.BASE_URL}{self.bot_token}/{method}"
     
     async def _process_update(self, update: Dict[str, Any], db: SessionLocal):
-        """Обработать одно обновление"""
         try:
             # Проверяем, что это сообщение
             if "message" not in update:
@@ -90,7 +87,6 @@ class BotPolling:
             print(f"[BotPolling] Traceback: {traceback.format_exc()}")
     
     async def _poll_updates(self):
-        """Получить обновления от Telegram"""
         if not self.bot_token:
             print("[BotPolling] Токен бота не установлен, пропускаем polling")
             await asyncio.sleep(10)
@@ -145,7 +141,6 @@ class BotPolling:
             await asyncio.sleep(5)
     
     async def start(self):
-        """Запустить polling"""
         if not self.bot_token:
             print("[BotPolling] Токен бота не установлен, polling не запущен")
             return
@@ -161,7 +156,6 @@ class BotPolling:
                 await asyncio.sleep(5)
     
     def stop(self):
-        """Остановить polling"""
         self.running = False
         print("[BotPolling] ⏹️ Остановлен polling")
 

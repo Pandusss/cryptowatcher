@@ -8,6 +8,7 @@ from datetime import datetime
 
 from app.providers.base import BaseChartAdapter
 from app.core.coin_registry import coin_registry
+from app.utils.formatters import format_chart_date
 
 
 class BinanceChartAdapter(BaseChartAdapter):
@@ -71,16 +72,7 @@ class BinanceChartAdapter(BaseChartAdapter):
                 # Преобразуем timestamp в строку даты
                 timestamp_seconds = timestamp_ms / 1000
                 date_obj = datetime.fromtimestamp(timestamp_seconds)
-                
-                # Форматируем дату в зависимости от периода
-                if period == "1d":
-                    date_str = date_obj.strftime("%Y-%m-%d %H:%M")
-                elif period == "7d":
-                    date_str = date_obj.strftime("%Y-%m-%d %H:%M")
-                elif period == "30d":
-                    date_str = date_obj.strftime("%Y-%m-%d 00:00")
-                else:  # 1y
-                    date_str = date_obj.strftime("%Y-%m-%d 00:00")
+                date_str = format_chart_date(date_obj, period)
                 
                 chart_data.append({
                     "date": date_str,

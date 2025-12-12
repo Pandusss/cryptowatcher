@@ -18,7 +18,7 @@ class NotificationBase(BaseModel):
     value_type: NotificationValueType
     value: float
     current_price: float
-    expire_time_hours: Optional[int] = None  # null means no expiration
+    expire_time_hours: Optional[int] = None
 
 
 class NotificationCreate(NotificationBase):
@@ -31,7 +31,7 @@ class NotificationUpdate(BaseModel):
     value_type: Optional[NotificationValueType] = None
     value: Optional[float] = None
     is_active: Optional[bool] = None
-    expire_time_hours: Optional[int] = None  # null means no expiration
+    expire_time_hours: Optional[int] = None
 
 
 class NotificationResponse(NotificationBase):
@@ -42,7 +42,7 @@ class NotificationResponse(NotificationBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
     triggered_at: Optional[datetime] = None
-    crypto_image_url: Optional[str] = None  # URL изображения монеты из CoinGecko
+    crypto_image_url: Optional[str] = None
 
     class Config:
         from_attributes = True

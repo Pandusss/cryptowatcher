@@ -30,7 +30,7 @@ class Notification(Base):
     user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False, index=True)
     
     # Crypto info
-    crypto_id = Column(String, nullable=False)  # CoinMarketCap ID
+    crypto_id = Column(String, nullable=False) 
     crypto_symbol = Column(String, nullable=False)
     crypto_name = Column(String, nullable=False)
     
@@ -38,7 +38,7 @@ class Notification(Base):
     direction = Column(Enum(NotificationDirection), nullable=False)
     trigger = Column(Enum(NotificationTrigger), nullable=False)
     value_type = Column(Enum(NotificationValueType), nullable=False)
-    value = Column(Float, nullable=False)  # Percent or absolute value
+    value = Column(Float, nullable=False) 
     
     # Current price at creation
     current_price = Column(Float, nullable=False)
@@ -46,7 +46,7 @@ class Notification(Base):
     # Status
     is_active = Column(Boolean, default=True)
     
-    # Expiration time (in hours, null means no expiration)
+    # Expiration time 
     expire_time_hours = Column(Integer, nullable=True)
     
     # Timestamps

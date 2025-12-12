@@ -16,11 +16,7 @@ from app.utils.formatters import get_price_decimals
 
 
 class OKXWebSocketWorker:
-    """
-    WebSocket worker для получения цен в реальном времени от OKX.
-    Использует публичный канал tickers для получения всех тикеров.
-    """
-    
+
     OKX_WS_URL = "wss://ws.okx.com:8443/ws/v5/public"
     RECONNECT_DELAY = 5  # Секунд до переподключения
     PRICE_UPDATE_INTERVAL = 0.1  # Обновляем кэш каждые 100ms (при получении данных)
@@ -34,7 +30,6 @@ class OKXWebSocketWorker:
         self._coins_with_updates: Set[str] = set()  # Множество монет, которые получили обновления за последний период
         
     def _load_coins_config(self) -> list[str]:
-        """Загрузить список монет из CoinRegistry"""
         try:
             # Получаем все монеты с OKX маппингом
             coins = coin_registry.get_coins_by_source("okx")
@@ -48,7 +43,6 @@ class OKXWebSocketWorker:
     
     
     async def start(self):
-        """Запустить WebSocket worker"""
         if self._running:
             print("[OKXWebSocket] Уже запущен")
             return
@@ -81,7 +75,6 @@ class OKXWebSocketWorker:
         self._task = asyncio.create_task(self._websocket_loop())
     
     async def stop(self):
-        """Остановить WebSocket worker"""
         self._running = False
         
         if self._ws:
@@ -97,11 +90,9 @@ class OKXWebSocketWorker:
         print("[OKXWebSocket] ⏹️ WebSocket worker остановлен")
     
     async def close(self):
-        """Закрыть соединение (алиас для stop)"""
         await self.stop()
     
     async def _websocket_loop(self):
-        """Основной цикл WebSocket соединения"""
         while self._running:
             try:
                 print(f"[OKXWebSocket] 🔌 Подключение к {self.OKX_WS_URL}...")
@@ -110,13 +101,11 @@ class OKXWebSocketWorker:
                     self._ws = ws
                     print("[OKXWebSocket] ✅ Подключено к OKX WebSocket")
                     
-                    # Подписываемся на все тикеры (публичный канал)
                     # OKX использует формат: {"op": "subscribe", "args": [{"channel": "tickers", "instId": "BTC-USDT"}]}
                     # Для всех тикеров можно подписаться на канал без instId или использовать специальный формат
                     # Но OKX не поддерживает получение всех тикеров одним запросом как Binance
                     # Нужно подписаться на каждый тикер отдельно или использовать другой подход
                     
-                    # Получаем все OKX символы из конфига
                     okx_symbols = []
                     for coin_id in self._tracked_coins:
                         coin = coin_registry.get_coin(coin_id)
@@ -129,7 +118,7 @@ class OKXWebSocketWorker:
                         # Формат: {"op": "subscribe", "args": [{"channel": "tickers", "instId": "BTC-USDT"}, ...]}
                         subscribe_args = [
                             {"channel": "tickers", "instId": symbol}
-                            for symbol in okx_symbols[:100]  # OKX может иметь лимит на количество подписок
+                            for symbol in okx_symbols[:100]
                         ]
                         
                         subscribe_msg = {
@@ -164,10 +153,7 @@ class OKXWebSocketWorker:
         print("[OKXWebSocket] WebSocket loop завершен")
     
     async def _process_message(self, message: str):
-        """
-        Обработать сообщение от OKX WebSocket.
-        Формат OKX: {"event": "subscribe", "arg": {...}, "data": [...]}
-        """
+
         try:
             data = json.loads(message)
             
@@ -192,23 +178,21 @@ class OKXWebSocketWorker:
                 current_time = asyncio.get_event_loop().time()
                 total_tickers = len(tickers)
                 
-                # Обрабатываем каждый тикер
                 for ticker in tickers:
                     if not isinstance(ticker, dict):
                         continue
                     
                     # OKX формат: instId = "BTC-USDT", last = цена, open24h = цена 24ч назад, vol24h = объем
-                    inst_id = ticker.get("instId")  # Символ OKX (например, "BTC-USDT")
+                    inst_id = ticker.get("instId") 
                     if not inst_id:
                         continue
                     
-                    # Получаем внутренний ID монеты из CoinRegistry
                     coin = coin_registry.find_coin_by_external_id("okx", inst_id)
                     if not coin:
                         skipped_not_in_map += 1
                         continue
                     
-                    coin_id = coin.id  # Используем внутренний ID
+                    coin_id = coin.id
                     
                     if coin_id not in self._tracked_coins:
                         skipped_not_tracked += 1
@@ -221,12 +205,7 @@ class OKXWebSocketWorker:
                         skipped_wrong_priority += 1
                         continue
                     
-                    # Извлекаем данные о цене из OKX тикера
-                    # Формат OKX WebSocket ticker:
-                    # - "last": последняя цена (last price)
-                    # - "open24h": цена 24ч назад (open price 24h)
-                    # - "vol24h": объем за 24ч (volume 24h)
-                    price = float(ticker.get("last", 0))  # Текущая цена
+                    price = float(ticker.get("last", 0))  
                     
                     # Вычисляем изменение за 24ч в процентах
                     open_24h = float(ticker.get("open24h", 0))
@@ -241,7 +220,7 @@ class OKXWebSocketWorker:
                         skipped_zero_price += 1
                         continue
                     
-                    # Формируем данные для кэша (совместимый формат с CoinGecko)
+                    # Формируем данные для кэша
                     price_data = {
                         "price": price,
                         "percent_change_24h": price_change_24h,
@@ -249,26 +228,22 @@ class OKXWebSocketWorker:
                         "priceDecimals": get_price_decimals(price),
                     }
                     
-                    # Сохраняем в Redis с тем же ключом, что использовал CoinGecko
-                    # Это обеспечивает совместимость с существующим кодом
                     price_cache_key = f"coin_price:{coin_id}"
                     
                     try:
-                        # TTL 60 секунд (достаточно для real-time, но с запасом)
                         await redis.setex(
                             price_cache_key,
-                            60,  # TTL в секундах
+                            60, 
                             json.dumps(price_data)
                         )
                         
                         updated_count += 1
                         self._last_update_time[coin_id] = current_time
-                        self._coins_with_updates.add(coin_id)  # Отслеживаем, какие монеты получили обновления
+                        self._coins_with_updates.add(coin_id) 
                         
                     except Exception as e:
                         print(f"[OKXWebSocket] Ошибка записи в Redis для {coin_id}: {e}")
                 
-                # Логируем статистику каждые 5 секунд (чтобы не спамить в консоль)
                 should_log = (
                     current_time - getattr(self, '_last_log_time', 0) >= 5.0
                 )
@@ -300,7 +275,4 @@ class OKXWebSocketWorker:
             import traceback
             traceback.print_exc()
 
-
-# Глобальный экземпляр
 okx_websocket_worker = OKXWebSocketWorker()
-

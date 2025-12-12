@@ -8,18 +8,12 @@ from typing import Optional
 
 
 class SharedHTTPClient:
-    """Общий HTTP клиент для переиспользования"""
     
     _client: Optional[httpx.AsyncClient] = None
     
     @classmethod
     def get_client(cls) -> httpx.AsyncClient:
-        """
-        Получить общий HTTP клиент
-        
-        Returns:
-            Настроенный httpx.AsyncClient
-        """
+
         if cls._client is None:
             cls._client = httpx.AsyncClient(
                 timeout=30.0,
@@ -39,7 +33,7 @@ class SharedHTTPClient:
     
     @classmethod
     async def close(cls):
-        """Закрыть HTTP клиент"""
+        
         if cls._client is not None:
             await cls._client.aclose()
             cls._client = None

@@ -7,7 +7,6 @@ _redis_available: bool = True
 
 
 async def get_redis() -> Optional[redis.Redis]:
-    """Получить Redis клиент. Возвращает None если Redis недоступен."""
     global redis_client, _redis_available
     
     if not _redis_available:
@@ -19,9 +18,8 @@ async def get_redis() -> Optional[redis.Redis]:
                 settings.REDIS_URL,
                 encoding="utf-8",
                 decode_responses=True,
-                socket_connect_timeout=2,  # Таймаут подключения 2 секунды
+                socket_connect_timeout=2,
             )
-            # Проверяем подключение
             await redis_client.ping()
         except Exception as e:
             print(f"⚠️  Redis недоступен: {e}")
@@ -34,7 +32,6 @@ async def get_redis() -> Optional[redis.Redis]:
 
 
 async def close_redis():
-    """Закрыть Redis соединение"""
     global redis_client
     if redis_client:
         await redis_client.close()

@@ -7,7 +7,6 @@ from app.core.config import settings
 
 
 class TelegramService:
-    """Сервис для работы с Telegram Bot API"""
     
     BASE_URL = "https://api.telegram.org/bot"
     
@@ -17,7 +16,6 @@ class TelegramService:
             print("[TelegramService] WARNING: TELEGRAM_BOT_TOKEN не установлен. Уведомления не будут отправляться.")
     
     def _get_url(self, method: str) -> str:
-        """Получить URL для метода Telegram Bot API"""
         return f"{self.BASE_URL}{self.bot_token}/{method}"
     
     async def send_message(
@@ -27,18 +25,7 @@ class TelegramService:
         parse_mode: Optional[str] = "HTML",
         disable_web_page_preview: bool = True,
     ) -> bool:
-        """
-        Отправить сообщение пользователю
-        
-        Args:
-            chat_id: ID чата (user_id в Telegram)
-            text: Текст сообщения
-            parse_mode: Режим парсинга (HTML или Markdown)
-            disable_web_page_preview: Отключить превью ссылок
-        
-        Returns:
-            True если сообщение отправлено успешно, False в противном случае
-        """
+
         if not self.bot_token:
             print(f"[TelegramService] Пропуск отправки сообщения: токен бота не установлен")
             return False
@@ -101,22 +88,7 @@ class TelegramService:
         value: float,
         value_type: str,
     ) -> bool:
-        """
-        Отправить уведомление о срабатывании алерта
-        
-        Args:
-            user_id: ID пользователя в Telegram
-            crypto_name: Название криптовалюты
-            crypto_symbol: Символ криптовалюты
-            current_price: Текущая цена
-            direction: Направление (rise/fall/both)
-            trigger: Тип триггера (stop-loss/take-profit)
-            value: Значение изменения
-            value_type: Тип значения (percent/absolute)
-        
-        Returns:
-            True если уведомление отправлено успешно
-        """
+
         # Форматируем цену
         def format_price(price: float) -> str:
             if price >= 1000000:

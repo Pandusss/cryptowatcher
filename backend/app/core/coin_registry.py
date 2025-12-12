@@ -14,7 +14,6 @@ from dataclasses import dataclass
 
 @dataclass
 class CoinConfig:
-    """Конфигурация одной монеты"""
     id: str
     name: str
     symbol: str
@@ -24,7 +23,6 @@ class CoinConfig:
 
 
 class CoinRegistry:
-    """Централизованный реестр монет"""
     
     _instance: Optional['CoinRegistry'] = None
     _coins: Dict[str, CoinConfig] = {}
@@ -36,13 +34,12 @@ class CoinRegistry:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            cls._instance._coin_order = []  # Инициализируем порядок
+            cls._instance._coin_order = [] 
             cls._instance._config_path = Path(__file__).parent / "configs" / "coins.json"
             cls._instance._load_config()
         return cls._instance
     
     def _check_and_reload(self):
-        """Проверить, изменился ли файл конфига, и перезагрузить при необходимости"""
         if not self._config_path or not self._config_path.exists():
             return
         
@@ -55,7 +52,6 @@ class CoinRegistry:
             print(f"[CoinRegistry] ⚠️ Ошибка при проверке изменений конфига: {e}")
     
     def _load_config(self):
-        """Загрузить конфигурацию из coins.json"""
         try:
             if not self._config_path:
                 self._config_path = Path(__file__).parent / "configs" / "coins.json"
@@ -73,7 +69,6 @@ class CoinRegistry:
                 return
             
             # Вычисляем хеш всего содержимого конфига (для обнаружения любых изменений)
-            # Сортируем ключи для стабильности хеша
             normalized_content = json.dumps(config_data, sort_keys=True, ensure_ascii=False)
             new_config_hash = hashlib.md5(normalized_content.encode('utf-8')).hexdigest()
             
@@ -92,7 +87,7 @@ class CoinRegistry:
                     price_priority=coin_data.get('price_priority', [])
                 )
                 self._coins[coin_config.id] = coin_config
-                self._coin_order.append(coin_config.id)  # Сохраняем порядок
+                self._coin_order.append(coin_config.id)
             
             # Обновляем время модификации и хеш
             self._last_modified = os.path.getmtime(self._config_path)
@@ -122,26 +117,15 @@ class CoinRegistry:
             traceback.print_exc()
     
     def get_coin(self, coin_id: str) -> Optional[CoinConfig]:
-        """Получить конфигурацию монеты по ID"""
         return self._coins.get(coin_id)
     
     def get_all_coins(self, enabled_only: bool = True) -> List[CoinConfig]:
-        """Получить все монеты"""
         coins = list(self._coins.values())
         if enabled_only:
             coins = [c for c in coins if c.enabled]
         return coins
     
     def get_coin_ids(self, enabled_only: bool = True) -> List[str]:
-        """
-        Получить список всех ID монет в порядке из конфига
-        
-        Args:
-            enabled_only: Только включенные монеты
-            
-        Returns:
-            Список ID монет в порядке из конфига
-        """
         # Проверяем, изменился ли конфиг
         self._check_and_reload()
         
@@ -158,73 +142,33 @@ class CoinRegistry:
             return self._coin_order.copy()
     
     def get_external_id(self, coin_id: str, source: str) -> Optional[str]:
-        """
-        Получить внешний ID монеты для указанного источника
-        
-        Args:
-            coin_id: Внутренний ID монеты
-            source: Источник (coingecko, binance, kucoin, etc.)
-            
-        Returns:
-            Внешний ID или None если не найден
-        """
         coin = self.get_coin(coin_id)
         if not coin:
             return None
         return coin.external_ids.get(source)
     
     def get_price_providers(self, coin_id: str) -> List[str]:
-        """
-        Получить список провайдеров цен для монеты в порядке приоритета
-        
-        Args:
-            coin_id: Внутренний ID монеты
-            
-        Returns:
-            Список провайдеров (binance, kucoin, etc.)
-        """
         coin = self.get_coin(coin_id)
         if not coin:
             return []
         return coin.price_priority.copy()
     
     def find_coin_by_external_id(self, source: str, external_id: str) -> Optional[CoinConfig]:
-        """
-        Найти монету по внешнему ID источника
-        
-        Args:
-            source: Источник (coingecko, binance, etc.)
-            external_id: Внешний ID
-            
-        Returns:
-            Конфигурация монеты или None
-        """
         for coin in self._coins.values():
             if coin.external_ids.get(source) == external_id:
                 return coin
         return None
     
     def get_coins_by_source(self, source: str) -> List[CoinConfig]:
-        """
-        Получить все монеты, доступные на указанном источнике
-        
-        Args:
-            source: Источник (coingecko, binance, etc.)
-            
-        Returns:
-            Список конфигураций монет
-        """
         return [
             coin for coin in self._coins.values()
             if coin.enabled and source in coin.external_ids
         ]
     
     def reload(self):
-        """Перезагрузить конфигурацию из файла"""
         self._load_config()
     
     def get_config_hash(self) -> Optional[str]:
-        """Получить хеш текущего конфига"""
         return self._config_hash
 
 

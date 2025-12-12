@@ -7,7 +7,6 @@ from app.core.database import get_db
 from app.models.notification import Notification
 from app.schemas.notification import NotificationCreate, NotificationUpdate, NotificationResponse
 from app.services.user_service import get_or_create_user
-from app.services.coingecko import CoinGeckoService
 from app.core.coin_registry import coin_registry
 
 router = APIRouter()
@@ -28,9 +27,6 @@ async def get_notifications(
             .filter(Notification.is_active == True)  # Показываем только активные уведомления
             .all()
     )
-    
-    # Получаем imageUrl для каждой монеты из CoinGecko (с долгосрочным кэшированием)
-    coingecko_service = CoinGeckoService()
     
     # Создаем словарь для хранения imageUrl по crypto_id
     image_urls = {}

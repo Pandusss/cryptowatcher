@@ -8,11 +8,11 @@ from datetime import datetime
 
 from app.providers.base import BaseChartAdapter
 from app.core.coin_registry import coin_registry
+from app.utils.formatters import format_chart_date
 
 
 class OKXChartAdapter(BaseChartAdapter):
-    """Адаптер для получения графиков из OKX REST API"""
-    
+
     BASE_URL = "https://www.okx.com/api/v5"
     
     # Маппинг периодов на интервалы OKX и количество свечей
@@ -29,16 +29,7 @@ class OKXChartAdapter(BaseChartAdapter):
         coin_id: str,
         period: str = "7d",
     ) -> Optional[List[Dict]]:
-        """
-        Получить данные графика из OKX API
-        
-        Args:
-            coin_id: OKX символ (например, "BTC-USDT")
-            period: Период графика (1d, 7d, 30d, 1y)
-            
-        Returns:
-            Список точек графика [{"date": str, "price": float, "volume": float}] или None
-        """
+
         try:
             # Получаем конфигурацию периода
             config = self.PERIOD_MAP.get(period)
@@ -47,7 +38,6 @@ class OKXChartAdapter(BaseChartAdapter):
                 return None
             
             # Получаем исторические данные из OKX REST API
-            # OKX API: GET /api/v5/market/candles
             # Параметры: instId, bar (интервал), limit
             from app.utils.http_client import SharedHTTPClient
             client = SharedHTTPClient.get_client()
@@ -75,26 +65,15 @@ class OKXChartAdapter(BaseChartAdapter):
             
             # Преобразуем данные OKX candle в наш формат
             # Формат OKX candle: [timestamp, open, high, low, close, volume, volCcy, volCcyQuote, confirm]
-            # timestamp в миллисекундах (строковое представление)
             chart_data = []
             for candle in candles:
-                timestamp_ms = int(candle[0])  # Unix timestamp в миллисекундах (строка)
-                close_price = float(candle[4])  # Используем цену закрытия
-                volume = float(candle[5])  # Объем в базовой валюте
+                timestamp_ms = int(candle[0]) 
+                close_price = float(candle[4]) 
+                volume = float(candle[5])
                 
-                # Преобразуем timestamp в строку даты
                 timestamp_seconds = timestamp_ms / 1000
                 date_obj = datetime.fromtimestamp(timestamp_seconds)
-                
-                # Форматируем дату в зависимости от периода
-                if period == "1d":
-                    date_str = date_obj.strftime("%Y-%m-%d %H:%M")
-                elif period == "7d":
-                    date_str = date_obj.strftime("%Y-%m-%d %H:%M")
-                elif period == "30d":
-                    date_str = date_obj.strftime("%Y-%m-%d 00:00")
-                else:  # 1y
-                    date_str = date_obj.strftime("%Y-%m-%d 00:00")
+                date_str = format_chart_date(date_obj, period)
                 
                 chart_data.append({
                     "date": date_str,
@@ -115,19 +94,7 @@ class OKXChartAdapter(BaseChartAdapter):
             return None
     
     def is_available(self, coin_id: str) -> bool:
-        """
-        Проверить, доступна ли монета на OKX
-        
-        Args:
-            coin_id: OKX символ (например, "BTC-USDT")
-            
-        Returns:
-            True если монета есть в реестре с OKX маппингом
-        """
         internal_coin = coin_registry.find_coin_by_external_id("okx", coin_id)
         return internal_coin is not None
 
-
-# Глобальный экземпляр
 okx_chart_adapter = OKXChartAdapter()
-

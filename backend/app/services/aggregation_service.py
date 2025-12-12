@@ -18,7 +18,6 @@ from app.utils.cache import CoinCacheManager
 
 
 class AggregationService:
-    """Сервис для агрегации данных из разных провайдеров"""
     
     def __init__(self):
         self.cache = CoinCacheManager()
@@ -40,15 +39,7 @@ class AggregationService:
         }
     
     async def get_coin_static_data(self, coin_id: str) -> Optional[Dict]:
-        """
-        Получить статические данные монеты
-        
-        Args:
-            coin_id: Внутренний ID монеты
-            
-        Returns:
-            {id, name, symbol, imageUrl} или None
-        """
+
         coin = coin_registry.get_coin(coin_id)
         if not coin:
             return None
@@ -61,15 +52,7 @@ class AggregationService:
         return await self.static_providers["coingecko"].get_coin_static_data(coingecko_id)
     
     async def get_coins_static_data(self, coin_ids: List[str]) -> Dict[str, Dict]:
-        """
-        Получить статические данные для нескольких монет
-        
-        Args:
-            coin_ids: Список внутренних ID монет
-            
-        Returns:
-            Словарь {coin_id: {id, name, symbol, imageUrl}}
-        """
+
         # Получаем CoinGecko ID для всех монет
         coingecko_ids = []
         coin_id_map = {}  # coingecko_id -> internal_id
@@ -98,15 +81,7 @@ class AggregationService:
         return result
     
     async def get_coin_price(self, coin_id: str) -> Optional[Dict]:
-        """
-        Получить цену монеты с учетом приоритетов провайдеров
-        
-        Args:
-            coin_id: Внутренний ID монеты
-            
-        Returns:
-            {price, percent_change_24h, volume_24h} или None
-        """
+
         coin = coin_registry.get_coin(coin_id)
         if not coin:
             return None
@@ -138,15 +113,7 @@ class AggregationService:
         return None
     
     async def get_coins_prices(self, coin_ids: List[str]) -> Dict[str, Dict]:
-        """
-        Получить цены для нескольких монет
-        
-        Args:
-            coin_ids: Список внутренних ID монет
-            
-        Returns:
-            Словарь {coin_id: {price, percent_change_24h, volume_24h}}
-        """
+
         # Получаем цены параллельно
         tasks = [self.get_coin_price(coin_id) for coin_id in coin_ids]
         prices = await asyncio.gather(*tasks)
@@ -163,16 +130,7 @@ class AggregationService:
         coin_id: str,
         period: str = "7d"
     ) -> Optional[List[Dict]]:
-        """
-        Получить данные графика с учетом приоритетов провайдеров
-        
-        Args:
-            coin_id: Внутренний ID монеты
-            period: Период (1d, 7d, 30d, 1y)
-            
-        Returns:
-            Список точек графика или None
-        """
+
         coin = coin_registry.get_coin(coin_id)
         if not coin:
             return None
@@ -220,15 +178,7 @@ class AggregationService:
         return None
     
     async def get_coin_image_url(self, coin_id: str) -> Optional[str]:
-        """
-        Получить URL изображения монеты
-        
-        Args:
-            coin_id: Внутренний ID монеты
-            
-        Returns:
-            URL изображения или None
-        """
+
         coin = coin_registry.get_coin(coin_id)
         if not coin:
             return None
@@ -240,15 +190,7 @@ class AggregationService:
         return await self.static_providers["coingecko"].get_coin_image_url(coingecko_id)
     
     async def get_coin_details(self, coin_id: str) -> Optional[Dict]:
-        """
-        Получить полные данные монеты (статика + цена)
-        
-        Args:
-            coin_id: Внутренний ID монеты
-            
-        Returns:
-            {id, name, symbol, imageUrl, currentPrice, priceChange24h, ...} или None
-        """
+
         # Получаем статику и цену параллельно
         static_task = self.get_coin_static_data(coin_id)
         price_task = self.get_coin_price(coin_id)
@@ -272,7 +214,5 @@ class AggregationService:
         
         return result
 
-
 # Глобальный экземпляр
 aggregation_service = AggregationService()
-

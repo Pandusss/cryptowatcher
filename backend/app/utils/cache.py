@@ -8,7 +8,6 @@ from app.core.redis_client import get_redis
 
 
 class CoinCacheManager:
-    """Менеджер для работы с кэшем монет в Redis"""
     
     # TTL для разных типов данных
     CACHE_TTL_TOP3000 = 3600  # 1 час для топ-3000
@@ -20,26 +19,21 @@ class CoinCacheManager:
     
     @staticmethod
     def _get_static_key(coin_id: str) -> str:
-        """Ключ для статических данных монеты"""
         return f"coin_static:{coin_id}"
     
     @staticmethod
     def _get_price_key(coin_id: str) -> str:
-        """Ключ для цены монеты"""
         return f"coin_price:{coin_id}"
     
     @staticmethod
     def _get_chart_key(coin_id: str, period: str) -> str:
-        """Ключ для графика монеты"""
         return f"coin_chart:{coin_id}:{period}"
     
     @staticmethod
     def _get_image_url_key(coin_id: str) -> str:
-        """Ключ для URL изображения"""
         return f"coin_image_url:{coin_id}"
     
     async def get_static(self, coin_id: str) -> Optional[Dict]:
-        """Получить статические данные монеты из кэша"""
         redis = await get_redis()
         if not redis:
             return None
@@ -52,7 +46,6 @@ class CoinCacheManager:
             return None
     
     async def set_static(self, coin_id: str, static_data: Dict) -> bool:
-        """Сохранить статические данные монеты в кэш"""
         redis = await get_redis()
         if not redis:
             return False
@@ -69,7 +62,6 @@ class CoinCacheManager:
             return False
     
     async def get_price(self, coin_id: str) -> Optional[Dict]:
-        """Получить цену монеты из кэша"""
         redis = await get_redis()
         if not redis:
             return None
@@ -82,7 +74,6 @@ class CoinCacheManager:
             return None
     
     async def set_price(self, coin_id: str, price_data: Dict) -> bool:
-        """Сохранить цену монеты в кэш"""
         redis = await get_redis()
         if not redis:
             return False
@@ -99,7 +90,6 @@ class CoinCacheManager:
             return False
     
     async def get_chart(self, coin_id: str, period: str) -> Optional[List[Dict]]:
-        """Получить данные графика из кэша"""
         redis = await get_redis()
         if not redis:
             return None
@@ -112,7 +102,6 @@ class CoinCacheManager:
             return None
     
     async def set_chart(self, coin_id: str, period: str, chart_data: List[Dict]) -> bool:
-        """Сохранить данные графика в кэш"""
         redis = await get_redis()
         if not redis:
             return False
@@ -129,7 +118,6 @@ class CoinCacheManager:
             return False
     
     async def get_image_url(self, coin_id: str) -> Optional[str]:
-        """Получить URL изображения из кэша"""
         redis = await get_redis()
         if not redis:
             return None
@@ -141,7 +129,6 @@ class CoinCacheManager:
             return None
     
     async def set_image_url(self, coin_id: str, image_url: str) -> bool:
-        """Сохранить URL изображения в кэш"""
         redis = await get_redis()
         if not redis:
             return False

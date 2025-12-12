@@ -17,7 +17,6 @@ from app.services.telegram import telegram_service
 
 
 class NotificationChecker:
-    """Сервис для проверки и обработки уведомлений"""
     
     def __init__(self):
         self.aggregation_service = aggregation_service
@@ -30,16 +29,7 @@ class NotificationChecker:
         notification: Notification,
         current_price: float,
     ) -> bool:
-        """
-        Проверить, сработало ли условие уведомления
-        
-        Args:
-            notification: Уведомление для проверки
-            current_price: Текущая цена криптовалюты
-        
-        Returns:
-            True если условие сработало, False иначе
-        """
+
         original_price = notification.current_price
         price_change = current_price - original_price
         
@@ -80,15 +70,7 @@ class NotificationChecker:
                 return abs(price_change) >= notification.value
     
     async def _get_crypto_price(self, crypto_id: str) -> Optional[float]:
-        """
-        Получить текущую цену криптовалюты через AggregationService
-        
-        Args:
-            crypto_id: Внутренний ID криптовалюты
-        
-        Returns:
-            Текущая цена или None если не удалось получить
-        """
+
         try:
             price_data = await self.aggregation_service.get_coin_price(crypto_id)
             if price_data:
@@ -112,17 +94,7 @@ class NotificationChecker:
         current_price: float,
         db: Session,
     ) -> bool:
-        """
-        Проверить одно уведомление и отправить алерт при срабатывании
-        
-        Args:
-            notification: Уведомление для проверки
-            current_price: Текущая цена криптовалюты (уже получена)
-            db: Сессия базы данных
-        
-        Returns:
-            True если уведомление было отправлено
-        """
+
         try:
             # Проверяем условие
             if self._check_notification_condition(notification, current_price):
@@ -169,15 +141,7 @@ class NotificationChecker:
             return False
     
     def _is_dnd_active(self, user: User) -> bool:
-        """
-        Проверить, активен ли режим Don't Disturb для пользователя
-        
-        Args:
-            user: Пользователь для проверки
-        
-        Returns:
-            True если DND активен (уведомления не должны отправляться), False иначе
-        """
+
         if not user.dnd_start_time or not user.dnd_end_time:
             # Если DND не настроен, уведомления отправляются всегда
             return False
@@ -198,10 +162,7 @@ class NotificationChecker:
         return current_time >= start_time or current_time <= end_time
     
     def _check_notification_expired(self, notification: Notification) -> bool:
-        """
-        Проверить, истекло ли время уведомления
-        Возвращает True если уведомление истекло и должно быть удалено
-        """
+
         if notification.expire_time_hours is None:
             # Бессрочное уведомление
             return False
@@ -213,11 +174,7 @@ class NotificationChecker:
         return current_time >= expire_time
     
     async def check_all_notifications(self):
-        """
-        Проверить все активные уведомления
-        
-        Оптимизация: группируем уведомления по crypto_id и проверяем цену один раз для каждой криптовалюты
-        """
+
         db = SessionLocal()
         try:
             # Получаем все активные уведомления
@@ -276,7 +233,7 @@ class NotificationChecker:
             db.close()
     
     async def start(self):
-        """Запустить периодическую проверку уведомлений"""
+
         self.running = True
         print(f"[NotificationChecker] 🚀 Запущена проверка уведомлений (интервал: {self.check_interval} сек)")
         
@@ -292,7 +249,7 @@ class NotificationChecker:
             await asyncio.sleep(self.check_interval)
     
     def stop(self):
-        """Остановить проверку уведомлений"""
+
         self.running = False
         print("[NotificationChecker] ⏹️ Остановлена проверка уведомлений")
     

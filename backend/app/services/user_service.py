@@ -13,20 +13,6 @@ def get_or_create_user(
     last_name: str = None,
     language_code: str = None,
 ) -> User:
-    """
-    Получить пользователя или создать нового, если его нет
-    
-    Args:
-        db: Сессия базы данных
-        user_id: ID пользователя в Telegram
-        username: Username пользователя (опционально)
-        first_name: Имя пользователя (опционально)
-        last_name: Фамилия пользователя (опционально)
-        language_code: Код языка (опционально)
-    
-    Returns:
-        User объект
-    """
     user = db.query(User).filter(User.id == user_id).first()
     
     if not user:

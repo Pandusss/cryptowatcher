@@ -20,7 +20,7 @@ from app.core.config import settings
 from app.core.redis_client import get_redis
 from app.providers.coingecko_client import CoinGeckoClient
 from app.utils.cache import CoinCacheManager
-from app.utils.formatters import get_price_decimals
+from app.utils.formatters import get_price_decimals, format_chart_date
 from functools import wraps
 
 
@@ -29,30 +29,7 @@ from functools import wraps
 # ============================================================================
 
 def cached_async(cache_key_func, ttl: int, serialize_func=None, deserialize_func=None):
-    """
-    Декоратор для автоматического кэширования результатов async функций
-    
-    Что такое декоратор?
-    Декоратор - это функция, которая принимает другую функцию и расширяет её поведение.
-    Вместо изменения самой функции, мы "оборачиваем" её декоратором.
-    
-    Пример использования:
-    @cached_async(lambda coin_id: f"coin_price:{coin_id}", ttl=10)
-    async def get_price(coin_id: str):
-        # код функции
-        return price_data
-    
-    Как это работает:
-    1. При вызове get_price(coin_id) сначала проверяется кэш
-    2. Если данные в кэше - возвращаются из кэша
-    3. Если данных нет - выполняется функция и результат сохраняется в кэш
-    
-    Args:
-        cache_key_func: Функция для генерации ключа кэша из аргументов
-        ttl: Время жизни кэша в секундах
-        serialize_func: Функция для сериализации данных перед сохранением (по умолчанию json.dumps)
-        deserialize_func: Функция для десериализации данных из кэша (по умолчанию json.loads)
-    """
+
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
@@ -111,28 +88,7 @@ def cached_async(cache_key_func, ttl: int, serialize_func=None, deserialize_func
     return decorator
 
 
-# ============================================================================
-# CoinGeckoClient и CoinCacheManager теперь находятся в:
-# - CoinGeckoClient: app.providers.static.coingecko.client
-# - CoinCacheManager: app.utils.cache
-# ============================================================================
-# Импортируем из новых мест для обратной совместимости
-# ============================================================================
-
-
-# ============================================================================
-# CoinService - бизнес-логика работы с монетами
-# ============================================================================
-
 class CoinService:
-    """
-    Сервис для работы с данными криптовалют.
-    
-    Использует:
-    - CoinGecko API: для статических данных (id, name, symbol, imageUrl)
-    - Binance WebSocket: для цен (через Redis кэш, обновляется в binance_websocket.py)
-    - BinanceService: для графиков (с fallback на CoinGecko)
-    """
     
     BATCH_PRICE_SIZE = 100  # Максимум монет в одном batch запросе
     
@@ -141,12 +97,10 @@ class CoinService:
         self.cache = CoinCacheManager()   # Кэш в Redis
     
     async def close(self):
-        """Закрыть HTTP клиент"""
         await self.client.close()
     
     
     def _load_coins_config(self) -> tuple[List[str], str]:
-        """Загрузить список монет из CoinRegistry"""
         try:
             from app.core.coin_registry import coin_registry
             
@@ -165,13 +119,7 @@ class CoinService:
             return [], ""
     
     def _format_coin_data(self, coin_data: Dict, coin_id: str) -> Dict:
-        """
-        Форматировать данные монеты для фронтенда
-        
-        Args:
-            coin_data: Данные от CoinGecko API (содержит CoinGecko ID)
-            coin_id: Внутренний ID монеты (из конфига)
-        """
+
         price = coin_data.get("current_price", 0)
         
         return {
@@ -191,10 +139,7 @@ class CoinService:
         }
     
     async def _fetch_single_batch_prices(self, batch: List[str], batch_num: int, total_batches: int) -> Dict[str, Dict[str, Any]]:
-        """
-        Внутренний метод для загрузки цен одного батча.
-        Используется для параллельного выполнения через asyncio.gather.
-        """
+ 
         ids_param = ','.join(batch)
         
         print(f"[CoinService._fetch_single_batch_prices] Батч {batch_num}/{total_batches}: отправляем запрос для {len(batch)} монет...")
@@ -227,10 +172,7 @@ class CoinService:
             return {}
     
     async def get_batch_prices(self, coin_ids: List[str]) -> Dict[str, Dict[str, Any]]:
-        """
-        Получить цены для нескольких монет через batch API.
-        Оптимизировано: использует asyncio.gather для параллельных запросов всех батчей.
-        """
+
         if not coin_ids:
             return {}
         
@@ -293,7 +235,6 @@ class CoinService:
             return {}
     
     async def get_crypto_list_prices(self, coin_ids: List[str]) -> Dict[str, Dict]:
-        """Получить только цены для списка монет из Redis кэша (обновляется через WebSocket)"""
         if not coin_ids:
             return {}
         
@@ -349,13 +290,7 @@ class CoinService:
         page: int = 1,
         force_refresh: bool = False,
     ) -> List[Dict]:
-        """
-        Получить список криптовалют из конфиг-файла.
-        
-        Источники данных:
-        - Статика (id, name, symbol, imageUrl): CoinGecko API (/coins/markets)
-        - Цены: Redis кэш (обновляется Binance WebSocket)
-        """
+
         config_coins, config_hash = self._load_coins_config()
         
         if not config_coins:
@@ -577,17 +512,10 @@ class CoinService:
         return formatted_coins
     
     async def get_crypto_details(self, coin_id: str) -> Dict:
-        """
-        Получить детали криптовалюты.
-        
-        Источники данных:
-        - Статика (id, name, symbol, imageUrl): CoinGecko API или кэш
-        - Цены: Redis кэш (обновляется Binance WebSocket)
-        """
+
         # Сначала получаем статические данные (из кэша или API)
         cached_static = await self.cache.get_static(coin_id)
         
-        # Получаем цену ИЗ КЭША Redis (обновляется каждые 10 секунд)
         cached_price = await self.cache.get_price(coin_id)
         if cached_price:
             print(f"[CoinService.get_crypto_details] ✅ Цена {coin_id} из кэша Redis: ${cached_price.get('price', 0)}")
@@ -663,10 +591,7 @@ class CoinService:
         deserialize_func=lambda x: x.decode('utf-8') if isinstance(x, bytes) else x
     )
     async def _fetch_coin_image_url(self, coin_id: str) -> Optional[str]:
-        """
-        Внутренний метод для загрузки URL изображения из API.
-        Кэширование выполняется автоматически через декоратор.
-        """
+
         try:
             data = await self.client.get(
                 f"/coins/{coin_id}",
@@ -693,12 +618,7 @@ class CoinService:
             return None
     
     async def get_coin_image_url(self, coin_id: str) -> Optional[str]:
-        """
-        Получить URL изображения монеты из CoinGecko API.
-        
-        Иконки монет не меняются, поэтому кэшируем на 7 дней.
-        Использует декоратор для автоматического кэширования.
-        """
+
         return await self._fetch_coin_image_url(coin_id)
     
     @cached_async(
@@ -710,10 +630,7 @@ class CoinService:
         coin_id: str,
         period: str = "7d",
     ) -> List[Dict]:
-        """
-        Внутренний метод для загрузки данных графика из API.
-        Кэширование выполняется автоматически через декоратор.
-        """
+
         # Маппинг периодов на дни для CoinGecko API
         days_map = {
             "1d": 1,
@@ -723,42 +640,20 @@ class CoinService:
         }
         days = days_map.get(period, 7)
         
-        # Если coin_id - это число (старый CoinMarketCap ID), нужно получить CoinGecko ID
-        cg_coin_id = coin_id
+        # coin_id - это всегда внутренний ID из конфига (например, "eth")
+        from app.core.coin_registry import coin_registry
         
-        # Если coin_id - число, пытаемся получить CoinGecko ID из деталей монеты
-        if coin_id.isdigit():
-            print(f"[CoinService._fetch_crypto_chart_data] Обнаружен числовой ID, пытаемся получить CoinGecko ID")
-            try:
-                # Используем маппинг популярных монет
-                id_mapping = {
-                    "1": "bitcoin",
-                    "1027": "ethereum",
-                    "825": "tether",
-                    "52": "ripple",
-                    "11419": "the-open-network",
-                    "1958": "tron",
-                    "28850": "notcoin",
-                    "1839": "binancecoin",
-                    "5426": "solana",
-                    "2010": "cardano",
-                    "5": "dogecoin",
-                    "3890": "matic-network",
-                    "6636": "polkadot",
-                    "5805": "avalanche-2",
-                    "2": "litecoin",
-                    "7083": "uniswap",
-                    "3794": "cosmos",
-                    "1975": "chainlink",
-                    "1321": "ethereum-classic",
-                }
-                cg_coin_id = id_mapping.get(coin_id)
-                if not cg_coin_id:
-                    print(f"[CoinService._fetch_crypto_chart_data] Не найден маппинг для ID {coin_id}, используем как есть")
-                    cg_coin_id = coin_id
-            except Exception as e:
-                print(f"[CoinService._fetch_crypto_chart_data] Ошибка при получении CoinGecko ID: {e}")
-                cg_coin_id = coin_id
+        coin_config = coin_registry.get_coin(coin_id)
+        if not coin_config:
+            print(f"[CoinService._fetch_crypto_chart_data] ❌ Монета {coin_id} не найдена в реестре")
+            return []
+        
+        cg_coin_id = coin_config.external_ids.get("coingecko")
+        if not cg_coin_id:
+            print(f"[CoinService._fetch_crypto_chart_data] ❌ У монеты {coin_id} нет CoinGecko ID в конфиге")
+            return []
+        
+        print(f"[CoinService._fetch_crypto_chart_data] Используем CoinGecko ID из реестра: {coin_id} → {cg_coin_id}")
         
         try:
             # Получаем исторические данные через CoinGecko market_chart endpoint
@@ -774,7 +669,6 @@ class CoinService:
             
             print(f"[CoinService._fetch_crypto_chart_data] Ответ от market_chart API: {str(chart_data_response)[:500]}")
             
-            # Парсим данные графика
             prices = chart_data_response.get("prices", [])
             volumes = chart_data_response.get("total_volumes", [])
             
@@ -787,24 +681,13 @@ class CoinService:
                 timestamp_ms = price_point[0]  # Unix timestamp в миллисекундах
                 price = price_point[1]
                 
-                # Находим соответствующий объем (если есть)
                 volume = 0
                 if volumes and i < len(volumes):
                     volume = volumes[i][1] if len(volumes[i]) > 1 else 0
                 
-                # Преобразуем timestamp в строку даты
                 timestamp_seconds = timestamp_ms / 1000
                 date_obj = datetime.fromtimestamp(timestamp_seconds)
-                
-                # Форматируем дату в зависимости от периода
-                if period == "1d":
-                    date_str = date_obj.strftime("%Y-%m-%d %H:%M")
-                elif period == "7d":
-                    date_str = date_obj.strftime("%Y-%m-%d %H:%M")
-                elif period == "30d":
-                    date_str = date_obj.strftime("%Y-%m-%d 00:00")
-                else:  # 1y
-                    date_str = date_obj.strftime("%Y-%m-%d 00:00")
+                date_str = format_chart_date(date_obj, period)
                 
                 chart_data.append({
                     "date": date_str,
@@ -812,7 +695,6 @@ class CoinService:
                     "volume": float(volume) if volume else 0,
                 })
             
-            # Сортируем по дате (на всякий случай)
             chart_data.sort(key=lambda x: x["date"])
             
             print(f"[CoinService._fetch_crypto_chart_data] Успешно получено {len(chart_data)} точек из CoinGecko API")
@@ -830,34 +712,25 @@ class CoinService:
         coin_id: str,
         period: str = "7d",  # 1d, 7d, 30d, 1y
     ) -> List[Dict]:
-        """
-        Получить данные графика для криптовалюты.
-        Сначала пытается получить из Binance, затем fallback на CoinGecko.
-        Использует кэширование для обоих источников.
-        """
-        # Проверяем кэш перед запросом к Binance
+
         cached_data = await self.cache.get_chart(coin_id, period)
         if cached_data:
             print(f"[CoinService.get_crypto_chart] ✅ Данные из кэша для {coin_id} ({period})")
             return cached_data
         
-        # Используем BinanceChartAdapter для графиков
         from app.providers.binance_chart import binance_chart_adapter
         from app.core.coin_registry import coin_registry
         
-        # Получаем Binance символ для монеты
         binance_symbol = coin_registry.get_external_id(coin_id, "binance")
         
         if binance_symbol:
             binance_data = await binance_chart_adapter.get_chart_data(binance_symbol, period)
             if binance_data:
-                # Сохраняем в кэш
                 await self.cache.set_chart(coin_id, period, binance_data)
                 print(f"[CoinService.get_crypto_chart] ✅ Использованы данные из Binance для {coin_id} ({period})")
                 return binance_data
         
-        # Fallback на CoinGecko если монета не найдена в Binance
-        # CoinGecko метод использует декоратор кэширования автоматически
+
         print(f"[CoinService.get_crypto_chart] Монета {coin_id} не найдена в Binance, используем CoinGecko")
         chart_data = await self._fetch_crypto_chart_data(coin_id, period)
         
@@ -865,106 +738,3 @@ class CoinService:
             print(f"[CoinService.get_crypto_chart] Исторические данные недоступны для {coin_id} ({period})")
         
         return chart_data
-
-
-# ============================================================================
-# CoinGeckoService - старый класс для обратной совместимости
-# ============================================================================
-
-class CoinGeckoService:
-    """
-    Старый класс для обратной совместимости.
-    Делегирует все вызовы новому CoinService.
-    TODO: Удалить после миграции всех мест использования на CoinService.
-    """
-    
-    # Константы для обратной совместимости
-    CACHE_TTL_TOP3000 = 3600
-    CACHE_TTL_COIN_STATIC = 3600
-    CACHE_TTL_COIN_PRICE = 10
-    CACHE_TTL_IMAGE_URL = 604800
-    CACHE_TTL_PRICE_DECIMALS = 86400
-    CACHE_TTL_CHART = 60
-    BATCH_PRICE_SIZE = 100
-    PER_PAGE_MAX = 250
-    TOP_COINS_PAGES = 12
-    
-    def __init__(self):
-        self._service = CoinService()
-    
-    async def close(self):
-        """Закрыть HTTP клиент"""
-        await self._service.close()
-    
-    
-    async def _make_request(
-        self,
-        endpoint: str,
-        params: Dict[str, Any] = None,
-        retry_on_rate_limit: bool = True
-    ) -> Dict:
-        """Выполнить запрос к API (делегирует CoinGeckoClient)"""
-        return await self._service.client.get(endpoint, params, retry_on_rate_limit)
-    
-    def _load_coins_config(self) -> tuple[List[str], str]:
-        """Загрузить список монет из конфиг-файла (делегирует CoinService)"""
-        return self._service._load_coins_config()
-    
-    def _format_coin_data(self, coin_data: Dict, coin_id: str) -> Dict:
-        """Форматировать данные монеты для фронтенда (делегирует CoinService)"""
-        return self._service._format_coin_data(coin_data, coin_id)
-    
-    # Делегируем все методы новому CoinService
-    async def get_batch_prices(self, coin_ids: List[str]) -> Dict[str, Dict[str, Any]]:
-        """Получить цены для нескольких монет (делегирует CoinService)"""
-        return await self._service.get_batch_prices(coin_ids)
-    
-    async def get_crypto_list(
-        self,
-        limit: int = 100,
-        page: int = 1,
-        force_refresh: bool = False,
-    ) -> List[Dict]:
-        """Получить список криптовалют (делегирует CoinService)"""
-        return await self._service.get_crypto_list(limit, page, force_refresh)
-    
-    async def get_crypto_list_prices(self, coin_ids: List[str]) -> Dict[str, Dict]:
-        """Получить только цены для списка монет (делегирует CoinService)"""
-        return await self._service.get_crypto_list_prices(coin_ids)
-    
-    async def get_crypto_details(self, coin_id: str) -> Dict:
-        """Получить детали криптовалюты (делегирует CoinService)"""
-        return await self._service.get_crypto_details(coin_id)
-    
-    async def get_coin_image_url(self, coin_id: str) -> Optional[str]:
-        """Получить URL изображения монеты (делегирует CoinService)"""
-        return await self._service.get_coin_image_url(coin_id)
-    
-    async def get_crypto_chart(
-        self,
-        coin_id: str,
-        period: str = "7d",
-    ) -> List[Dict]:
-        """Получить данные графика для криптовалюты (делегирует CoinService)"""
-        return await self._service.get_crypto_chart(coin_id, period)
-
-
-# Глобальный singleton экземпляр для переиспользования HTTP клиента
-# и предотвращения утечек памяти
-_coingecko_service_instance: Optional[CoinGeckoService] = None
-
-
-def get_coingecko_service() -> CoinGeckoService:
-    """Получить глобальный экземпляр CoinGeckoService (singleton)"""
-    global _coingecko_service_instance
-    if _coingecko_service_instance is None:
-        _coingecko_service_instance = CoinGeckoService()
-    return _coingecko_service_instance
-
-
-async def close_coingecko_service():
-    """Закрыть HTTP клиент глобального экземпляра CoinGeckoService"""
-    global _coingecko_service_instance
-    if _coingecko_service_instance is not None:
-        await _coingecko_service_instance.close()
-        _coingecko_service_instance = None

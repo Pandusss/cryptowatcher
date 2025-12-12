@@ -6,7 +6,6 @@ from typing import Dict, List, Optional
 
 
 class BaseStaticAdapter(ABC):
-    """Базовый класс для адаптеров статических данных (названия, символы, изображения)"""
     
     @abstractmethod
     async def get_coin_static_data(self, coin_id: str) -> Optional[Dict]:
@@ -92,7 +91,6 @@ class BasePriceAdapter(ABC):
 
 
 class BaseChartAdapter(ABC):
-    """Базовый класс для адаптеров графиков"""
     
     @abstractmethod
     async def get_chart_data(

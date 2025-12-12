@@ -2,7 +2,6 @@
 Binance WebSocket Worker для получения цен в реальном времени
 
 Использует !ticker@arr для получения всех тикеров одним потоком.
-Обновляет Redis кэш с ключами coin_price:{coin_id} для совместимости.
 """
 import asyncio
 import json
@@ -16,11 +15,6 @@ from app.utils.formatters import get_price_decimals
 
 
 class BinanceWebSocketWorker:
-    """
-    WebSocket worker для получения цен в реальном времени от Binance.
-    Использует !ticker@arr для получения всех тикеров одним потоком.
-    """
-    
     BINANCE_WS_URL = "wss://stream.binance.com:9443/ws/!ticker@arr"
     RECONNECT_DELAY = 5  # Секунд до переподключения
     PRICE_UPDATE_INTERVAL = 0.1  # Обновляем кэш каждые 100ms (при получении данных)
@@ -34,7 +28,6 @@ class BinanceWebSocketWorker:
         self._coins_with_updates: Set[str] = set()  # Множество монет, которые получили обновления за последний период
         
     def _load_coins_config(self) -> list[str]:
-        """Загрузить список монет из CoinRegistry"""
         try:
             # Получаем все монеты с Binance маппингом
             coins = coin_registry.get_coins_by_source("binance")
@@ -48,7 +41,6 @@ class BinanceWebSocketWorker:
     
     
     async def start(self):
-        """Запустить WebSocket worker"""
         if self._running:
             print("[BinanceWebSocket] Уже запущен")
             return
@@ -97,11 +89,9 @@ class BinanceWebSocketWorker:
         print("[BinanceWebSocket] ⏹️ WebSocket worker остановлен")
     
     async def close(self):
-        """Закрыть соединение (алиас для stop)"""
         await self.stop()
     
     async def _websocket_loop(self):
-        """Основной цикл WebSocket соединения"""
         while self._running:
             try:
                 print(f"[BinanceWebSocket] 🔌 Подключение к {self.BINANCE_WS_URL}...")
@@ -134,10 +124,6 @@ class BinanceWebSocketWorker:
         print("[BinanceWebSocket] WebSocket loop завершен")
     
     async def _process_ticker_update(self, message: str):
-        """
-        Обработать обновление тикера от Binance.
-        Формат сообщения: массив объектов тикеров
-        """
         try:
             tickers = json.loads(message)
             
@@ -184,11 +170,6 @@ class BinanceWebSocketWorker:
                     skipped_wrong_priority += 1
                     continue
                 
-                # Извлекаем данные о цене из Binance тикера
-                # Формат Binance WebSocket ticker:
-                # - "c": последняя цена (current price)
-                # - "P": изменение за 24ч в процентах (price change percent)
-                # - "v": объем за 24ч (volume)
                 price = float(ticker.get("c", 0))  # Текущая цена
                 price_change_24h = float(ticker.get("P", 0))  # Изменение за 24ч в процентах
                 volume_24h = float(ticker.get("v", 0))  # Объем за 24ч
@@ -197,7 +178,6 @@ class BinanceWebSocketWorker:
                     skipped_zero_price += 1
                     continue
                 
-                # Формируем данные для кэша (совместимый формат с CoinGecko)
                 price_data = {
                     "price": price,
                     "percent_change_24h": price_change_24h,
@@ -205,12 +185,9 @@ class BinanceWebSocketWorker:
                     "priceDecimals": get_price_decimals(price),
                 }
                 
-                # Сохраняем в Redis с тем же ключом, что использовал CoinGecko
-                # Это обеспечивает совместимость с существующим кодом
                 price_cache_key = f"coin_price:{coin_id}"
                 
                 try:
-                    # TTL 60 секунд (достаточно для real-time, но с запасом)
                     await redis.setex(
                         price_cache_key,
                         60,  # TTL в секундах
@@ -224,7 +201,6 @@ class BinanceWebSocketWorker:
                 except Exception as e:
                     print(f"[BinanceWebSocket] Ошибка записи в Redis для {coin_id}: {e}")
             
-            # Логируем статистику каждые 5 секунд (чтобы не спамить в консоль)
             should_log = (
                 current_time - getattr(self, '_last_log_time', 0) >= 5.0
             )
@@ -253,7 +229,6 @@ class BinanceWebSocketWorker:
                     
         except Exception as e:
             print(f"[BinanceWebSocket] Ошибка обработки сообщения: {e}")
-
 
 # Глобальный экземпляр
 binance_websocket_worker = BinanceWebSocketWorker()

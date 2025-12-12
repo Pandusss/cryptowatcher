@@ -10,15 +10,12 @@ from typing import Dict, Any, Optional
 from app.core.config import settings
 
 
-class CoinGeckoClient:
-    """HTTP клиент для работы с CoinGecko API"""
-    
+class CoinGeckoClient:    
     BASE_URL = "https://api.coingecko.com/api/v3"
     
     def __init__(self):
         self.headers = {"Accept": "application/json"}
         
-        # Добавляем API ключ, если он есть
         self.api_key = getattr(settings, 'COINGECKO_API_KEY', '') or ''
         if self.api_key:
             self.headers["x-cg-demo-api-key"] = self.api_key
@@ -27,7 +24,6 @@ class CoinGeckoClient:
         self._client: Optional[httpx.AsyncClient] = None
     
     async def _get_client(self) -> httpx.AsyncClient:
-        """Получить или создать HTTP клиент"""
         if self._client is None:
             self._client = httpx.AsyncClient(
                 headers=self.headers,
@@ -36,7 +32,7 @@ class CoinGeckoClient:
         return self._client
     
     async def close(self):
-        """Закрыть HTTP клиент"""
+        """ HTTP клиент"""
         if self._client is not None:
             await self._client.aclose()
             self._client = None
@@ -47,17 +43,7 @@ class CoinGeckoClient:
         params: Dict[str, Any] = None,
         retry_on_rate_limit: bool = True
     ) -> Dict:
-        """
-        Выполнить GET запрос к CoinGecko API
-        
-        Args:
-            endpoint: URL эндпоинта (например, "/coins/markets")
-            params: Параметры запроса
-            retry_on_rate_limit: Повторить запрос при rate limit
-            
-        Returns:
-            Ответ API в формате JSON
-        """
+
         url = f"{self.BASE_URL}{endpoint}"
         client = await self._get_client()
         
@@ -80,3 +66,4 @@ class CoinGeckoClient:
             print(f"[CoinGeckoClient] Ошибка запроса к {url}: {e}")
             raise
 
+        
