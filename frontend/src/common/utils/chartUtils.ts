@@ -5,6 +5,13 @@
 import { ChartPeriod } from '../../types/chart.types'
 import { ChartDataPoint } from '../../services/api'
 
+// Импортируем функции для работы с датами из отдельного файла
+import { 
+  formatDateForAxis, 
+  formatDateForTooltip, 
+  getXAxisTicks 
+} from './chartTimeUtils'
+
 /**
  * Определяет цвет графика на основе тренда
  */
@@ -246,220 +253,6 @@ export const formatPriceForTooltip = (price: number, priceDecimals: number = 2):
 }
 
 /**
- * Форматирование даты для оси X в зависимости от периода
- */
-export const formatDateForAxis = (dateStr: string, period: ChartPeriod): string => {
-  try {
-    // dateStr в формате: "2025-12-17 18:12" - это UTC время!
-    
-    // 1. Парсим строку как UTC
-    const [datePart, timePart] = dateStr.split(' ')
-    if (!datePart || !timePart) return dateStr
-    
-    const [year, month, day] = datePart.split('-').map(Number)
-    const [hours, minutes] = timePart.split(':').map(Number)
-    
-    // 2. Создаем Date объект в UTC
-    const dateUtc = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0))
-    
-    // 3. Конвертируем в московское время (UTC+3)
-    const mskOffset = 3 * 60 * 60 * 1000 // UTC+3
-    const dateMsk = new Date(dateUtc.getTime() + mskOffset)
-    
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-    const monthShort = monthNames[month - 1]
-    
-    switch (period) {
-      case '1d':
-        // Для 1D: часы в московском времени
-        // Используем часы из MSK даты, но для 1D периода показываем каждый час
-        const mskHours = dateMsk.getUTCHours() // потому что dateMsk в UTC, но с +3 часами
-        let roundedHour = Math.floor(mskHours / 3) * 3
-        roundedHour = roundedHour % 24
-        
-        return `${String(roundedHour).padStart(2, '0')}:00`
-        
-      case '7d':
-      case '30d':
-      case '1y':
-        // Показываем месяц и день (MMM DD) в московском времени
-        // Используем компоненты из MSK даты
-        const mskDay = dateMsk.getUTCDate() // getUTCDate потому что dateMsk на самом деле в UTC
-        const mskMonth = dateMsk.getUTCMonth() // но с +3 часами
-        
-        return `${monthNames[mskMonth]} ${mskDay}`
-        
-      default:
-        return dateStr
-    }
-  } catch {
-    return dateStr
-  }
-}
-
-/**
- * Форматирование даты для tooltip
- */
-export const formatDateForTooltip = (dateStr: string, period: ChartPeriod): string => {
-  try {
-    // dateStr в формате: "2025-12-17 18:12" - это UTC время!
-    
-    // 1. Парсим строку как UTC
-    const [datePart, timePart] = dateStr.split(' ')
-    if (!datePart || !timePart) return dateStr
-    
-    const [year, month, day] = datePart.split('-').map(Number)
-    const [hours, minutes] = timePart.split(':').map(Number)
-    
-    // 2. Создаем Date объект в UTC
-    const dateUtc = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0))
-    
-    // 3. Конвертируем в московское время (UTC+3)
-    const mskOffset = 3 * 60 * 60 * 1000
-    const dateMsk = new Date(dateUtc.getTime() + mskOffset)
-    
-    // 4. Форматируем в московском времени
-    const dayMsk = dateMsk.getUTCDate() // getUTCDate потому что dateMsk на самом деле в UTC
-    const monthMsk = dateMsk.toLocaleDateString('en-US', { 
-      month: 'short',
-      timeZone: 'UTC' // специальный трюк - dateMsk уже содержит смещение
-    })
-    
-    if (period === '7d') {
-      // Для 7D показываем часы в московском времени
-      const hoursMsk = dateMsk.getUTCHours() // getUTCHours потому что dateMsk в UTC
-      const formattedTime = new Date(Date.UTC(0, 0, 0, hoursMsk, 0, 0))
-        .toLocaleTimeString('en-US', {
-          hour: '2-digit',
-          hour12: true,
-          timeZone: 'UTC'
-        })
-      return `${dayMsk} ${monthMsk} ${formattedTime}`
-    }
-    
-    // Для остальных периодов: часы и минуты в московском времени
-    const hoursMsk = dateMsk.getUTCHours()
-    const minutesMsk = dateMsk.getUTCMinutes()
-    const formattedTime = new Date(Date.UTC(0, 0, 0, hoursMsk, minutesMsk, 0))
-      .toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true,
-        timeZone: 'UTC'
-      })
-    
-    return `${dayMsk} ${monthMsk} ${formattedTime}`
-  } catch {
-    return dateStr
-  }
-}
-
-/**
- * Получает тики для оси X в зависимости от периода
- */
-export const getXAxisTicks = (data: ChartDataPoint[], period: ChartPeriod): string[] | undefined => {
-  if (data.length === 0) return undefined
-  
-  // Для 1D таймфрейма показываем фиксированные временные метки каждые 3 часа
-  if (period === '1d') {
-    const ticks: string[] = []
-    
-    // Создаем массив UTC часов из данных
-    const utcHours: number[] = []
-    
-    data.forEach(item => {
-      const [datePart, timePart] = item.date.split(' ')
-      if (datePart && timePart) {
-        const [hours] = timePart.split(':').map(Number)
-        utcHours.push(hours)
-      }
-    })
-    
-    if (utcHours.length === 0) return undefined
-    
-    // Находим минимальный и максимальный час (в UTC)
-    const minHour = Math.min(...utcHours)
-    const maxHour = Math.max(...utcHours)
-    
-    // Конвертируем в MSK (добавляем 3)
-    const minHourMsk = minHour + 3
-    const maxHourMsk = maxHour + 3
-    
-    // Находим первый час в MSK, кратный 3
-    const firstRoundedHourMsk = Math.floor(minHourMsk / 3) * 3
-    
-    // Генерируем часы в MSK
-    const mskHoursToShow: number[] = []
-    let currentMskHour = firstRoundedHourMsk
-    
-    while (currentMskHour <= maxHourMsk + 3) { // +3 для запаса
-      if (currentMskHour >= minHourMsk && currentMskHour <= maxHourMsk + 3) {
-        mskHoursToShow.push(currentMskHour % 24) // приводим к 0-23
-      }
-      currentMskHour += 3
-    }
-    
-    // Для каждого MSK часа находим ближайшую точку в данных (по UTC часу)
-    mskHoursToShow.forEach(mskHour => {
-      // Конвертируем MSK час обратно в UTC для поиска
-      let utcHourForSearch = mskHour - 3
-      if (utcHourForSearch < 0) utcHourForSearch += 24
-      
-      let closestIndex = -1
-      let minDiff = Infinity
-      
-      data.forEach((item, index) => {
-        const [datePart, timePart] = item.date.split(' ')
-        if (datePart && timePart) {
-          const [hours] = timePart.split(':').map(Number)
-          const diff = Math.abs(hours - utcHourForSearch)
-          if (diff < minDiff) {
-            minDiff = diff
-            closestIndex = index
-          }
-        }
-      })
-      
-      if (closestIndex >= 0 && !ticks.includes(data[closestIndex].date)) {
-        ticks.push(data[closestIndex].date)
-      }
-    })
-    
-    return ticks.length > 0 ? ticks.sort() : undefined
-  }
-  
-  // Для остальных таймфреймов используем стандартную логику
-  const optimalCount = period === '7d' ? 7 : 6
-  const totalPoints = data.length
-  
-  if (totalPoints <= optimalCount) {
-    return data.map(item => item.date)
-  }
-  
-  const step = Math.floor((totalPoints - 1) / (optimalCount - 1))
-  const ticks: string[] = []
-  
-  ticks.push(data[0].date)
-  
-  for (let i = step; i < totalPoints - 1; i += step) {
-    if (ticks.length < optimalCount - 1) {
-      ticks.push(data[i].date)
-    }
-  }
-  
-  const lastDate = data[totalPoints - 1].date
-  if (ticks[ticks.length - 1] !== lastDate) {
-    if (ticks.length >= optimalCount) {
-      ticks[ticks.length - 1] = lastDate
-    } else {
-      ticks.push(lastDate)
-    }
-  }
-  
-  return ticks.length > 0 ? ticks : undefined
-}
-
-/**
  * Рассчитывает все необходимые значения для графика
  */
 export const calculateChartValues = (
@@ -486,3 +279,10 @@ export const calculateChartValues = (
     maxVolume: data.length > 0 ? Math.max(...data.map(d => d.volume || 0)) : 0,
   }
 }
+
+// Экспортируем функции для работы с датами для обратной совместимости
+export { 
+  formatDateForAxis, 
+  formatDateForTooltip, 
+  getXAxisTicks 
+} from './chartTimeUtils'

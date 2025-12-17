@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { apiService, type ChartDataPoint } from '../../services/api'
 import { ChartPeriod } from '../../types/chart.types'
+import { convertServerDateToLocal, getCurrentLocalTime } from '../../common/utils/chartTimeUtils'
 
 interface UseLiveChartDataOptions {
   /** ID криптовалюты */
@@ -66,12 +67,19 @@ export const useLiveChartData = ({
       setChartLoading(true)
       setError(null)
       const data = await apiService.getCoinChart(coinId, newPeriod)
-      setChartData(data)
+      
+      // КОНВЕРТИРУЕМ ВСЕ ДАННЫЕ в локальное время пользователя
+      const convertedData = data.map(point => ({
+        ...point,
+        date: convertServerDateToLocal(point.date)
+      }))
+      
+      setChartData(convertedData)
       setPeriod(newPeriod)
       
       // Если есть данные, устанавливаем последнюю цену как текущую
-      if (data.length > 0) {
-        const lastPrice = data[data.length - 1].price
+      if (convertedData.length > 0) {
+        const lastPrice = convertedData[convertedData.length - 1].price
         setCurrentPrice(lastPrice)
         previousPriceRef.current = lastPrice
       }
@@ -119,25 +127,20 @@ export const useLiveChartData = ({
         
         // Обновляем последнюю точку графика, если есть данные
         if (chartData.length > 0) {
-        const updatedData = [...chartData]
-        const lastIndex = updatedData.length - 1
-        
-        // ВАЖНО: Используем UTC время вместо локального!
-        const now = new Date()
-        const year = now.getUTCFullYear()  // getUTCFullYear вместо getFullYear
-        const month = String(now.getUTCMonth() + 1).padStart(2, '0')  // getUTCMonth
-        const day = String(now.getUTCDate()).padStart(2, '0')  // getUTCDate
-        const hours = String(now.getUTCHours()).padStart(2, '0')  // getUTCHours
-        const minutes = String(now.getUTCMinutes()).padStart(2, '0')  // getUTCMinutes
-        const formattedDate = `${year}-${month}-${day} ${hours}:${minutes}`
-        
-        // Обновляем последнюю точку
-        updatedData[lastIndex] = {
+          const updatedData = [...chartData]
+          const lastIndex = updatedData.length - 1
+          
+          // Используем локальное время пользователя
+          const formattedDate = getCurrentLocalTime()
+          
+          // Обновляем последнюю точку
+          updatedData[lastIndex] = {
             ...updatedData[lastIndex],
             price: newPrice,
-            date: formattedDate, // Теперь UTC время!
-        }
-        setChartData(updatedData)
+            date: formattedDate,
+          }
+          
+          setChartData(updatedData)
         }
       }
     } catch (err) {
