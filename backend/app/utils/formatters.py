@@ -2,8 +2,7 @@
 Утилиты для форматирования данных
 """
 from typing import Union
-from datetime import datetime
-
+from datetime import datetime, timezone
 
 def get_price_decimals(price: Union[float, int]) -> int:
     """
@@ -27,19 +26,25 @@ def get_price_decimals(price: Union[float, int]) -> int:
 
 def format_chart_date(date_obj: datetime, period: str) -> str:
     """
-    Форматировать дату для графика в зависимости от периода
-    
-    Args:
-        date_obj: Объект datetime
-        period: Период графика ("1d", "7d", "30d", "1y")
-        
-    Returns:
-        Отформатированная строка даты
+    Форматировать дату для графика.
+    ВСЕГДА возвращает время в UTC, но без указания часового пояса в строке.
     """
-    if period in ("1d", "7d"):
-        # Для коротких периодов показываем дату и время
-        return date_obj.strftime("%Y-%m-%d %H:%M")
+    from datetime import timezone
+    
+    # 1. Гарантируем, что datetime в UTC
+    if date_obj.tzinfo is None:
+        # Если datetime без часового пояса - считаем что это уже UTC
+        date_obj_utc = date_obj.replace(tzinfo=timezone.utc)
     else:
-        # Для длинных периодов показываем только дату (время 00:00)
-        return date_obj.strftime("%Y-%m-%d 00:00")
+        # Если есть часовой пояс - конвертируем в UTC
+        date_obj_utc = date_obj.astimezone(timezone.utc)
+    
+    # 2. Убираем информацию о часовом поясе для обратной совместимости
+    date_obj_naive = date_obj_utc.replace(tzinfo=None)
+    
+    # 3. Форматируем как раньше
+    if period in ("1d", "7d"):
+        return date_obj_naive.strftime("%Y-%m-%d %H:%M")
+    else:
+        return date_obj_naive.strftime("%Y-%m-%d 00:00")
 
