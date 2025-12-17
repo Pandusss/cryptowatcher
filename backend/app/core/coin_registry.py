@@ -7,9 +7,12 @@ CoinRegistry - централизованный реестр монет с ма�
 import json
 import hashlib
 import os
+import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 from dataclasses import dataclass
+
+logger = logging.getLogger("CoinRegistry")
 
 
 @dataclass
@@ -46,9 +49,9 @@ class CoinRegistry:
         try:
             current_mtime = os.path.getmtime(self._config_path)
             if self._last_modified is None or current_mtime > self._last_modified:
-                print(f"[CoinRegistry] 🔄 Обнаружены изменения в конфиге, перезагружаем...")
                 self._load_config()
         except Exception as e:
+
             print(f"[CoinRegistry] ⚠️ Ошибка при проверке изменений конфига: {e}")
     
     def _load_config(self):

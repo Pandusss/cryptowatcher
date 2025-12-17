@@ -92,7 +92,7 @@
       "enabled": true,
       "external_ids": {
         "binance": "LUNAUSDT",
-        "coingecko": "luna-by-virtuals",
+        "coingecko": "terra-luna-2",
         "okx": "LUNA-USDT"
       },
       "price_priority": [

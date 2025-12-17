@@ -1,6 +1,6 @@
 """
-Провайдеры данных для криптовалют
+Data providers for cryptocurrencies
 
-Каждый провайдер - независимый модуль, реализующий интерфейс для получения данных.
+Each provider is an independent module implementing an interface for data retrieval.
 """
 

@@ -3,6 +3,7 @@
 """
 import asyncio
 import json
+import logging
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict
@@ -23,6 +24,7 @@ class NotificationChecker:
         self.running = False
         self.check_interval = 60  # Проверяем каждые 60 секунд
         self.price_cache_ttl = 10  # Кэшируем цены на 10 секунд для актуальности
+        self._logger = logging.getLogger("NotificationChecker")
     
     def _check_notification_condition(
         self,
@@ -76,16 +78,12 @@ class NotificationChecker:
             if price_data:
                 price = price_data.get("price", 0)
                 if price > 0:
-                    print(f"[NotificationChecker] ✅ Цена {crypto_id} через AggregationService: ${price}")
                     return price
                 else:
-                    print(f"[NotificationChecker] ⚠️ Цена {crypto_id} равна 0")
                     return None
             else:
-                print(f"[NotificationChecker] ⚠️ Цена {crypto_id} не найдена")
                 return None
         except Exception as e:
-            print(f"[NotificationChecker] Ошибка получения цены через AggregationService: {e}")
             return None
     
     async def _check_and_process_notification(
@@ -98,12 +96,10 @@ class NotificationChecker:
         try:
             # Проверяем условие
             if self._check_notification_condition(notification, current_price):
-                print(f"[NotificationChecker] ✅ Уведомление {notification.id} сработало! Цена: {current_price}")
                 
                 # Проверяем DND режим пользователя
                 user = db.query(User).filter(User.id == notification.user_id).first()
                 if user and self._is_dnd_active(user):
-                    print(f"[NotificationChecker] ⏸️ Уведомление {notification.id} пропущено из-за DND режима (пользователь {notification.user_id})")
                     # Не отправляем уведомление, но и не деактивируем его - оно сработает позже
                     return False
                 
@@ -126,18 +122,14 @@ class NotificationChecker:
                 db.commit()
                 
                 if success:
-                    print(f"[NotificationChecker] Уведомление {notification.id} отправлено и деактивировано")
                     return True
                 else:
-                    print(f"[NotificationChecker] ⚠️ Уведомление {notification.id} деактивировано, но отправка не удалась (возможно, пользователь не запустил бота)")
                     return False
             
             return False
         
         except Exception as e:
             import traceback
-            print(f"[NotificationChecker] Ошибка при проверке уведомления {notification.id}: {str(e)}")
-            print(f"[NotificationChecker] Traceback: {traceback.format_exc()}")
             return False
     
     def _is_dnd_active(self, user: User) -> bool:
@@ -184,15 +176,12 @@ class NotificationChecker:
             
             if not active_notifications:
                 return
-            
-            print(f"[NotificationChecker] Проверяю {len(active_notifications)} активных уведомлений")
-            
+                        
             # Сначала проверяем и удаляем истекшие уведомления
             expired_count = 0
             valid_notifications = []
             for notification in active_notifications:
                 if self._check_notification_expired(notification):
-                    print(f"[NotificationChecker] Уведомление {notification.id} истекло (создано: {notification.created_at}, срок: {notification.expire_time_hours} часов)")
                     db.delete(notification)
                     expired_count += 1
                 else:
@@ -200,26 +189,21 @@ class NotificationChecker:
             
             if expired_count > 0:
                 db.commit()
-                print(f"[NotificationChecker] Удалено {expired_count} истекших уведомлений")
             
             if not valid_notifications:
-                print("[NotificationChecker] Все уведомления истекли")
                 return
             
             # Группируем уведомления по crypto_id
             notifications_by_crypto: Dict[str, List[Notification]] = defaultdict(list)
             for notification in valid_notifications:
                 notifications_by_crypto[notification.crypto_id].append(notification)
-            
-            print(f"[NotificationChecker] Уникальных криптовалют: {len(notifications_by_crypto)}")
-            
+                        
             # Проверяем каждую криптовалюту один раз
             for crypto_id, notifications in notifications_by_crypto.items():
                 # Получаем текущую цену (с кэшированием)
                 current_price = await self._get_crypto_price(crypto_id)
                 
                 if current_price is None:
-                    print(f"[NotificationChecker] Пропускаю {len(notifications)} уведомлений для {crypto_id} (не удалось получить цену)")
                     continue
                 
                 # Проверяем все уведомления для этой криптовалюты
@@ -235,15 +219,14 @@ class NotificationChecker:
     async def start(self):
 
         self.running = True
-        print(f"[NotificationChecker] 🚀 Запущена проверка уведомлений (интервал: {self.check_interval} сек)")
         
         while self.running:
             try:
                 await self.check_all_notifications()
             except Exception as e:
                 import traceback
-                print(f"[NotificationChecker] Критическая ошибка: {str(e)}")
-                print(f"[NotificationChecker] Traceback: {traceback.format_exc()}")
+                self._logger.error(f"Critical error: {str(e)}")
+                self._logger.error(f"Traceback: {traceback.format_exc()}")
             
             # Ждем перед следующей проверкой
             await asyncio.sleep(self.check_interval)
@@ -251,8 +234,7 @@ class NotificationChecker:
     def stop(self):
 
         self.running = False
-        print("[NotificationChecker] ⏹️ Остановлена проверка уведомлений")
-    
+        self._logger.warning(f"Notification verification stopped")    
 
 
 # Глобальный экземпляр

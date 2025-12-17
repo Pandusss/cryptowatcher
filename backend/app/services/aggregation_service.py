@@ -6,6 +6,7 @@ AggregationService - агрегация данных из разных пров�
 """
 from typing import Dict, List, Optional
 import asyncio
+import logging
 
 from app.core.coin_registry import coin_registry
 from app.providers.coingecko_static import coingecko_static_adapter
@@ -20,6 +21,7 @@ class AggregationService:
     
     def __init__(self):
         self.cache = CoinCacheManager()
+        self._logger = logging.getLogger("AggregationService")
         
         # Регистр провайдеров
         self.static_providers = {
@@ -136,7 +138,7 @@ class AggregationService:
         # Проверяем кэш
         cached_data = await self.cache.get_chart(coin_id, period)
         if cached_data:
-            print(f"[AggregationService.get_coin_chart] ✅ График загружен из КЭША для {coin_id} ({period}): {len(cached_data)} точек")
+            self._logger.info(f"The graph is loaded from the CACHE for {coin_id} ({period}): {len(cached_data)} points")
             return cached_data
         
         # Получаем список провайдеров в порядке приоритета
@@ -146,43 +148,40 @@ class AggregationService:
         for provider_name in providers:
             provider = self.chart_providers.get(provider_name)
             if not provider:
-                print(f"[AggregationService.get_coin_chart] Провайдер {provider_name} не найден для {coin_id}")
+                self._logger.warning(f"Provider {provider_name} not found for {coin_id}")
                 continue
             
             # Получаем внешний ID для этого провайдера
             external_id = coin.external_ids.get(provider_name)
             if not external_id:
-                print(f"[AggregationService.get_coin_chart] У монеты {coin_id} нет внешнего ID для провайдера {provider_name}")
+                self._logger.warning(f"The coin {coin_id} does not have an external ID for the provider {provider_name}")
                 continue
             
             # Проверяем доступность
             if not provider.is_available(external_id):
-                print(f"[AggregationService.get_coin_chart] Провайдер {provider_name} недоступен для {external_id}")
+                self._logger.warning(f"Provider {provider_name} is unavailable for {external_id}")
                 continue
             
             # Пытаемся получить график
-            print(f"[AggregationService.get_coin_chart] Пробуем получить график от {provider_name} для {coin_id} ({external_id})")
             try:
                 chart_data = await provider.get_chart_data(external_id, period)
                 if chart_data:
                     # Сохраняем в кэш (если провайдер еще не сохранил)
                     await self.cache.set_chart(coin_id, period, chart_data)
-                    print(f"[AggregationService.get_coin_chart] ✅ График загружен с площадки {provider_name.upper()} для {coin_id} ({period}): {len(chart_data)} точек")
+                    self._logger.info(f"The chart was uploaded from the {provider_name.upper()} platform for {coin_id} ({period}): {len(chart_data)} points")
                     return chart_data
                 else:
-                    print(f"[AggregationService.get_coin_chart] Провайдер {provider_name} вернул пустые данные для {coin_id}")
+                    self._logger.warning(f"Provider {provider_name} returned empty data for {coin_id}")
             except Exception as e:
-                print(f"[AggregationService.get_coin_chart] ❌ Ошибка получения графика от {provider_name} для {coin_id}: {e}")
+                self._logger.error(f"Error getting a chart from {provider_name} for {coin_id}: {e}")
                 continue
         
-        # Если ни один провайдер из price_priority не вернул график, пробуем все доступные провайдеры как fallback
-        # (на случай если price_priority не содержит всех доступных провайдеров или основной провайдер недоступен)
-        print(f"[AggregationService.get_coin_chart] Пробуем fallback на все доступные провайдеры для {coin_id}")
-        # Динамически получаем список всех доступных провайдеров из chart_providers
+        # If none of the providers from price_priority returned the schedule, we try all available providers as a fallback
+        self._logger.info(f"Trying a fallback on all available providers for {coin_id}")
         all_available_providers = list(self.chart_providers.keys())
         
         for provider_name in all_available_providers:
-            # Пропускаем провайдеры, которые уже пробовали выше
+            # Skip the providers that have already tried above
             if provider_name in providers:
                 continue
             
@@ -197,19 +196,18 @@ class AggregationService:
             if not provider.is_available(external_id):
                 continue
             
-            print(f"[AggregationService.get_coin_chart] Fallback: пробуем получить график от {provider_name} для {coin_id} ({external_id})")
             try:
                 chart_data = await provider.get_chart_data(external_id, period)
                 if chart_data:
                     await self.cache.set_chart(coin_id, period, chart_data)
-                    print(f"[AggregationService.get_coin_chart] ✅ Fallback успешен: график загружен с площадки {provider_name.upper()} для {coin_id} ({period}): {len(chart_data)} точек")
+                    self._logger.info(f"Fallback was successful: the chart was loaded from the {provider_name.upper()} site for {coin_id} ({period}): {len(chart_data)} points")
                     return chart_data
             except Exception as e:
-                print(f"[AggregationService.get_coin_chart] ❌ Fallback ошибка от {provider_name} для {coin_id}: {e}")
+                self._logger.error(f"Fallback error from {provider_name} for {coin_id}: {e}")
                 continue
         
         # Если ни один провайдер не вернул график, возвращаем None
-        print(f"[AggregationService.get_coin_chart] ❌ График не найден для {coin_id} ({period}) ни у одного провайдера")
+        self._logger.error(f"No chart was found for {coin_id} ({period}) from any provider.")
         return None
     
     async def get_coin_image_url(self, coin_id: str) -> Optional[str]:

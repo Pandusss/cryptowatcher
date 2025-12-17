@@ -4,9 +4,10 @@
 """
 import asyncio
 import httpx
-from typing import Optional, Callable, Dict, Any
+import logging
+from typing import Optional, Dict, Any
 from app.core.config import settings
-from app.core.database import get_db, SessionLocal
+from app.core.database import SessionLocal
 from app.services.user_service import get_or_create_user
 from app.services.telegram import telegram_service
 
@@ -19,9 +20,11 @@ class BotPolling:
         self.bot_token = settings.TELEGRAM_BOT_TOKEN
         self.offset = 0
         self.running = False
+        self._logger = logging.getLogger("BotPolling")
+
         
         if not self.bot_token:
-            print("[BotPolling] WARNING: TELEGRAM_BOT_TOKEN не установлен")
+            self._logger.warning("TELEGRAM_BOT_TOKEN is not installed")
     
     def _get_url(self, method: str) -> str:
         return f"{self.BASE_URL}{self.bot_token}/{method}"
@@ -46,13 +49,9 @@ class BotPolling:
             
             # Получаем текст сообщения
             text = message.get("text", "").strip()
-            
-            print(f"[BotPolling] Сообщение от пользователя {user_id}: '{text}'")
-            
+                        
             # Обрабатываем команду /start
-            if text == "/start" or text.startswith("/start"):
-                print(f"[BotPolling] Обработка команды /start от пользователя {user_id}")
-                
+            if text == "/start" or text.startswith("/start"):                
                 # Создаем или обновляем пользователя
                 user = get_or_create_user(
                     db=db,
@@ -68,27 +67,20 @@ class BotPolling:
                     "👋 Добро пожаловать в CryptoWatcher!\n\n"
                     "🔔 Создавайте уведомления о изменении цен криптовалют\n"
                     "📊 Отслеживайте графики и получайте алерты\n\n"
-                    "Откройте Mini App для начала работы!"
+                    "Откройте приложение для начала работы!"
                 )
                 
                 success = await telegram_service.send_message(
                     chat_id=user_id,
                     text=welcome_message,
                 )
-                
-                if success:
-                    print(f"[BotPolling] ✅ Команда /start обработана успешно для пользователя {user_id}")
-                else:
-                    print(f"[BotPolling] ❌ Ошибка отправки сообщения пользователю {user_id}")
         
         except Exception as e:
             import traceback
-            print(f"[BotPolling] Ошибка при обработке update: {str(e)}")
-            print(f"[BotPolling] Traceback: {traceback.format_exc()}")
+            self._logger.error(f"Traceback: {traceback.format_exc()}")
     
     async def _poll_updates(self):
         if not self.bot_token:
-            print("[BotPolling] Токен бота не установлен, пропускаем polling")
             await asyncio.sleep(10)
             return
         
@@ -98,13 +90,12 @@ class BotPolling:
                     self._get_url("getUpdates"),
                     params={
                         "offset": self.offset,
-                        "timeout": 10,  # Long polling - ждем до 10 секунд
-                        "allowed_updates": ["message"],  # Только сообщения
+                        "timeout": 10,
+                        "allowed_updates": ["message"],  
                     },
                 )
                 
                 if response.status_code != 200:
-                    print(f"[BotPolling] Ошибка получения обновлений: {response.status_code}")
                     await asyncio.sleep(5)
                     return
                 
@@ -112,15 +103,13 @@ class BotPolling:
                 
                 if not result.get("ok"):
                     error_description = result.get("description", "Unknown error")
-                    print(f"[BotPolling] Ошибка от Telegram API: {error_description}")
+                    self._logger.error(f"Error from Telegram API: {error_description}")
                     await asyncio.sleep(5)
                     return
                 
                 updates = result.get("result", [])
                 
-                if updates:
-                    print(f"[BotPolling] Получено {len(updates)} обновлений")
-                    
+                if updates:                    
                     # Создаем сессию БД для обработки обновлений
                     db = SessionLocal()
                     try:
@@ -132,33 +121,29 @@ class BotPolling:
                         db.close()
         
         except httpx.TimeoutException:
-            # Timeout - это нормально для long polling
             pass
         except Exception as e:
             import traceback
-            print(f"[BotPolling] Ошибка при polling: {str(e)}")
-            print(f"[BotPolling] Traceback: {traceback.format_exc()}")
+            self._logger.error(f"Traceback: {traceback.format_exc()}")
             await asyncio.sleep(5)
     
     async def start(self):
         if not self.bot_token:
-            print("[BotPolling] Токен бота не установлен, polling не запущен")
             return
         
         self.running = True
-        print("[BotPolling] 🚀 Запущен polling для Telegram бота")
+        self._logger.info("Polling for Telegram bot launched")
         
         while self.running:
             try:
                 await self._poll_updates()
             except Exception as e:
-                print(f"[BotPolling] Критическая ошибка: {str(e)}")
+                self._logger.error(f"Critical error: {str(e)}")
                 await asyncio.sleep(5)
     
     def stop(self):
         self.running = False
-        print("[BotPolling] ⏹️ Остановлен polling")
-
+        self._logger.info("Stop polling")
 
 # Глобальный экземпляр
 bot_polling = BotPolling()

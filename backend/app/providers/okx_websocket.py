@@ -4,257 +4,117 @@ OKX WebSocket Worker для получения цен в реальном вре
 Использует публичный канал tickers для получения всех тикеров.
 Обновляет Redis кэш с ключами coin_price:{coin_id} для совместимости.
 """
-import asyncio
 import json
+from typing import Dict, Optional, Callable
 import websockets
-from typing import Dict, Optional, Set
-from pathlib import Path
 
-from app.core.redis_client import get_redis
+from app.providers.base_websocket import BaseWebSocketWorker
 from app.core.coin_registry import coin_registry
-from app.utils.websocket_price_handler import process_price_update
 
 
-class OKXWebSocketWorker:
-
+class OKXWebSocketWorker(BaseWebSocketWorker):
+    """WebSocket worker для получения цен с OKX"""
+    
     OKX_WS_URL = "wss://ws.okx.com:8443/ws/v5/public"
-    RECONNECT_DELAY = 5  # Секунд до переподключения
-    PRICE_UPDATE_INTERVAL = 0.1  # Обновляем кэш каждые 100ms (при получении данных)
+    MAX_SUBSCRIPTIONS_PER_REQUEST = 100  # OKX лимит на количество подписок в одном запросе
     
     def __init__(self):
-        self._running = False
-        self._task: Optional[asyncio.Task] = None
-        self._ws: Optional[websockets.WebSocketClientProtocol] = None
-        self._tracked_coins: Set[str] = set()  # Множество внутренних ID из конфига
-        self._last_update_time: Dict[str, float] = {}  # Для отслеживания частоты обновлений
-        self._coins_with_updates: Set[str] = set()  # Множество монет, которые получили обновления за последний период
-        
-    def _load_coins_config(self) -> list[str]:
-        try:
-            # Получаем все монеты с OKX маппингом
-            coins = coin_registry.get_coins_by_source("okx")
-            coin_ids = [coin.id for coin in coins]
-            
-            print(f"[OKXWebSocket] Загружено {len(coin_ids)} монет с OKX из реестра")
-            return coin_ids
-        except Exception as e:
-            print(f"[OKXWebSocket] Ошибка загрузки монет из реестра: {e}")
-            return []
+        super().__init__(source="okx")
     
+    def _get_websocket_url(self) -> str:
+        """Получить URL для WebSocket подключения"""
+        return self.OKX_WS_URL
     
-    async def start(self):
-        if self._running:
-            print("[OKXWebSocket] Уже запущен")
-            return
+    async def _subscribe(self, ws: websockets.WebSocketClientProtocol):
+        """
+        Подписаться на тикеры OKX
         
-        self._running = True
-        
-        # Загружаем список монет из конфига
-        config_coins = self._load_coins_config()
-        self._tracked_coins = set(config_coins)
-        
-        if not self._tracked_coins:
-            print("[OKXWebSocket] ⚠️ Нет монет для отслеживания, WebSocket не запущен")
-            self._running = False
-            return
-        
-        # Определяем, какие монеты есть в OKX
-        coins_in_okx = []
-        coins_not_in_okx = []
+        OKX требует явной подписки на каждый тикер.
+        Формат: {"op": "subscribe", "args": [{"channel": "tickers", "instId": "BTC-USDT"}, ...]}
+        """
+        # Получаем все символы OKX для отслеживаемых монет
+        okx_symbols = []
         for coin_id in self._tracked_coins:
             coin = coin_registry.get_coin(coin_id)
             if coin and "okx" in coin.external_ids:
-                coins_in_okx.append(coin_id)
-            else:
-                coins_not_in_okx.append(coin_id)
+                okx_symbols.append(coin.external_ids["okx"])
         
-        print(f"[OKXWebSocket] 🚀 Запуск WebSocket worker для {len(self._tracked_coins)} монет...")
-        print(f"[OKXWebSocket] 📈 Отслеживаем {len(self._tracked_coins)} монет | В OKX: {len(coins_in_okx)} | Не в OKX: {len(coins_not_in_okx)}")
+        if not okx_symbols:
+            self._logger.warning("Нет символов OKX для подписки")
+            return
         
-        # Запускаем WebSocket loop в фоне
-        self._task = asyncio.create_task(self._websocket_loop())
-    
-    async def stop(self):
-        self._running = False
-        
-        if self._ws:
-            await self._ws.close()
-        
-        if self._task:
-            self._task.cancel()
-            try:
-                await self._task
-            except asyncio.CancelledError:
-                pass
-        
-        print("[OKXWebSocket] ⏹️ WebSocket worker остановлен")
-    
-    async def close(self):
-        await self.stop()
-    
-    async def _websocket_loop(self):
-        while self._running:
-            try:
-                print(f"[OKXWebSocket] 🔌 Подключение к {self.OKX_WS_URL}...")
-                
-                async with websockets.connect(self.OKX_WS_URL) as ws:
-                    self._ws = ws
-                    print("[OKXWebSocket] ✅ Подключено к OKX WebSocket")
-                    
-                    # OKX использует формат: {"op": "subscribe", "args": [{"channel": "tickers", "instId": "BTC-USDT"}]}
-                    # Для всех тикеров можно подписаться на канал без instId или использовать специальный формат
-                    # Но OKX не поддерживает получение всех тикеров одним запросом как Binance
-                    # Нужно подписаться на каждый тикер отдельно или использовать другой подход
-                    
-                    okx_symbols = []
-                    for coin_id in self._tracked_coins:
-                        coin = coin_registry.get_coin(coin_id)
-                        if coin and "okx" in coin.external_ids:
-                            okx_symbols.append(coin.external_ids["okx"])
-                    
-                    if okx_symbols:
-                        # Подписываемся на каждый тикер отдельно
-                        # OKX позволяет подписаться на несколько тикеров одним запросом
-                        # Формат: {"op": "subscribe", "args": [{"channel": "tickers", "instId": "BTC-USDT"}, ...]}
-                        subscribe_args = [
-                            {"channel": "tickers", "instId": symbol}
-                            for symbol in okx_symbols[:100]
-                        ]
-                        
-                        subscribe_msg = {
-                            "op": "subscribe",
-                            "args": subscribe_args
-                        }
-                        
-                        await ws.send(json.dumps(subscribe_msg))
-                        print(f"[OKXWebSocket] 📡 Подписано на {len(subscribe_args)} тикеров")
-                    
-                    async for message in ws:
-                        if not self._running:
-                            break
-                        
-                        await self._process_message(message)
-                
-            except websockets.exceptions.ConnectionClosed:
-                if self._running:
-                    print(f"[OKXWebSocket] ⚠️ Соединение закрыто, переподключение через {self.RECONNECT_DELAY} сек...")
-                    await asyncio.sleep(self.RECONNECT_DELAY)
-                else:
-                    break
+        # Подписываемся батчами (OKX имеет лимит на количество подписок в одном запросе)
+        total_subscribed = 0
+        for i in range(0, len(okx_symbols), self.MAX_SUBSCRIPTIONS_PER_REQUEST):
+            batch = okx_symbols[i:i + self.MAX_SUBSCRIPTIONS_PER_REQUEST]
+            subscribe_args = [
+                {"channel": "tickers", "instId": symbol}
+                for symbol in batch
+            ]
             
-            except Exception as e:
-                if self._running:
-                    print(f"[OKXWebSocket] ❌ Ошибка WebSocket: {e}")
-                    print(f"[OKXWebSocket] Переподключение через {self.RECONNECT_DELAY} сек...")
-                    await asyncio.sleep(self.RECONNECT_DELAY)
-                else:
-                    break
-        
-        print("[OKXWebSocket] WebSocket loop завершен")
+            subscribe_msg = {
+                "op": "subscribe",
+                "args": subscribe_args
+            }
+            
+            await ws.send(json.dumps(subscribe_msg))
+            total_subscribed += len(subscribe_args)
+            
+            self._logger.info(f"Подписано на {len(subscribe_args)} тикеров (всего: {total_subscribed}/{len(okx_symbols)})")
     
-    async def _process_message(self, message: str):
-
+    def _parse_message(self, message: str) -> Optional[list]:
+        """
+        Распарсить сообщение от OKX и извлечь тикеры
+        
+        OKX отправляет данные в формате:
+        - Подтверждение подписки: {"event": "subscribe", "arg": {...}}
+        - Данные тикеров: {"data": [{...}, {...}], "arg": {...}}
+        """
         try:
             data = json.loads(message)
             
             # Обрабатываем события подписки
             if data.get("event") == "subscribe":
-                print(f"[OKXWebSocket] ✅ Подписка подтверждена: {data.get('arg', {})}")
-                return
+                channel_info = data.get('arg', {})
+                self._logger.debug(f"Подписка подтверждена: {channel_info}")
+                return None
             
             # Обрабатываем данные тикеров
             if "data" in data and isinstance(data["data"], list):
-                tickers = data["data"]
-                
-                redis = await get_redis()
-                if not redis:
-                    return
-                
-                updated_count = 0
-                skipped_not_in_map = 0
-                skipped_not_tracked = 0
-                skipped_zero_price = 0
-                skipped_wrong_priority = 0
-                current_time = asyncio.get_event_loop().time()
-                total_tickers = len(tickers)
-                
-                # Функции для извлечения данных из OKX тикера
-                def symbol_extractor(t: Dict) -> Optional[str]:
-                    return t.get("instId")
-                
-                def price_extractor(t: Dict) -> float:
-                    return float(t.get("last", 0))
-                
-                def price_change_extractor(t: Dict) -> float:
-                    # Вычисляем изменение за 24ч в процентах
-                    price = float(t.get("last", 0))
-                    open_24h = float(t.get("open24h", 0))
-                    if open_24h > 0:
-                        return ((price - open_24h) / open_24h) * 100
-                    return 0.0
-                
-                def volume_extractor(t: Dict) -> float:
-                    return float(t.get("vol24h", 0))
-                
-                # Обрабатываем каждый тикер
-                for ticker in tickers:
-                    if not isinstance(ticker, dict):
-                        continue
-                    
-                    status, coin_id = await process_price_update(
-                        ticker=ticker,
-                        source="okx",
-                        symbol_extractor=symbol_extractor,
-                        price_extractor=price_extractor,
-                        price_change_extractor=price_change_extractor,
-                        volume_extractor=volume_extractor,
-                        adapter_name="OKXWebSocket",
-                        tracked_coins=self._tracked_coins,
-                        last_update_time=self._last_update_time,
-                        coins_with_updates=self._coins_with_updates,
-                        redis=redis,
-                    )
-                    
-                    if status == "updated":
-                        updated_count += 1
-                    elif status == "skipped_not_in_map":
-                        skipped_not_in_map += 1
-                    elif status == "skipped_not_tracked":
-                        skipped_not_tracked += 1
-                    elif status == "skipped_wrong_priority":
-                        skipped_wrong_priority += 1
-                    elif status == "skipped_zero_price":
-                        skipped_zero_price += 1
-                
-                should_log = (
-                    current_time - getattr(self, '_last_log_time', 0) >= 5.0
-                )
-                
-                if should_log:
-                    self._last_log_time = current_time
-                    
-                    # Очищаем старые записи из _coins_with_updates (старше 5 секунд)
-                    coins_to_remove = [
-                        coin_id for coin_id, update_time in self._last_update_time.items()
-                        if current_time - update_time > 5.0
-                    ]
-                    for coin_id in coins_to_remove:
-                        self._coins_with_updates.discard(coin_id)
-                    
-                    if should_log:
-                        # Детальная статистика для диагностики
-                        coins_with_okx = len([c for c in self._tracked_coins 
-                                             if coin_registry.get_coin(c) and "okx" in coin_registry.get_coin(c).external_ids])
-                        coins_not_in_okx = len(self._tracked_coins) - coins_with_okx
-                        
-                        print(f"[OKXWebSocket] 💰 Обновлено цен: {updated_count} монет из {total_tickers} тикеров в этом сообщении")
-                        print(f"[OKXWebSocket] 📊 Статистика сообщения: пропущено (нет в маппинге: {skipped_not_in_map}, не отслеживаем: {skipped_not_tracked}, не приоритет OKX: {skipped_wrong_priority}, цена=0: {skipped_zero_price})")
-                        print(f"[OKXWebSocket] 📈 Всего отслеживаем: {len(self._tracked_coins)} монет | В OKX: {coins_with_okx} | Не в OKX: {coins_not_in_okx}")
-                        print(f"[OKXWebSocket] ✅ Уникальных монет с обновлениями за последние 5 сек: {len(self._coins_with_updates)}")
-                    
+                return data["data"]
+            
+            return None
+            
         except Exception as e:
-            print(f"[OKXWebSocket] Ошибка обработки сообщения: {e}")
-            import traceback
-            traceback.print_exc()
+            self._logger.error(f"Ошибка парсинга сообщения: {e}", exc_info=True)
+            return None
+    
+    def _get_symbol_extractor(self) -> Callable[[Dict], Optional[str]]:
+        """Извлечь символ из OKX тикера"""
+        return lambda t: t.get("instId")
+    
+    def _get_price_extractor(self) -> Callable[[Dict], float]:
+        """Извлечь цену из OKX тикера"""
+        return lambda t: float(t.get("last", 0))
+    
+    def _get_price_change_extractor(self) -> Callable[[Dict], float]:
+        """
+        Извлечь изменение цены за 24ч из OKX тикера
+        
+        OKX не предоставляет процентное изменение напрямую,
+        поэтому вычисляем его из текущей цены и цены открытия 24ч назад
+        """
+        def extractor(t: Dict) -> float:
+            price = float(t.get("last", 0))
+            open_24h = float(t.get("open24h", 0))
+            if open_24h > 0:
+                return ((price - open_24h) / open_24h) * 100
+            return 0.0
+        
+        return extractor
+    
+    def _get_volume_extractor(self) -> Callable[[Dict], float]:
+        """Извлечь объем за 24ч из OKX тикера"""
+        return lambda t: float(t.get("vol24h", 0))
 
 okx_websocket_worker = OKXWebSocketWorker()

@@ -1,17 +1,18 @@
 """
 CoinGecko Static Data Provider
 
-Только статические данные (id, name, symbol, imageUrl).
-Не предоставляет цены - для этого используются биржи.
+Only static data (id, name, symbol, imageUrl).
+Does not provide prices - exchanges are used for that.
 """
 from typing import Dict, List, Optional
+import logging
 
-from app.providers.base import BaseStaticAdapter
 from app.providers.coingecko_client import CoinGeckoClient
 from app.utils.cache import CoinCacheManager
 
+logger = logging.getLogger(f"CoingeckoStatic")
 
-class CoinGeckoStaticAdapter(BaseStaticAdapter):    
+class CoinGeckoStaticAdapter:    
     def __init__(self):
         self.client = CoinGeckoClient()
         self.cache = CoinCacheManager()
@@ -36,7 +37,7 @@ class CoinGeckoStaticAdapter(BaseStaticAdapter):
             return static_data
             
         except Exception as e:
-            print(f"[CoinGeckoStaticAdapter] Ошибка получения статики для {coin_id}: {e}")
+            logger.error(f"Error fetching static data for {coin_id}: {e}")
             return None
     
     async def get_coins_static_data(self, coin_ids: List[str]) -> Dict[str, Dict]:
@@ -57,7 +58,7 @@ class CoinGeckoStaticAdapter(BaseStaticAdapter):
             return result
         
         try:
-            # Batch запрос через /coins/markets
+            # Batch request via /coins/markets
             ids_param = ",".join(ids_to_fetch)
             coins_data = await self.client.get(
                 "/coins/markets",
@@ -70,7 +71,7 @@ class CoinGeckoStaticAdapter(BaseStaticAdapter):
                 },
             )
             
-            # Формируем результат
+            # Build result
             for coin_data in coins_data:
                 coin_id = coin_data.get("id")
                 if coin_id in ids_to_fetch:
@@ -82,11 +83,9 @@ class CoinGeckoStaticAdapter(BaseStaticAdapter):
                     }
                     result[coin_id] = static_data
                     await self.cache.set_static(coin_id, static_data)
-            
-            print(f"[CoinGeckoStaticAdapter] Получено статики: {len(result)} из {len(coin_ids)} запрошенных")
-            
+                        
         except Exception as e:
-            print(f"[CoinGeckoStaticAdapter] Ошибка batch запроса статики: {e}")
+            logger.error(f"Batch static data request error: {e}")
         
         return result
     

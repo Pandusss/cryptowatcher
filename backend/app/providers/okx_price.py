@@ -1,19 +1,16 @@
 """
 OKX Price Provider
 
-Провайдер цен из OKX WebSocket (через Redis кэш).
-WebSocket обновляет кэш в фоне, этот адаптер только читает из кэша.
+Price provider from OKX WebSocket (via Redis cache).
+WebSocket updates cache in background, this adapter only reads from cache.
 """
 from typing import Dict, List, Optional
 
-from app.providers.base import BasePriceAdapter
+from app.providers.base_adapters import BasePriceAdapter
 from app.core.coin_registry import coin_registry
 
 
 class OKXPriceAdapter(BasePriceAdapter):
-    
-    def __init__(self):
-        self.cache_ttl = 10  # TTL кэша цен в секундах
     
     async def get_price(self, coin_id: str) -> Optional[Dict]:
         return await self._get_price_from_redis(coin_id, "okx", "OKXPriceAdapter")
@@ -21,7 +18,7 @@ class OKXPriceAdapter(BasePriceAdapter):
     async def get_prices(self, coin_ids: List[str]) -> Dict[str, Dict]:
         result = {}
         
-        # Получаем все цены параллельно
+        # Get all prices in parallel
         import asyncio
         tasks = [self.get_price(coin_id) for coin_id in coin_ids]
         prices = await asyncio.gather(*tasks)

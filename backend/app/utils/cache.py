@@ -2,19 +2,19 @@
 Утилиты для работы с кэшем
 """
 import json
+import logging
 from typing import Dict, List, Optional
 
 from app.core.redis_client import get_redis
 
+logger = logging.getLogger(f"UtilsCache")
 
 class CoinCacheManager:
     
     # TTL для разных типов данных
-    CACHE_TTL_TOP3000 = 3600  # 1 час для топ-3000
     CACHE_TTL_COIN_STATIC = 3600  # 1 час для статических данных
     CACHE_TTL_COIN_PRICE = 10  # 10 секунд для цен
     CACHE_TTL_IMAGE_URL = 604800  # 7 дней для иконок
-    CACHE_TTL_PRICE_DECIMALS = 86400  # 1 день для decimals
     CACHE_TTL_CHART = 60  # 1 минута для графиков
     
     @staticmethod
@@ -42,7 +42,7 @@ class CoinCacheManager:
             data = await redis.get(self._get_static_key(coin_id))
             return json.loads(data) if data else None
         except Exception as e:
-            print(f"[CoinCacheManager] Ошибка чтения статики для {coin_id}: {e}")
+            logger.error(f"Static reading error for {coin_id}: {e}")
             return None
     
     async def set_static(self, coin_id: str, static_data: Dict) -> bool:
@@ -58,7 +58,7 @@ class CoinCacheManager:
             )
             return True
         except Exception as e:
-            print(f"[CoinCacheManager] Ошибка записи статики для {coin_id}: {e}")
+            logger.error(f"Static recording error for {coin_id}: {e}")
             return False
     
     async def get_price(self, coin_id: str) -> Optional[Dict]:
@@ -70,7 +70,7 @@ class CoinCacheManager:
             data = await redis.get(self._get_price_key(coin_id))
             return json.loads(data) if data else None
         except Exception as e:
-            print(f"[CoinCacheManager] Ошибка чтения цены для {coin_id}: {e}")
+            logger.error(f"Error reading the price for {coin_id}: {e}")
             return None
     
     async def set_price(self, coin_id: str, price_data: Dict) -> bool:
@@ -86,7 +86,7 @@ class CoinCacheManager:
             )
             return True
         except Exception as e:
-            print(f"[CoinCacheManager] Ошибка записи цены для {coin_id}: {e}")
+            logger.error(f"Error recording the price for {coin_id}: {e}")
             return False
     
     async def get_chart(self, coin_id: str, period: str) -> Optional[List[Dict]]:
@@ -98,7 +98,7 @@ class CoinCacheManager:
             data = await redis.get(self._get_chart_key(coin_id, period))
             return json.loads(data) if data else None
         except Exception as e:
-            print(f"[CoinCacheManager] Ошибка чтения графика для {coin_id}: {e}")
+            logger.error(f"Chart reading error for {coin_id}: {e}")
             return None
     
     async def set_chart(self, coin_id: str, period: str, chart_data: List[Dict]) -> bool:
@@ -114,7 +114,7 @@ class CoinCacheManager:
             )
             return True
         except Exception as e:
-            print(f"[CoinCacheManager] Ошибка записи графика для {coin_id}: {e}")
+            logger.error(f"Chart recording error for {coin_id}: {e}")
             return False
     
     async def get_image_url(self, coin_id: str) -> Optional[str]:
@@ -125,7 +125,7 @@ class CoinCacheManager:
         try:
             return await redis.get(self._get_image_url_key(coin_id))
         except Exception as e:
-            print(f"[CoinCacheManager] Ошибка чтения URL для {coin_id}: {e}")
+            logger.error(f"Error reading the URL for {coin_id}: {e}")
             return None
     
     async def set_image_url(self, coin_id: str, image_url: str) -> bool:
@@ -141,7 +141,7 @@ class CoinCacheManager:
             )
             return True
         except Exception as e:
-            print(f"[CoinCacheManager] Ошибка записи URL для {coin_id}: {e}")
+            logger.error(f"Error writing the URL for {coin_id}: {e}")
             return False
     
     async def get_static_and_prices_batch(
@@ -195,7 +195,7 @@ class CoinCacheManager:
                             static_data = static_data.decode('utf-8')
                         static_dict = json.loads(static_data) if static_data else None
                     except (json.JSONDecodeError, UnicodeDecodeError) as e:
-                        print(f"[CoinCacheManager] Ошибка десериализации статики для {coin_id}: {e}")
+                        logger.error(f"Static deserialization error for {coin_id}: {e}")
                 
                 price_dict = None
                 if price_data:
@@ -204,7 +204,7 @@ class CoinCacheManager:
                             price_data = price_data.decode('utf-8')
                         price_dict = json.loads(price_data) if price_data else None
                     except (json.JSONDecodeError, UnicodeDecodeError) as e:
-                        print(f"[CoinCacheManager] Ошибка десериализации цены для {coin_id}: {e}")
+                        logger.error(f"Price deserialization error for {coin_id}: {e}")
                 
                 result[coin_id] = {
                     "static": static_dict,
@@ -214,7 +214,7 @@ class CoinCacheManager:
             return result
             
         except Exception as e:
-            print(f"[CoinCacheManager] Ошибка batch чтения кэша: {e}")
+            logger.error(f"Batch cache read error: {e}")
             # В случае ошибки возвращаем None для всех монет
             return {coin_id: {"static": None, "price": None} for coin_id in coin_ids}
 

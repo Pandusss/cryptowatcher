@@ -4,12 +4,15 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import time
 import asyncio
+import logging
 
 from app.core.database import get_db
 from app.models.user import User
 from app.services.user_service import get_or_create_user
 
 router = APIRouter()
+logger = logging.getLogger("EndpointsUsers")
+
 
 
 class UserCreateRequest(BaseModel):
@@ -83,13 +86,11 @@ async def update_dnd_settings(
     db: Session = Depends(get_db),
 ):
     """Обновить настройки Don't Disturb для пользователя"""
-    print(f"[DND Settings] Updating DND settings for user {user_id}: {settings}")
     loop = asyncio.get_event_loop()
     
     def update_settings():
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
-            print(f"[DND Settings] User {user_id} not found")
             raise HTTPException(status_code=404, detail="User not found")
         
         # Парсим время из строки "HH:MM"
@@ -97,9 +98,7 @@ async def update_dnd_settings(
             try:
                 hour, minute = map(int, settings.dnd_start_time.split(':'))
                 user.dnd_start_time = time(hour, minute)
-                print(f"[DND Settings] Set start_time to {user.dnd_start_time}")
             except (ValueError, AttributeError) as e:
-                print(f"[DND Settings] Invalid start_time format: {settings.dnd_start_time}, error: {e}")
                 raise HTTPException(status_code=400, detail=f"Invalid start_time format. Use HH:MM. Got: {settings.dnd_start_time}")
         elif settings.dnd_start_time is None and hasattr(settings, 'dnd_start_time'):
             # Если явно передан None, сбрасываем значение
@@ -109,9 +108,7 @@ async def update_dnd_settings(
             try:
                 hour, minute = map(int, settings.dnd_end_time.split(':'))
                 user.dnd_end_time = time(hour, minute)
-                print(f"[DND Settings] Set end_time to {user.dnd_end_time}")
             except (ValueError, AttributeError) as e:
-                print(f"[DND Settings] Invalid end_time format: {settings.dnd_end_time}, error: {e}")
                 raise HTTPException(status_code=400, detail=f"Invalid end_time format. Use HH:MM. Got: {settings.dnd_end_time}")
         elif settings.dnd_end_time is None and hasattr(settings, 'dnd_end_time'):
             # Если явно передан None, сбрасываем значение
@@ -119,7 +116,6 @@ async def update_dnd_settings(
         
         db.commit()
         db.refresh(user)
-        print(f"[DND Settings] Successfully updated user {user_id} DND settings")
         return user
     
     try:
@@ -130,12 +126,11 @@ async def update_dnd_settings(
             dnd_start_time=user.dnd_start_time.strftime("%H:%M") if user.dnd_start_time else None,
             dnd_end_time=user.dnd_end_time.strftime("%H:%M") if user.dnd_end_time else None,
         )
-        print(f"[DND Settings] Returning response: {result}")
         return result
     except HTTPException:
         raise
     except Exception as e:
-        print(f"[DND Settings] Unexpected error: {e}")
+        logger.error(f"Unexpected error: {e}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")

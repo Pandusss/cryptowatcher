@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from typing import List
 import asyncio
+import logging
 
 from app.core.database import get_db
 from app.models.notification import Notification
@@ -10,6 +11,8 @@ from app.services.user_service import get_or_create_user
 from app.core.coin_registry import coin_registry
 
 router = APIRouter()
+logger = logging.getLogger("EndpointNotifications")
+
 
 
 @router.get("/", response_model=List[NotificationResponse])
@@ -40,12 +43,12 @@ async def get_notifications(
             # Получаем CoinGecko ID из coin_registry
             coin = coin_registry.get_coin(crypto_id)
             if not coin:
-                print(f"[get_notifications] Монета {crypto_id} не найдена в реестре")
+                logger.warning(f"coin {crypto_id} was not found in the registry")
                 return crypto_id, None
             
             coingecko_id = coin.external_ids.get("coingecko")
             if not coingecko_id:
-                print(f"[get_notifications] У монеты {crypto_id} нет CoinGecko ID")
+                logger.warning(f"coin {crypto_id} does not have a CoinGecko ID")
                 return crypto_id, None
             
             # Используем aggregation_service для получения imageUrl (правильный способ)
@@ -53,7 +56,7 @@ async def get_notifications(
             image_url = await aggregation_service.get_coin_image_url(crypto_id)
             return crypto_id, image_url
         except Exception as e:
-            print(f"[get_notifications] Failed to get imageUrl for {crypto_id}: {e}")
+            logger.warning(f"Failed to get imageUrl for {crypto_id}: {e}")
             import traceback
             traceback.print_exc()
             return crypto_id, None
@@ -114,7 +117,7 @@ async def get_notification(
         from app.services.aggregation_service import aggregation_service
         image_url = await aggregation_service.get_coin_image_url(notification.crypto_id)
     except Exception as e:
-        print(f"[get_notification] Failed to get imageUrl for {notification.crypto_id}: {e}")
+        logger.warning(f"ailed to get imageUrl for {notification.crypto_id}: {e}")
         import traceback
         traceback.print_exc()
     

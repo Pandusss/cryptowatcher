@@ -6,7 +6,7 @@ Binance Chart Provider
 from typing import Dict, List, Optional
 from datetime import datetime
 
-from app.providers.base import BaseChartAdapter
+from app.providers.base_adapters import BaseChartAdapter
 from app.core.coin_registry import coin_registry
 from app.utils.formatters import format_chart_date
 
@@ -33,7 +33,6 @@ class BinanceChartAdapter(BaseChartAdapter):
             # Получаем конфигурацию периода
             config = self.PERIOD_MAP.get(period)
             if not config:
-                print(f"[BinanceChartAdapter] Неподдерживаемый период: {period}")
                 return None
             
             # Получаем исторические данные из Binance REST API
@@ -73,11 +72,9 @@ class BinanceChartAdapter(BaseChartAdapter):
             # Сортируем по дате
             chart_data.sort(key=lambda x: x["date"])
             
-            print(f"[BinanceChartAdapter] ✅ Получено {len(chart_data)} точек из Binance для {coin_id} ({period})")
             return chart_data
             
         except Exception as e:
-            print(f"[BinanceChartAdapter] Ошибка получения данных из Binance для {coin_id}: {e}")
             return None
     
     def is_available(self, coin_id: str) -> bool:

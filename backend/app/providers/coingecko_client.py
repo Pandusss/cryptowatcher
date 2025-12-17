@@ -5,10 +5,12 @@ HTTP клиент для работы с CoinGecko API.
 """
 import asyncio
 import httpx
+import logging
 from typing import Dict, Any, Optional
 
 from app.core.config import settings
 
+logger = logging.getLogger(f"CoingeckoCLient")
 
 class CoinGeckoClient:    
     BASE_URL = "https://api.coingecko.com/api/v3"
@@ -56,14 +58,13 @@ class CoinGeckoClient:
             if e.response.status_code == 429 and retry_on_rate_limit:
                 # Rate limit - ждем и повторяем
                 retry_after = int(e.response.headers.get("Retry-After", "60"))
-                print(f"[CoinGeckoClient] Rate limit, ждем {retry_after} секунд...")
                 await asyncio.sleep(retry_after)
                 return await self.get(endpoint, params, retry_on_rate_limit=False)
             
             raise
         
         except Exception as e:
-            print(f"[CoinGeckoClient] Ошибка запроса к {url}: {e}")
+            logger.error(f"Error in the request to {url}: {e}")
             raise
 
         

@@ -4,11 +4,13 @@
 """
 import json
 import asyncio
+import logging
 from typing import Dict, Optional, Callable, Tuple
 from app.core.redis_client import get_redis
 from app.core.coin_registry import coin_registry
 from app.utils.formatters import get_price_decimals
 
+logger = logging.getLogger(f"UtilsWebsocketPriceHandler")
 
 async def process_price_update(
     ticker: Dict,
@@ -102,6 +104,6 @@ async def process_price_update(
         return "updated", coin_id
         
     except Exception as e:
-        print(f"[{adapter_name}] Ошибка записи в Redis для {coin_id}: {e}")
+        logger.error(f"Ошибка записи в Redis для {coin_id}: {e}")
         return "error", coin_id
 
