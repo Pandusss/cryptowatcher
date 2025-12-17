@@ -3,6 +3,7 @@
 """
 from typing import Dict, List, Optional
 
+from app.core.redis_client import get_redis
 from app.utils.cache import CoinCacheManager
 
 
@@ -40,7 +41,7 @@ class CoinCacheService:
         return await self.cache.set_price(coin_id, price_data)
     
     async def get_static_and_prices_batch(
-        self, 
+        self,
         coin_ids: List[str]
     ) -> Dict[str, Dict[str, Optional[Dict]]]:
         """
@@ -82,7 +83,7 @@ class CoinCacheService:
         """
         Очистить кэш статических данных для монеты.
         """
-        redis = await self.cache._get_redis()
+        redis = await get_redis()
         if not redis:
             return False
         
@@ -98,7 +99,7 @@ class CoinCacheService:
         """
         Очистить кэш цены для монеты.
         """
-        redis = await self.cache._get_redis()
+        redis = await get_redis()
         if not redis:
             return False
         
@@ -113,7 +114,7 @@ class CoinCacheService:
         """
         Очистить весь кэш статических данных.
         """
-        redis = await self.cache._get_redis()
+        redis = await get_redis()
         if not redis:
             return False
         
