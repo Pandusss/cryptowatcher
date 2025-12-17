@@ -5,7 +5,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 12px; /* Дополнительный отступ снизу */
+  margin-bottom: 12px;
 }
 
 .loading {
@@ -15,76 +15,36 @@
   height: 200px;
 }
 
-.priceUpdatedUp {
-  animation: priceFlashUp 0.8s ease-out;
+// Универсальная анимация с модификаторами
+.priceUpdated {
+  animation: priceFlash 0.8s ease-out;
   display: inline-block;
   border-radius: 6px;
-}
-
-.priceUpdatedDown {
-  animation: priceFlashDown 0.8s ease-out;
-  display: inline-block;
-  border-radius: 6px;
-}
-
-.priceUpdatedNeutral {
-  animation: priceFlashNeutral 0.8s ease-out;
-  display: inline-block;
-  border-radius: 6px;
-}
-
-@keyframes priceFlashUp {
-  0% {
-    box-shadow: inset 0 0 0 0 rgba(52, 199, 89, 0);
+  
+  &--up {
+    --flash-color: rgba(52, 199, 89, 0.35);
   }
-  25% {
-    box-shadow: inset 0 0 30px 12px rgba(52, 199, 89, 0.35); /* Светло-зеленый фон для роста */
+  
+  &--down {
+    --flash-color: rgba(255, 59, 48, 0.3);
   }
-  50% {
-    box-shadow: inset 0 0 30px 12px rgba(52, 199, 89, 0.25);
-  }
-  75% {
-    box-shadow: inset 0 0 30px 12px rgba(52, 199, 89, 0.12);
-  }
-  100% {
-    box-shadow: inset 0 0 0 0 rgba(52, 199, 89, 0);
+  
+  &--neutral {
+    --flash-color: rgba(142, 142, 147, 0.25);
   }
 }
 
-@keyframes priceFlashDown {
-  0% {
-    box-shadow: inset 0 0 0 0 rgba(255, 59, 48, 0);
+@keyframes priceFlash {
+  0%, 100% { 
+    box-shadow: inset 0 0 0 0 var(--flash-color, transparent); 
   }
-  25% {
-    box-shadow: inset 0 0 30px 12px rgba(255, 59, 48, 0.3); /* Светло-красный фон для падения */
+  25% { 
+    box-shadow: inset 0 0 30px 12px var(--flash-color); 
   }
-  50% {
-    box-shadow: inset 0 0 30px 12px rgba(255, 59, 48, 0.2);
+  50% { 
+    box-shadow: inset 0 0 30px 12px rgba(var(--flash-color), 0.6); 
   }
-  75% {
-    box-shadow: inset 0 0 30px 12px rgba(255, 59, 48, 0.1);
-  }
-  100% {
-    box-shadow: inset 0 0 0 0 rgba(255, 59, 48, 0);
+  75% { 
+    box-shadow: inset 0 0 30px 12px rgba(var(--flash-color), 0.3); 
   }
 }
-
-@keyframes priceFlashNeutral {
-  0% {
-    box-shadow: inset 0 0 0 0 rgba(142, 142, 147, 0);
-  }
-  25% {
-    box-shadow: inset 0 0 30px 12px rgba(142, 142, 147, 0.25); /* Серый фон для отсутствия изменения */
-  }
-  50% {
-    box-shadow: inset 0 0 30px 12px rgba(142, 142, 147, 0.15);
-  }
-  75% {
-    box-shadow: inset 0 0 30px 12px rgba(142, 142, 147, 0.08);
-  }
-  100% {
-    box-shadow: inset 0 0 0 0 rgba(142, 142, 147, 0);
-  }
-}
-
-

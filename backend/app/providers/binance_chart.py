@@ -60,7 +60,7 @@ class BinanceChartAdapter(BaseChartAdapter):
                 
                 # Преобразуем timestamp в строку даты
                 timestamp_seconds = timestamp_ms / 1000
-                date_obj = datetime.fromtimestamp(timestamp_seconds)
+                date_obj = datetime.fromtimestamp(timestamp_seconds) 
                 date_str = format_chart_date(date_obj, period)
                 
                 chart_data.append({
