@@ -11,7 +11,6 @@ from app.core.coin_registry import coin_registry
 
 
 class BinancePriceAdapter(BasePriceAdapter):
-
     async def get_price(self, coin_id: str) -> Optional[Dict]:
         return await self._get_price_from_redis(coin_id, "binance", "BinancePriceAdapter")
     
@@ -32,7 +31,5 @@ class BinancePriceAdapter(BasePriceAdapter):
     def is_available(self, coin_id: str) -> bool:
         return coin_registry.find_coin_by_external_id("binance", coin_id) is not None
 
-# Глобальный экземпляр
+# Global instance
 binance_price_adapter = BinancePriceAdapter()
-
-

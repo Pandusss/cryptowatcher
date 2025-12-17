@@ -1,5 +1,5 @@
 """
-Сервис для работы с пользователями
+Service for working with users
 """
 from sqlalchemy.orm import Session
 from app.models.user import User
@@ -16,7 +16,7 @@ def get_or_create_user(
     user = db.query(User).filter(User.id == user_id).first()
     
     if not user:
-        # Создаем нового пользователя
+        # Create new user
         user = User(
             id=user_id,
             username=username,
@@ -28,9 +28,8 @@ def get_or_create_user(
         db.add(user)
         db.commit()
         db.refresh(user)
-        print(f"[UserService] Создан новый пользователь: {user_id}")
     else:
-        # Обновляем данные существующего пользователя, если они изменились
+        # Update existing user data if it has changed
         updated = False
         if username and user.username != username:
             user.username = username
@@ -48,6 +47,5 @@ def get_or_create_user(
         if updated:
             db.commit()
             db.refresh(user)
-            print(f"[UserService] Обновлен пользователь: {user_id}")
     
     return user

@@ -41,16 +41,16 @@ async def health_check():
 
 @app.on_event("startup")
 async def startup_event():
-    # Запускаем polling для обработки команд бота
+    # Start polling for bot command processing
     asyncio.create_task(bot_polling.start())
     
-    # Запускаем проверку уведомлений
+    # Start notification checking
     asyncio.create_task(notification_checker.start())
     
-    # Запускаем Binance WebSocket
+    # Start Binance WebSocket
     asyncio.create_task(binance_websocket_worker.start())
     
-    # Запускаем OKX WebSocket
+    # Start OKX WebSocket
     asyncio.create_task(okx_websocket_worker.start())
 
 
@@ -58,14 +58,13 @@ async def startup_event():
 async def shutdown_event():
     bot_polling.stop()
     notification_checker.stop()
-    binance_websocket_worker.stop()  # Останавливаем Binance WebSocket
-    okx_websocket_worker.stop()  # Останавливаем OKX WebSocket
+    binance_websocket_worker.stop()  # Stop Binance WebSocket
+    okx_websocket_worker.stop()  # Stop OKX WebSocket
     
-    # Закрываем WebSocket соединения для предотвращения утечек памяти
+    # Close WebSocket connections to prevent memory leaks
     await binance_websocket_worker.close()
     await okx_websocket_worker.close()
     
-    # Закрываем общий HTTP клиент
+    # Close shared HTTP client
     from app.utils.http_client import SharedHTTPClient
     await SharedHTTPClient.close()
-

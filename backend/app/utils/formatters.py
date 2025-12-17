@@ -1,18 +1,18 @@
 """
-Утилиты для форматирования данных
+Utilities for formatting data
 """
 from typing import Union
 from datetime import datetime, timezone
 
 def get_price_decimals(price: Union[float, int]) -> int:
     """
-    Определить количество знаков после запятой для цены
+    Determine the number of decimal places for the price
     
     Args:
-        price: Цена монеты
+        price: The price of the coin
         
     Returns:
-        Количество знаков после запятой (2, 4, 6 или 8)
+        Number of decimal places (2, 4, 6 or 8)
     """
     if price >= 1:
         return 2
@@ -26,29 +26,28 @@ def get_price_decimals(price: Union[float, int]) -> int:
 
 def format_chart_date(date_obj: datetime, period: str) -> str:
     """
-    Форматировать дату для графика.
-    Возвращает ISO строку с часовым поясом UTC для корректного парсинга на фронтенде.
-    Пример: "2025-12-17T18:12:12+00:00"
+    Format the date for the chart.
+    Returns an ISO string with the UTC time zone for correct parsing on the frontend.
+    Example: "2025-12-17T18:12:12+00:00"
     """
     from datetime import timezone, datetime
     
-    # 1. Гарантируем, что datetime в UTC
+    # 1. Ensure datetime is in UTC
     if date_obj.tzinfo is None:
-        # Если datetime без часового пояса - считаем что это уже UTC
+        # If datetime has no timezone - assume it's already UTC
         date_obj_utc = date_obj.replace(tzinfo=timezone.utc)
     else:
-        # Если есть часовой пояс - конвертируем в UTC
+        # If there is a timezone - convert to UTC
         date_obj_utc = date_obj.astimezone(timezone.utc)
     
-    # 2. Форматируем как ISO строку с часовым поясом UTC
-    # Для периодов 1d и 7d включаем время
+    # 2. Format as ISO string with UTC timezone
+    # For periods 1d and 7d include time
     if period in ("1d", "7d"):
-        # ISO формат с часовым поясом: "2025-12-17T18:12:12+00:00"
+        # ISO format with timezone: "2025-12-17T18:12:12+00:00"
         return date_obj_utc.isoformat()
     else:
-        # Для длинных периодов используем только дату с временем 00:00
+        # For longer periods use only date with 00:00 time
         date_only = date_obj_utc.date()
-        # Создаем datetime с временем 00:00:00 в UTC
+        # Create datetime with 00:00:00 time in UTC
         date_with_time = datetime.combine(date_only, datetime.min.time(), tzinfo=timezone.utc)
         return date_with_time.isoformat()
-

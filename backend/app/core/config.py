@@ -1,10 +1,10 @@
 """
-Конфигурация приложения из переменных окружения (.env файл)
+Application configuration from environment variables (.env file)
 
-Большинство переменных обязательны и должны быть указаны в .env файле.
-Pydantic автоматически валидирует типы и выдает ошибку при старте, если что-то не так.
+Most variables are required and must be specified in the .env file.
+Pydantic automatically validates types and shows error at startup if something is wrong.
 
-DEBUG по умолчанию False (для production безопасности).
+DEBUG is False by default (for production security).
 """
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     # Application
     APP_NAME: str = Field(default="CryptoWatcher") 
     APP_VERSION: str = Field(default="0.1.0")
-    DEBUG: bool = Field(default=False)  # По умолчанию False для production 
+    DEBUG: bool = Field(default=False)  # False by default for production 
 
     # Database
     DATABASE_URL: str = Field(...)
@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     # Telegram Bot API
     TELEGRAM_BOT_TOKEN: str = Field(...)
 
-    # CORS - храним как строку, парсим в main.py
+    # CORS - store as string, parse in main.py
     ALLOWED_ORIGINS: str = Field(...)
 
     model_config = SettingsConfigDict(
@@ -38,4 +38,3 @@ class Settings(BaseSettings):
     )
 
 settings = Settings()
-

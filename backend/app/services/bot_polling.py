@@ -1,6 +1,6 @@
 """
-Простой polling сервис для получения обновлений от Telegram Bot API
-Работает без webhook - бот сам запрашивает обновления
+Simple polling service for getting updates from Telegram Bot API
+Works without webhook - bot itself requests updates
 """
 import asyncio
 import httpx
@@ -24,20 +24,20 @@ class BotPolling:
 
         
         if not self.bot_token:
-            self._logger.warning("TELEGRAM_BOT_TOKEN is not installed")
+            self._logger.warning("TELEGRAM_BOT_TOKEN is not set")
     
     def _get_url(self, method: str) -> str:
         return f"{self.BASE_URL}{self.bot_token}/{method}"
     
     async def _process_update(self, update: Dict[str, Any], db: SessionLocal):
         try:
-            # Проверяем, что это сообщение
+            # Check if it's a message
             if "message" not in update:
                 return
             
             message = update["message"]
             
-            # Проверяем, что есть отправитель
+            # Check if there's a sender
             if "from" not in message:
                 return
             
@@ -47,12 +47,12 @@ class BotPolling:
             if not user_id:
                 return
             
-            # Получаем текст сообщения
+            # Get message text
             text = message.get("text", "").strip()
                         
-            # Обрабатываем команду /start
+            # Process /start command
             if text == "/start" or text.startswith("/start"):                
-                # Создаем или обновляем пользователя
+                # Create or update user
                 user = get_or_create_user(
                     db=db,
                     user_id=user_id,
@@ -62,12 +62,12 @@ class BotPolling:
                     language_code=from_user.get("language_code"),
                 )
                 
-                # Отправляем приветственное сообщение
+                # Send welcome message
                 welcome_message = (
-                    "👋 Добро пожаловать в CryptoWatcher!\n\n"
-                    "🔔 Создавайте уведомления о изменении цен криптовалют\n"
-                    "📊 Отслеживайте графики и получайте алерты\n\n"
-                    "Откройте приложение для начала работы!"
+                    "👋 Welcome to CryptoWatcher!\n\n"
+                    "🔔 Create notifications for cryptocurrency price changes\n"
+                    "📊 Track charts and get alerts\n\n"
+                    "Open the app to get started!"
                 )
                 
                 success = await telegram_service.send_message(
@@ -110,11 +110,11 @@ class BotPolling:
                 updates = result.get("result", [])
                 
                 if updates:                    
-                    # Создаем сессию БД для обработки обновлений
+                    # Create DB session for processing updates
                     db = SessionLocal()
                     try:
                         for update in updates:
-                            # Обновляем offset перед обработкой
+                            # Update offset before processing
                             self.offset = update["update_id"] + 1
                             await self._process_update(update, db)
                     finally:
@@ -132,7 +132,7 @@ class BotPolling:
             return
         
         self.running = True
-        self._logger.info("Polling for Telegram bot launched")
+        self._logger.info("Telegram bot polling started")
         
         while self.running:
             try:
@@ -143,8 +143,7 @@ class BotPolling:
     
     def stop(self):
         self.running = False
-        self._logger.info("Stop polling")
+        self._logger.info("Polling stopped")
 
-# Глобальный экземпляр
+# Global instance
 bot_polling = BotPolling()
-

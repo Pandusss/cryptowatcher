@@ -1,19 +1,22 @@
 """
-Сервис для работы с ценами монет из Redis/WebSocket
+Service for working with coin prices from Redis/WebSocket
 """
 import asyncio
+import json
+import logging
 from typing import Dict, List, Any, Optional
 
 from app.core.redis_client import get_redis
 from app.utils.cache import CoinCacheManager
 from app.utils.formatters import get_price_decimals
 
+logger = logging.getLogger("CoinPriceService")
 
 class CoinPriceService:
     """
-    Сервис для работы с ценами монет.
-    Получает цены ТОЛЬКО из Redis кэша (который обновляется через Binance/OKX WebSocket).
-    CoinGecko НЕ используется для цен.
+    Service for working with coin prices.
+    Gets prices ONLY from Redis cache (which is updated via Binance/OKX WebSocket).
+    CoinGecko is NOT used for prices.
     """
     
     def __init__(self):
@@ -21,34 +24,34 @@ class CoinPriceService:
     
     async def get_price(self, coin_id: str) -> Optional[Dict]:
         """
-        Получить текущую цену монеты.
+        Get current price for a coin.
         
         Args:
-            coin_id: внутренний ID монеты
+            coin_id: internal coin ID
             
         Returns:
-            Словарь с данными о цене или None
+            Dictionary with price data or None
         """
         cached_price = await self.cache.get_price(coin_id)
         if cached_price:
             return cached_price
         
-        # Если цены нет в кэше, возвращаем None (цены должны приходить из WebSocket)
+        # If price is not in cache, return None (prices should come from WebSocket)
         return None
     
     async def get_prices_batch(self, coin_ids: List[str]) -> Dict[str, Optional[Dict]]:
         """
-        Получить цены для нескольких монет.
+        Get prices for multiple coins.
         
         Args:
-            coin_ids: список внутренних ID монет
+            coin_ids: list of internal coin IDs
             
         Returns:
-            Словарь {coin_id: price_data или None}
+            Dictionary {coin_id: price_data or None}
         """
         result = {}
         
-        # Используем Redis pipeline для batch чтения
+        # Use Redis pipeline for batch reading
         redis = await get_redis()
         if not redis:
             return {coin_id: None for coin_id in coin_ids}
@@ -70,39 +73,39 @@ class CoinPriceService:
                         price_dict = json.loads(price_data) if price_data else None
                         result[coin_id] = price_dict
                     except (json.JSONDecodeError, UnicodeDecodeError) as e:
-                        print(f"[CoinPriceService] Ошибка десериализации цены для {coin_id}: {e}")
+                        logger.error(f"Price deserialization error for {coin_id}: {e}")
                         result[coin_id] = None
                 else:
                     result[coin_id] = None
         
         except Exception as e:
-            print(f"[CoinPriceService] Ошибка batch чтения цен: {e}")
+            logger.error(f"Batch price reading error: {e}")
             result = {coin_id: None for coin_id in coin_ids}
         
         return result
     
     async def get_crypto_list_prices(self, coin_ids: List[str]) -> Dict[str, Dict]:
         """
-        Получить цены для списка монет ТОЛЬКО из Redis (обновляются через Binance/OKX WebSocket).
-        CoinGecko НЕ используется для цен - только для статики (картинки, названия).
+        Get prices for coin list ONLY from Redis (updated via Binance/OKX WebSocket).
+        CoinGecko is NOT used for prices - only for static data (images, names).
         
         Args:
-            coin_ids: список внутренних ID монет
+            coin_ids: list of internal coin IDs
             
         Returns:
-            Словарь {coin_id: price_data}
+            Dictionary {coin_id: price_data}
         """
         if not coin_ids:
             return {}
         
-        print(f"[CoinPriceService] Загружаем цены для {len(coin_ids)} монет из Redis...")
+        logger.info(f"Loading prices for {len(coin_ids)} coins from Redis...")
         
-        # Читаем цены ТОЛЬКО из Redis кэша
+        # Read prices ONLY from Redis cache
         prices_dict = {}
         redis = await get_redis()
         
         if redis:
-            # Читаем все цены параллельно
+            # Read all prices in parallel
             tasks = []
             for coin_id in coin_ids:
                 tasks.append(self.cache.get_price(coin_id))
@@ -111,7 +114,7 @@ class CoinPriceService:
             
             for coin_id, cached_price in zip(coin_ids, cached_prices):
                 if isinstance(cached_price, Exception):
-                    print(f"[CoinPriceService] Ошибка чтения цены для {coin_id}: {cached_price}")
+                    logger.error(f"Error reading price for {coin_id}: {cached_price}")
                     continue
                     
                 if cached_price and cached_price.get("price", 0) > 0:
@@ -122,21 +125,21 @@ class CoinPriceService:
                         "priceDecimals": cached_price.get("priceDecimals", get_price_decimals(cached_price.get("price", 0))),
                     }
         else:
-            print("[CoinPriceService]  ⚠️ Redis недоступен, цены недоступны (CoinGecko НЕ используется для цен)")
-            # НЕ используем CoinGecko как fallback - цены должны приходить только из WebSocket
+            logger.warning(f"Redis unavailable, prices not available")
+            # Do NOT use CoinGecko as fallback - prices should only come from WebSocket
         
-        print(f"[CoinPriceService] Получено цен: {len(prices_dict)} из {len(coin_ids)} запрошенных")
+        logger.warning(f"Got prices: {len(prices_dict)} out of {len(coin_ids)} requested")
         return prices_dict
     
     async def refresh_price(self, coin_id: str) -> bool:
         """
-        Принудительно удалить цену из кэша (чтобы обновилась через WebSocket).
+        Force delete price from cache (to be updated via WebSocket).
         
         Args:
-            coin_id: внутренний ID монеты
+            coin_id: internal coin ID
             
         Returns:
-            True если успешно, False если ошибка
+            True if successful, False if error
         """
         redis = await get_redis()
         if not redis:
@@ -147,36 +150,35 @@ class CoinPriceService:
             await redis.delete(price_key)
             return True
         except Exception as e:
-            print(f"[CoinPriceService] Ошибка удаления цены для {coin_id}: {e}")
             return False
     
     async def set_price(self, coin_id: str, price_data: Dict) -> bool:
         """
-        Установить цену монеты в кэш.
-        Используется WebSocket обработчиком для обновления цен.
+        Set coin price in cache.
+        Used by WebSocket handler for updating prices.
         
         Args:
-            coin_id: внутренний ID монеты
-            price_data: словарь с данными о цене
+            coin_id: internal coin ID
+            price_data: dictionary with price data
             
         Returns:
-            True если успешно, False если ошибка
+            True if successful, False if error
         """
         return await self.cache.set_price(coin_id, price_data)
     
     async def get_prices_for_formatting(self, coin_ids: List[str]) -> Dict[str, Dict]:
         """
-        Получить цены для форматирования в список монет.
-        Упрощенный вариант метода для использования в CoinService.
+        Get prices for formatting in coin list.
+        Simplified version of method for use in CoinService.
         
         Args:
-            coin_ids: список внутренних ID монет
+            coin_ids: list of internal coin IDs
             
         Returns:
-            Словарь {coin_id: price_data}
+            Dictionary {coin_id: price_data}
             
         Note:
-            Если цена не найдена, возвращает пустой словарь для этой монеты
+            If price not found, returns empty dictionary for that coin
         """
         prices = await self.get_prices_batch(coin_ids)
         result = {}
@@ -189,5 +191,3 @@ class CoinPriceService:
                     "priceDecimals": price_dict.get("priceDecimals", get_price_decimals(price_dict.get("price", 0))),
                 }
         return result
-
-import json  # Для десериализации

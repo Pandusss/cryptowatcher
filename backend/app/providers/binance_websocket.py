@@ -62,7 +62,5 @@ class BinanceWebSocketWorker(BaseWebSocketWorker):
         """Extract 24h volume from Binance ticker"""
         return lambda t: float(t.get("v", 0))
 
-# Глобальный экземпляр
+# Global instance
 binance_websocket_worker = BinanceWebSocketWorker()
-
-

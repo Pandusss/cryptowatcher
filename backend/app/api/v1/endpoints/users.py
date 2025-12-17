@@ -38,7 +38,7 @@ async def get_user(
     user_id: int,
     db: Session = Depends(get_db),
 ):
-    """Получить пользователя по ID"""
+    """Get user by ID"""
     loop = asyncio.get_event_loop()
     user = await loop.run_in_executor(
         None,
@@ -54,7 +54,7 @@ async def create_or_update_user(
     user_data: UserCreateRequest,
     db: Session = Depends(get_db),
 ):
-    """Создать или обновить пользователя из Telegram WebApp"""
+    """Create or update user from Telegram WebApp"""
     loop = asyncio.get_event_loop()
     user = await loop.run_in_executor(
         None,
@@ -75,7 +75,7 @@ async def register_user(
     user_data: UserCreateRequest,
     db: Session = Depends(get_db),
 ):
-    """Регистрация пользователя (алиас для create_or_update_user)"""
+    """User registration (alias for create_or_update_user)"""
     return await create_or_update_user(user_data, db)
 
 
@@ -85,7 +85,7 @@ async def update_dnd_settings(
     settings: DndSettingsUpdate,
     db: Session = Depends(get_db),
 ):
-    """Обновить настройки Don't Disturb для пользователя"""
+    """Update Don't Disturb settings for user"""
     loop = asyncio.get_event_loop()
     
     def update_settings():
@@ -93,7 +93,7 @@ async def update_dnd_settings(
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         
-        # Парсим время из строки "HH:MM"
+        # Parse time from string "HH:MM"
         if settings.dnd_start_time is not None:
             try:
                 hour, minute = map(int, settings.dnd_start_time.split(':'))
@@ -101,7 +101,7 @@ async def update_dnd_settings(
             except (ValueError, AttributeError) as e:
                 raise HTTPException(status_code=400, detail=f"Invalid start_time format. Use HH:MM. Got: {settings.dnd_start_time}")
         elif settings.dnd_start_time is None and hasattr(settings, 'dnd_start_time'):
-            # Если явно передан None, сбрасываем значение
+            # If explicitly passed None, reset value
             user.dnd_start_time = None
         
         if settings.dnd_end_time is not None:
@@ -111,7 +111,7 @@ async def update_dnd_settings(
             except (ValueError, AttributeError) as e:
                 raise HTTPException(status_code=400, detail=f"Invalid end_time format. Use HH:MM. Got: {settings.dnd_end_time}")
         elif settings.dnd_end_time is None and hasattr(settings, 'dnd_end_time'):
-            # Если явно передан None, сбрасываем значение
+            # If explicitly passed None, reset value
             user.dnd_end_time = None
         
         db.commit()
@@ -121,7 +121,7 @@ async def update_dnd_settings(
     try:
         user = await loop.run_in_executor(None, update_settings)
         
-        # Форматируем время для ответа
+        # Format time for response
         result = DndSettingsResponse(
             dnd_start_time=user.dnd_start_time.strftime("%H:%M") if user.dnd_start_time else None,
             dnd_end_time=user.dnd_end_time.strftime("%H:%M") if user.dnd_end_time else None,
@@ -141,7 +141,7 @@ async def get_dnd_settings(
     user_id: int,
     db: Session = Depends(get_db),
 ):
-    """Получить настройки Don't Disturb для пользователя"""
+    """Get Don't Disturb settings for user"""
     loop = asyncio.get_event_loop()
     user = await loop.run_in_executor(
         None,
@@ -155,4 +155,3 @@ async def get_dnd_settings(
         dnd_start_time=user.dnd_start_time.strftime("%H:%M") if user.dnd_start_time else None,
         dnd_end_time=user.dnd_end_time.strftime("%H:%M") if user.dnd_end_time else None,
     )
-

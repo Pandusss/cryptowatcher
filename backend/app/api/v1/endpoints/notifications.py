@@ -20,38 +20,38 @@ async def get_notifications(
     user_id: int,
     db: Session = Depends(get_db),
 ):
-    """Получить список активных уведомлений пользователя"""
-    # Выполняем синхронный DB запрос в отдельном потоке, чтобы не блокировать event loop
+    """Get list of active notifications for user"""
+    # Execute synchronous DB query in separate thread to avoid blocking event loop
     loop = asyncio.get_event_loop()
     notifications = await loop.run_in_executor(
         None,
         lambda: db.query(Notification)
             .filter(Notification.user_id == user_id)
-            .filter(Notification.is_active == True)  # Показываем только активные уведомления
+            .filter(Notification.is_active == True)  # Show only active notifications
             .all()
     )
     
-    # Создаем словарь для хранения imageUrl по crypto_id
+    # Create dictionary to store imageUrl by crypto_id
     image_urls = {}
     
-    # Получаем уникальные crypto_id из уведомлений
+    # Get unique crypto_ids from notifications
     unique_crypto_ids = list(set([n.crypto_id for n in notifications]))
     
-    # Получаем imageUrl для каждой монеты параллельно (используем оптимизированный метод)
+    # Get imageUrl for each coin in parallel (using optimized method)
     async def get_image_url(crypto_id: str):
         try:
-            # Получаем CoinGecko ID из coin_registry
+            # Get CoinGecko ID from coin_registry
             coin = coin_registry.get_coin(crypto_id)
             if not coin:
-                logger.warning(f"coin {crypto_id} was not found in the registry")
+                logger.warning(f"Coin {crypto_id} not found in registry")
                 return crypto_id, None
             
             coingecko_id = coin.external_ids.get("coingecko")
             if not coingecko_id:
-                logger.warning(f"coin {crypto_id} does not have a CoinGecko ID")
+                logger.warning(f"Coin {crypto_id} doesn't have CoinGecko ID")
                 return crypto_id, None
             
-            # Используем aggregation_service для получения imageUrl (правильный способ)
+            # Use aggregation_service to get imageUrl (correct method)
             from app.services.aggregation_service import aggregation_service
             image_url = await aggregation_service.get_coin_image_url(crypto_id)
             return crypto_id, image_url
@@ -61,19 +61,19 @@ async def get_notifications(
             traceback.print_exc()
             return crypto_id, None
     
-    # Запускаем параллельные запросы
+    # Run parallel requests
     results = await asyncio.gather(*[get_image_url(crypto_id) for crypto_id in unique_crypto_ids], return_exceptions=True)
     
-    # Заполняем словарь image_urls
+    # Fill image_urls dictionary
     for result in results:
         if isinstance(result, tuple):
             crypto_id, image_url = result
             image_urls[crypto_id] = image_url
     
-    # Добавляем imageUrl к каждому уведомлению
+    # Add imageUrl to each notification
     notifications_with_images = []
     for notification in notifications:
-        # Создаем словарь из уведомления
+        # Create dictionary from notification
         notification_dict = {
             "id": notification.id,
             "user_id": notification.user_id,
@@ -102,7 +102,7 @@ async def get_notification(
     notification_id: int,
     db: Session = Depends(get_db),
 ):
-    """Получить одно уведомление по ID"""
+    """Get single notification by ID"""
     loop = asyncio.get_event_loop()
     notification = await loop.run_in_executor(
         None,
@@ -111,17 +111,17 @@ async def get_notification(
     if not notification:
         raise HTTPException(status_code=404, detail="Notification not found")
     
-    # Получаем imageUrl через aggregation_service (правильный способ с использованием coin_registry)
+    # Get imageUrl via aggregation_service (correct method using coin_registry)
     image_url = None
     try:
         from app.services.aggregation_service import aggregation_service
         image_url = await aggregation_service.get_coin_image_url(notification.crypto_id)
     except Exception as e:
-        logger.warning(f"ailed to get imageUrl for {notification.crypto_id}: {e}")
+        logger.warning(f"Failed to get imageUrl for {notification.crypto_id}: {e}")
         import traceback
         traceback.print_exc()
     
-    # Создаем словарь из уведомления с imageUrl
+    # Create dictionary from notification with imageUrl
     notification_dict = {
         "id": notification.id,
         "user_id": notification.user_id,
@@ -149,10 +149,10 @@ async def create_notification(
     notification: NotificationCreate,
     db: Session = Depends(get_db),
 ):
-    """Создать новое уведомление"""
+    """Create new notification"""
     loop = asyncio.get_event_loop()
     
-    # Автоматически создаем пользователя, если его нет
+    # Automatically create user if doesn't exist
     await loop.run_in_executor(
         None,
         lambda: get_or_create_user(
@@ -178,7 +178,7 @@ async def update_notification(
     notification: NotificationUpdate,
     db: Session = Depends(get_db),
 ):
-    """Обновить уведомление"""
+    """Update notification"""
     loop = asyncio.get_event_loop()
     
     db_notification = await loop.run_in_executor(
@@ -204,7 +204,7 @@ async def delete_notification(
     notification_id: int,
     db: Session = Depends(get_db),
 ):
-    """Удалить уведомление"""
+    """Delete notification"""
     loop = asyncio.get_event_loop()
     
     db_notification = await loop.run_in_executor(
@@ -220,4 +220,3 @@ async def delete_notification(
         return {"message": "Notification deleted"}
     
     return await loop.run_in_executor(None, _delete)
-

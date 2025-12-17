@@ -1,5 +1,5 @@
 """
-Сервис для работы со статическими данными монет из CoinGecko API
+Service for working with static coin data from CoinGecko API
 """
 import asyncio
 import logging
@@ -13,8 +13,8 @@ from app.utils.cache import CoinCacheManager
 
 class CoinStaticService:
     """
-    Сервис для работы со статическими данными монет (название, символ, изображение и т.д.)
-    Использует CoinGecko API для получения статики и кэширует результаты в Redis.
+    Service for working with static coin data (name, symbol, image, etc.)
+    Uses CoinGecko API to get static data and caches results in Redis.
     """
     
     def __init__(self):
@@ -24,25 +24,25 @@ class CoinStaticService:
 
     
     async def close(self):
-        """Закрыть HTTP клиент"""
+        """Close HTTP client"""
         await self.client.close()
     
     async def get_static_data(self, coin_id: str) -> Optional[Dict]:
         """
-        Получить статические данные для одной монеты.
+        Get static data for a single coin.
         
         Args:
-            coin_id: внутренний ID монеты
+            coin_id: internal coin ID
             
         Returns:
-            Словарь с статическими данными или None
+            Dictionary with static data or None
         """
-        # Сначала проверяем кэш
+        # First check cache
         cached_static = await self.cache.get_static(coin_id)
         if cached_static:
             return cached_static
         
-        # Если нет в кэше, загружаем из CoinGecko
+        # If not in cache, load from CoinGecko
         coin = coin_registry.get_coin(coin_id)
         if not coin:
             return None
@@ -74,33 +74,33 @@ class CoinStaticService:
                 "imageUrl": image_url,
             }
             
-            # Сохраняем в кэш
+            # Save to cache
             await self.cache.set_static(coin_id, static_data)
             
-            # Сохраняем иконку отдельно
+            # Save icon separately
             if image_url:
                 await self.cache.set_image_url(coin_id, image_url)
             
             return static_data
             
         except Exception as e:
-            self._logger.error(f"Ошибка получения статики для {coin_id}: {e}")
+            self._logger.error(f"Error getting static data for {coin_id}: {e}")
             return None
     
     async def get_static_data_batch(self, coin_ids: List[str]) -> Dict[str, Optional[Dict]]:
         """
-        Получить статические данные для нескольких монет.
+        Get static data for multiple coins.
         
         Args:
-            coin_ids: список внутренних ID монет
+            coin_ids: list of internal coin IDs
             
         Returns:
-            Словарь {coin_id: static_data или None}
+            Dictionary {coin_id: static_data or None}
         """
         if not coin_ids:
             return {}
         
-        # Проверяем кэш для всех монет
+        # Check cache for all coins
         result = {}
         coins_to_fetch = []
         
@@ -111,11 +111,11 @@ class CoinStaticService:
             else:
                 coins_to_fetch.append(coin_id)
         
-        # Если все есть в кэше, возвращаем
+        # If everything is in cache, return
         if not coins_to_fetch:
             return result
         
-        # Загружаем оставшиеся из CoinGecko
+        # Load remaining from CoinGecko
         coingecko_ids = []
         coingecko_to_internal = {}
         
@@ -127,10 +127,10 @@ class CoinStaticService:
                     coingecko_ids.append(coingecko_id)
                     coingecko_to_internal[coingecko_id] = internal_id
                 else:
-                    self._logger.warning(f"Монета {internal_id} не имеет CoinGecko ID")
+                    self._logger.warning(f"Coin {internal_id} doesn't have CoinGecko ID")
                     result[internal_id] = None
             else:
-                self._logger.warning(f"Монета {internal_id} не найдена в реестре")
+                self._logger.warning(f"Coin {internal_id} not found in registry")
                 result[internal_id] = None
         
         if not coingecko_ids:
@@ -149,7 +149,7 @@ class CoinStaticService:
                 },
             )
             
-            # Создаем словарь: internal_id -> coin_data
+            # Create dictionary: internal_id -> coin_data
             coins_dict = {}
             for coin_data in coins_data:
                 coingecko_id = coin_data.get("id")
@@ -157,7 +157,7 @@ class CoinStaticService:
                     internal_id = coingecko_to_internal[coingecko_id]
                     coins_dict[internal_id] = coin_data
             
-            # Обрабатываем загруженные данные
+            # Process loaded data
             for coin_id in coins_to_fetch:
                 if coin_id in coins_dict:
                     coin_data = coins_dict[coin_id]
@@ -171,20 +171,20 @@ class CoinStaticService:
                     
                     result[coin_id] = static_data
                     
-                    # Сохраняем в кэш
+                    # Save to cache
                     await self.cache.set_static(coin_id, static_data)
                     
-                    # Сохраняем иконку отдельно
+                    # Save icon separately
                     image_url = coin_data.get("image", "")
                     if image_url:
                         await self.cache.set_image_url(coin_id, image_url)
                 else:
                     result[coin_id] = None
-                    print(f"[CoinStaticService] ⚠️ Монета {coin_id} не найдена в ответе API")
+                    self._logger.warning(f"Coin {coin_id} not found in API response")
         
         except Exception as e:
-            print(f"[CoinStaticService] Ошибка получения статики для batch: {e}")
-            # Для монет, которые не удалось загрузить, возвращаем None
+            self._logger.error(f"Error getting static data for batch: {e}")
+            # For coins that failed to load, return None
             for coin_id in coins_to_fetch:
                 if coin_id not in result:
                     result[coin_id] = None
@@ -193,21 +193,21 @@ class CoinStaticService:
     
     async def refresh_static_data(self, coin_id: str) -> bool:
         """
-        Принудительно обновить статические данные монеты.
+        Force refresh static data for a coin.
         
         Args:
-            coin_id: внутренний ID монеты
+            coin_id: internal coin ID
             
         Returns:
-            True если успешно, False если ошибка
+            True if successful, False if error
         """
-        # Удаляем из кэша
+        # Remove from cache
         redis = await self.cache._get_redis()
         if redis:
             static_key = self.cache._get_static_key(coin_id)
             image_key = self.cache._get_image_url_key(coin_id)
             await redis.delete(static_key, image_key)
         
-        # Загружаем заново
+        # Load again
         static_data = await self.get_static_data(coin_id)
         return static_data is not None

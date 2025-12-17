@@ -1,10 +1,12 @@
 """
-Сервис для отправки уведомлений в Telegram через Bot API
+Service for sending notifications to Telegram via Bot API
 """
 import httpx
+import logging
 from typing import Optional
 from app.core.config import settings
 
+logger = logging.getLogger(f"TelegramService")
 
 class TelegramService:
     
@@ -13,7 +15,7 @@ class TelegramService:
     def __init__(self):
         self.bot_token = settings.TELEGRAM_BOT_TOKEN
         if not self.bot_token:
-            print("[TelegramService] WARNING: TELEGRAM_BOT_TOKEN не установлен. Уведомления не будут отправляться.")
+            logger.error(f"TELEGRAM_BOT_TOKEN is not installed. Notifications will not be sent")
     
     def _get_url(self, method: str) -> str:
         return f"{self.BASE_URL}{self.bot_token}/{method}"
@@ -27,7 +29,6 @@ class TelegramService:
     ) -> bool:
 
         if not self.bot_token:
-            print(f"[TelegramService] Пропуск отправки сообщения: токен бота не установлен")
             return False
         
         try:
@@ -45,36 +46,31 @@ class TelegramService:
                 result = response.json()
                 
                 if result.get("ok"):
-                    print(f"[TelegramService] Сообщение отправлено пользователю {chat_id}")
                     return True
                 else:
                     error_description = result.get("description", "Unknown error")
-                    print(f"[TelegramService] Ошибка отправки сообщения: {error_description}")
+                    logger.error(f"Error sending the message: {error_description}")
                     return False
                     
         except httpx.HTTPStatusError as e:
-            error_detail = f"HTTP {e.response.status_code}: {e.response.text}"
+            status_code = e.response.status_code
+            error_message = f"HTTP error {status_code}"
             
-            # Проверяем специфичные ошибки Telegram API
-            if e.response.status_code == 400:
+            if status_code == 400:
                 try:
                     error_data = e.response.json()
                     error_code = error_data.get("error_code")
                     description = error_data.get("description", "")
-                    
-                    if "chat not found" in description.lower():
-                        print(f"[TelegramService] ⚠️ Пользователь {chat_id} не найден (не запустил бота или заблокировал его)")
-                    elif error_code == 403:
-                        print(f"[TelegramService] ⚠️ Пользователь {chat_id} заблокировал бота")
+                    if error_code and description:
+                        error_message += f" (Telegram API {error_code}: {description})"
                     else:
-                        print(f"[TelegramService] Ошибка HTTP при отправке сообщения: {error_detail}")
+                        error_message += f": {e.response.text[:200]}"
                 except:
-                    print(f"[TelegramService] Ошибка HTTP при отправке сообщения: {error_detail}")
+                    error_message += f": {e.response.text[:200]}"
             else:
-                print(f"[TelegramService] Ошибка HTTP при отправке сообщения: {error_detail}")
-            return False
-        except Exception as e:
-            print(f"[TelegramService] Ошибка при отправке сообщения: {str(e)}")
+                error_message += f": {e.response.text[:200]}"
+            
+            logger.error(error_message)
             return False
     
     async def send_notification(
@@ -89,7 +85,7 @@ class TelegramService:
         value_type: str,
     ) -> bool:
 
-        # Форматируем цену
+        # Format price
         def format_price(price: float) -> str:
             if price >= 1000000:
                 return f"${(price / 1000000):.2f}M"
@@ -98,35 +94,35 @@ class TelegramService:
             else:
                 return f"${price:.2f}"
         
-        # Определяем направление для текста
+        # Determine direction for text
         direction_text = {
             "rise": "выросла",
             "fall": "упала",
             "both": "изменилась",
         }.get(direction, "изменилась")
         
-        # Определяем тип триггера для текста
+        # Determine trigger type for text
         trigger_text = {
             "stop-loss": "Stop-loss",
             "take-profit": "Take-profit",
         }.get(trigger, "Alert")
         
-        # Форматируем значение
+        # Format value
         if value_type == "percent":
             value_text = f"{value}%"
         else:
             value_text = format_price(value)
         
-        # Формируем сообщение
+        # Form message
         message = (
             f"🔔 <b>{trigger_text}</b>\n\n"
-            f"<b>{crypto_name} ({crypto_symbol})</b> {direction_text} на {value_text}\n\n"
-            f"Текущая цена: <b>{format_price(current_price)}</b>"
+            f"<b>{crypto_name} ({crypto_symbol})</b> {direction_text} by {value_text}\n\n"
+            f"Current price: <b>{format_price(current_price)}</b>"
         )
         
         return await self.send_message(user_id, message)
 
 
-# Создаем глобальный экземпляр сервиса
+# Create global service instance
 telegram_service = TelegramService()
 

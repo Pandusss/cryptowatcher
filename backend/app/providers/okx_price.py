@@ -33,4 +33,3 @@ class OKXPriceAdapter(BasePriceAdapter):
         return coin_registry.find_coin_by_external_id("okx", coin_id) is not None
 
 okx_price_adapter = OKXPriceAdapter()
-

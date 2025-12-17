@@ -1,8 +1,8 @@
 """
-AggregationService - агрегация данных из разных провайдеров
+AggregationService - data aggregation from different providers
 
-Централизованный сервис для получения данных о монетах из разных источников
-с учетом приоритетов и fallback механизмов.
+Centralized service for getting coin data from different sources
+with priority and fallback mechanisms.
 """
 from typing import Dict, List, Optional
 import asyncio
@@ -23,7 +23,7 @@ class AggregationService:
         self.cache = CoinCacheManager()
         self._logger = logging.getLogger("AggregationService")
         
-        # Регистр провайдеров
+        # Provider registry
         self.static_providers = {
             "coingecko": coingecko_static_adapter,
         }
@@ -39,12 +39,11 @@ class AggregationService:
         }
     
     async def get_coin_static_data(self, coin_id: str) -> Optional[Dict]:
-
         coin = coin_registry.get_coin(coin_id)
         if not coin:
             return None
         
-        # Используем CoinGecko для статики
+        # Use CoinGecko for static data
         coingecko_id = coin.external_ids.get("coingecko")
         if not coingecko_id:
             return None
@@ -52,8 +51,7 @@ class AggregationService:
         return await self.static_providers["coingecko"].get_coin_static_data(coingecko_id)
     
     async def get_coins_static_data(self, coin_ids: List[str]) -> Dict[str, Dict]:
-
-        # Получаем CoinGecko ID для всех монет
+        # Get CoinGecko IDs for all coins
         coingecko_ids = []
         coin_id_map = {}  # coingecko_id -> internal_id
         
@@ -68,10 +66,10 @@ class AggregationService:
         if not coingecko_ids:
             return {}
         
-        # Получаем статику из CoinGecko
+        # Get static data from CoinGecko
         static_data = await self.static_providers["coingecko"].get_coins_static_data(coingecko_ids)
         
-        # Преобразуем обратно в internal_id
+        # Convert back to internal_id
         result = {}
         for coingecko_id, data in static_data.items():
             internal_id = coin_id_map.get(coingecko_id)
@@ -81,40 +79,38 @@ class AggregationService:
         return result
     
     async def get_coin_price(self, coin_id: str) -> Optional[Dict]:
-
         coin = coin_registry.get_coin(coin_id)
         if not coin:
             return None
         
-        # Получаем список провайдеров в порядке приоритета
+        # Get provider list in priority order
         providers = coin.price_priority
         
-        # Пробуем получить цену от каждого провайдера по порядку
+        # Try to get price from each provider in order
         for provider_name in providers:
             provider = self.price_providers.get(provider_name)
             if not provider:
                 continue
             
-            # Получаем внешний ID для этого провайдера
+            # Get external ID for this provider
             external_id = coin.external_ids.get(provider_name)
             if not external_id:
                 continue
             
-            # Проверяем доступность
+            # Check availability
             if not provider.is_available(external_id):
                 continue
             
-            # Пытаемся получить цену
+            # Try to get price
             price_data = await provider.get_price(external_id)
             if price_data:
                 return price_data
         
-        # Если ни один провайдер не вернул цену, возвращаем None
+        # If no provider returned price, return None
         return None
     
     async def get_coins_prices(self, coin_ids: List[str]) -> Dict[str, Dict]:
-
-        # Получаем цены параллельно
+        # Get prices in parallel
         tasks = [self.get_coin_price(coin_id) for coin_id in coin_ids]
         prices = await asyncio.gather(*tasks)
         
@@ -130,58 +126,57 @@ class AggregationService:
         coin_id: str,
         period: str = "7d"
     ) -> Optional[List[Dict]]:
-
         coin = coin_registry.get_coin(coin_id)
         if not coin:
             return None
         
-        # Проверяем кэш
+        # Check cache
         cached_data = await self.cache.get_chart(coin_id, period)
         if cached_data:
-            self._logger.info(f"The graph is loaded from the CACHE for {coin_id} ({period}): {len(cached_data)} points")
+            self._logger.info(f"Chart loaded from CACHE for {coin_id} ({period}): {len(cached_data)} points")
             return cached_data
         
-        # Получаем список провайдеров в порядке приоритета
-        providers = coin.price_priority  # Используем те же провайдеры что и для цен
+        # Get provider list in priority order
+        providers = coin.price_priority  # Use same providers as for prices
         
-        # Пробуем получить график от каждого провайдера по порядку
+        # Try to get chart from each provider in order
         for provider_name in providers:
             provider = self.chart_providers.get(provider_name)
             if not provider:
                 self._logger.warning(f"Provider {provider_name} not found for {coin_id}")
                 continue
             
-            # Получаем внешний ID для этого провайдера
+            # Get external ID for this provider
             external_id = coin.external_ids.get(provider_name)
             if not external_id:
-                self._logger.warning(f"The coin {coin_id} does not have an external ID for the provider {provider_name}")
+                self._logger.warning(f"Coin {coin_id} doesn't have external ID for provider {provider_name}")
                 continue
             
-            # Проверяем доступность
+            # Check availability
             if not provider.is_available(external_id):
                 self._logger.warning(f"Provider {provider_name} is unavailable for {external_id}")
                 continue
             
-            # Пытаемся получить график
+            # Try to get chart
             try:
                 chart_data = await provider.get_chart_data(external_id, period)
                 if chart_data:
-                    # Сохраняем в кэш (если провайдер еще не сохранил)
+                    # Save to cache (if provider hasn't already saved)
                     await self.cache.set_chart(coin_id, period, chart_data)
-                    self._logger.info(f"The chart was uploaded from the {provider_name.upper()} platform for {coin_id} ({period}): {len(chart_data)} points")
+                    self._logger.info(f"Chart loaded from {provider_name.upper()} for {coin_id} ({period}): {len(chart_data)} points")
                     return chart_data
                 else:
                     self._logger.warning(f"Provider {provider_name} returned empty data for {coin_id}")
             except Exception as e:
-                self._logger.error(f"Error getting a chart from {provider_name} for {coin_id}: {e}")
+                self._logger.error(f"Error getting chart from {provider_name} for {coin_id}: {e}")
                 continue
         
-        # If none of the providers from price_priority returned the schedule, we try all available providers as a fallback
-        self._logger.info(f"Trying a fallback on all available providers for {coin_id}")
+        # If none of the providers from price_priority returned chart, try all available providers as fallback
+        self._logger.info(f"Trying fallback to all available providers for {coin_id}")
         all_available_providers = list(self.chart_providers.keys())
         
         for provider_name in all_available_providers:
-            # Skip the providers that have already tried above
+            # Skip providers already tried above
             if provider_name in providers:
                 continue
             
@@ -200,18 +195,17 @@ class AggregationService:
                 chart_data = await provider.get_chart_data(external_id, period)
                 if chart_data:
                     await self.cache.set_chart(coin_id, period, chart_data)
-                    self._logger.info(f"Fallback was successful: the chart was loaded from the {provider_name.upper()} site for {coin_id} ({period}): {len(chart_data)} points")
+                    self._logger.info(f"Fallback successful: chart loaded from {provider_name.upper()} for {coin_id} ({period}): {len(chart_data)} points")
                     return chart_data
             except Exception as e:
                 self._logger.error(f"Fallback error from {provider_name} for {coin_id}: {e}")
                 continue
         
-        # Если ни один провайдер не вернул график, возвращаем None
-        self._logger.error(f"No chart was found for {coin_id} ({period}) from any provider.")
+        # If no provider returned chart, return None
+        self._logger.error(f"No chart found for {coin_id} ({period}) from any provider.")
         return None
     
     async def get_coin_image_url(self, coin_id: str) -> Optional[str]:
-
         coin = coin_registry.get_coin(coin_id)
         if not coin:
             return None
@@ -223,8 +217,7 @@ class AggregationService:
         return await self.static_providers["coingecko"].get_coin_image_url(coingecko_id)
     
     async def get_coin_details(self, coin_id: str) -> Optional[Dict]:
-
-        # Получаем статику и цену параллельно
+        # Get static data and price in parallel
         static_task = self.get_coin_static_data(coin_id)
         price_task = self.get_coin_price(coin_id)
         
@@ -233,7 +226,7 @@ class AggregationService:
         if not static_data:
             return None
         
-        # Объединяем данные
+        # Combine data
         result = static_data.copy()
         
         if price_data:
@@ -247,5 +240,5 @@ class AggregationService:
         
         return result
 
-# Глобальный экземпляр
+# Global instance
 aggregation_service = AggregationService()

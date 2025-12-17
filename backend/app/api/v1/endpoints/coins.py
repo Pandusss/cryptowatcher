@@ -35,7 +35,7 @@ async def get_coins_list_static(
     """Get a list of coins (static + prices from cache) - for fast loading"""
     service = CoinService()
     try:
-        # Используем единый метод get_crypto_list (объединена логика с get_crypto_list_static_only)
+        # Use unified get_crypto_list method (merged logic with get_crypto_list_static_only)
         coins = await service.get_crypto_list(limit=limit, page=start, force_refresh=force_refresh)
         logger.info(f"Returning {len(coins)} coins to the client")
         return {"data": coins}
@@ -46,7 +46,7 @@ async def get_coins_list_static(
 
 @router.post("/list/prices")
 async def get_coins_list_prices(coin_ids: List[str] = Body(...)):
-    """Получить только цены для списка монет - для обновления после загрузки статики"""
+    """Get only prices for coin list - for updating after static data load"""
     service = CoinService()
     try:
         prices = await service.get_crypto_list_prices(coin_ids)
@@ -61,11 +61,11 @@ async def get_coins_list_prices(coin_ids: List[str] = Body(...)):
 async def get_coin_details(
     coin_id: str,
 ):
-    """Получить детали криптовалюты"""
+    """Get cryptocurrency details"""
     service = CoinService()
     try:
         coin = await service.get_crypto_details(coin_id)
-        logger.info(f"Returning these coins to the client: {coin}")
+        logger.info(f"Returning coin to the client: {coin}")
         return {"data": coin}
     except Exception as e:
         logger.error(f"Error: {str(e)}")
@@ -77,12 +77,12 @@ async def get_coin_chart(
     coin_id: str,
     period: str = "7d",  # 1d, 7d, 30d, 1y
 ):
-    """Получить данные графика для криптовалюты с учетом приоритетов провайдеров"""
+    """Get chart data for cryptocurrency with provider priority consideration"""
     from app.services.aggregation_service import aggregation_service
     try:
         chart_data = await aggregation_service.get_coin_chart(coin_id, period)
         if chart_data:
-            logger.info(f"Returning {len(chart_data)} graph points to the client")
+            logger.info(f"Returning {len(chart_data)} chart points to the client")
             return {"data": chart_data}
         else:
             logger.warning(f"Chart not found for {coin_id}")

@@ -121,5 +121,3 @@ class BaseChartAdapter(ABC):
             True if available, False otherwise
         """
         pass
-
-

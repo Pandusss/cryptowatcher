@@ -1,7 +1,7 @@
 """
-Общий HTTP клиент для переиспользования в провайдерах
+General HTTP client for reuse in providers
 
-Предоставляет настроенный httpx.AsyncClient с общими параметрами.
+Provides a configured httpx.AsyncClient with common parameters.
 """
 import httpx
 from typing import Optional

@@ -99,4 +99,3 @@ class CoinGeckoStaticAdapter:
         await self.client.close()
 
 coingecko_static_adapter = CoinGeckoStaticAdapter()
-

@@ -1,5 +1,5 @@
 """
-Утилиты для работы с кэшем
+Cache utilities
 """
 import json
 import logging
@@ -11,11 +11,11 @@ logger = logging.getLogger(f"UtilsCache")
 
 class CoinCacheManager:
     
-    # TTL для разных типов данных
-    CACHE_TTL_COIN_STATIC = 3600  # 1 час для статических данных
-    CACHE_TTL_COIN_PRICE = 10  # 10 секунд для цен
-    CACHE_TTL_IMAGE_URL = 604800  # 7 дней для иконок
-    CACHE_TTL_CHART = 60  # 1 минута для графиков
+    # TTL for different data types
+    CACHE_TTL_COIN_STATIC = 3600  # 1 hour for static data
+    CACHE_TTL_COIN_PRICE = 10  # 10 seconds for prices
+    CACHE_TTL_IMAGE_URL = 604800  # 7 days for icons
+    CACHE_TTL_CHART = 60  # 1 minute for charts
     
     @staticmethod
     def _get_static_key(coin_id: str) -> str:
@@ -149,13 +149,13 @@ class CoinCacheManager:
         coin_ids: List[str]
     ) -> Dict[str, Dict[str, Optional[Dict]]]:
         """
-        Получить статику и цены для нескольких монет через Redis pipeline
+        Get statics and prices for multiple coins via Redis pipeline
         
         Args:
-            coin_ids: Список внутренних ID монет
+            coin_ids: List of internal Coin IDs
             
         Returns:
-            Словарь {coin_id: {"static": Optional[Dict], "price": Optional[Dict]}}
+            Dictionary {coin_id: {"static": Optional[Dict], "price": Optional[Dict]}}
         """
         redis = await get_redis()
         if not redis:
@@ -164,22 +164,22 @@ class CoinCacheManager:
         result = {}
         
         try:
-            # Используем pipeline для batch запросов
+            # Using pipeline for batch requests
             async with redis.pipeline() as pipe:
-                # Добавляем все запросы в pipeline
+                # Add all requests to the pipeline
                 for coin_id in coin_ids:
                     pipe.get(self._get_static_key(coin_id))
                     pipe.get(self._get_price_key(coin_id))
                 
-                # Выполняем все запросы одним round-trip
+                # Execute all requests in one round-trip
                 results = await pipe.execute()
             
-            # Парсим результаты
-            # results[0] - статика для coin_ids[0]
-            # results[1] - цена для coin_ids[0]
-            # results[2] - статика для coin_ids[1]
-            # results[3] - цена для coin_ids[1]
-            # и т.д.
+            # Parse results
+            # results[0] - static for coin_ids[0]
+            # results[1] - price for coin_ids[0]
+            # results[2] - static for coin_ids[1]
+            # results[3] - price for coin_ids[1]
+            # and so on
             for i, coin_id in enumerate(coin_ids):
                 static_idx = i * 2
                 price_idx = i * 2 + 1
@@ -187,7 +187,7 @@ class CoinCacheManager:
                 static_data = results[static_idx]
                 price_data = results[price_idx]
                 
-                # Десериализуем JSON
+                # Deserialize JSON
                 static_dict = None
                 if static_data:
                     try:
@@ -215,6 +215,5 @@ class CoinCacheManager:
             
         except Exception as e:
             logger.error(f"Batch cache read error: {e}")
-            # В случае ошибки возвращаем None для всех монет
+            # In case of error, return None for all coins
             return {coin_id: {"static": None, "price": None} for coin_id in coin_ids}
-
