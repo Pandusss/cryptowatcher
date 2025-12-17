@@ -95,58 +95,59 @@ export const useLiveChartData = ({
   /**
    * Обновление текущей цены
    */
-  const updatePrice = useCallback(async () => {
+/**
+ * Обновление текущей цены (упрощенная версия)
+ */
+    const updatePrice = useCallback(async () => {
     if (!coinId) return
     
     try {
-      const coinDetails = await apiService.getCoinDetails(coinId)
-      if (coinDetails && coinDetails.currentPrice) {
+        const coinDetails = await apiService.getCoinDetails(coinId)
+        if (coinDetails && coinDetails.currentPrice) {
         const newPrice = coinDetails.currentPrice
         
         // Определяем направление изменения цены
         if (previousPriceRef.current !== null) {
-          if (newPrice > previousPriceRef.current) {
+            if (newPrice > previousPriceRef.current) {
             setPriceDirection('up')
-          } else if (newPrice < previousPriceRef.current) {
+            } else if (newPrice < previousPriceRef.current) {
             setPriceDirection('down')
-          } else {
+            } else {
             setPriceDirection('neutral')
-          }
+            }
         }
         
         // Запускаем анимацию обновления
         setPriceUpdated(true)
         setTimeout(() => {
-          setPriceUpdated(false)
-          setPriceDirection(null)
+            setPriceUpdated(false)
+            setPriceDirection(null)
         }, 800)
         
         // Обновляем текущую цену
         setCurrentPrice(newPrice)
         previousPriceRef.current = newPrice
         
-        // Обновляем последнюю точку графика, если есть данные
-        if (chartData.length > 0) {
-          const updatedData = [...chartData]
-          const lastIndex = updatedData.length - 1
-          
-          // Используем локальное время пользователя
-          const formattedDate = getCurrentLocalTime()
-          
-          // Обновляем последнюю точку
-          updatedData[lastIndex] = {
+        // Просто обновляем цену, не трогая время
+        setChartData(prev => {
+            if (prev.length === 0) return prev
+            
+            const updatedData = [...prev]
+            const lastIndex = updatedData.length - 1
+            
+            updatedData[lastIndex] = {
             ...updatedData[lastIndex],
             price: newPrice,
-            date: formattedDate,
-          }
-          
-          setChartData(updatedData)
+            // Время оставляем как есть
+            }
+            
+            return updatedData
+        })
         }
-      }
     } catch (err) {
-      console.error('Failed to update price:', err)
+        console.error('Failed to update price:', err)
     }
-  }, [coinId, chartData])
+    }, [coinId]) // <-- Только coinId
 
   /**
    * Инициализация: загрузка данных графика

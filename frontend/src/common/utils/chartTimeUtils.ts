@@ -5,23 +5,23 @@ import { ChartDataPoint } from '../../services/api'
  * Конвертирует дату сервера (UTC+3) в локальное время пользователя
  */
 export const convertServerDateToLocal = (serverDateStr: string): string => {
-  // Сервер отдает "YYYY-MM-DD HH:MM" в UTC+3
+  // Сервер отдает "YYYY-MM-DD HH:MM" в неизвестном часовом поясе
   const [datePart, timePart] = serverDateStr.split(' ')
   if (!datePart || !timePart) return serverDateStr
   
   const [year, month, day] = datePart.split('-').map(Number)
   const [hours, minutes] = timePart.split(':').map(Number)
   
-  // Создаем дату в UTC+3 (вычитаем 3 часа чтобы получить UTC, 
-  // потом браузер сам добавит локальное смещение)
-  const serverDate = new Date(Date.UTC(year, month - 1, day, hours - 3, minutes, 0))
+  // Шаг 1: Создаем дату в предположении, что это локальное время
+  // (браузер интерпретирует как локальное время)
+  const localDate = new Date(year, month - 1, day, hours, minutes, 0)
   
-  // Получаем локальное время пользователя
-  const localYear = serverDate.getFullYear()
-  const localMonth = String(serverDate.getMonth() + 1).padStart(2, '0')
-  const localDay = String(serverDate.getDate()).padStart(2, '0')
-  const localHours = String(serverDate.getHours()).padStart(2, '0')
-  const localMinutes = String(serverDate.getMinutes()).padStart(2, '0')
+  // Шаг 2: Форматируем как локальное время (оно уже локальное)
+  const localYear = localDate.getFullYear()
+  const localMonth = String(localDate.getMonth() + 1).padStart(2, '0')
+  const localDay = String(localDate.getDate()).padStart(2, '0')
+  const localHours = String(localDate.getHours()).padStart(2, '0')
+  const localMinutes = String(localDate.getMinutes()).padStart(2, '0')
   
   return `${localYear}-${localMonth}-${localDay} ${localHours}:${localMinutes}`
 }
