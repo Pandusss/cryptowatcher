@@ -119,26 +119,25 @@ export const useLiveChartData = ({
         
         // Обновляем последнюю точку графика, если есть данные
         if (chartData.length > 0) {
-          const updatedData = [...chartData]
-          const lastIndex = updatedData.length - 1
-          
-          // Форматируем дату в формате "YYYY-MM-DD HH:MM"
-          const now = new Date()
-          const year = now.getFullYear()
-          const month = String(now.getMonth() + 1).padStart(2, '0')
-          const day = String(now.getDate()).padStart(2, '0')
-          const hours = String(now.getHours()).padStart(2, '0')
-          const minutes = String(now.getMinutes()).padStart(2, '0')
-          const formattedDate = `${year}-${month}-${day} ${hours}:${minutes}`
-          
-          // Обновляем последнюю точку
-          updatedData[lastIndex] = {
+        const updatedData = [...chartData]
+        const lastIndex = updatedData.length - 1
+        
+        // ВАЖНО: Используем UTC время вместо локального!
+        const now = new Date()
+        const year = now.getUTCFullYear()  // getUTCFullYear вместо getFullYear
+        const month = String(now.getUTCMonth() + 1).padStart(2, '0')  // getUTCMonth
+        const day = String(now.getUTCDate()).padStart(2, '0')  // getUTCDate
+        const hours = String(now.getUTCHours()).padStart(2, '0')  // getUTCHours
+        const minutes = String(now.getUTCMinutes()).padStart(2, '0')  // getUTCMinutes
+        const formattedDate = `${year}-${month}-${day} ${hours}:${minutes}`
+        
+        // Обновляем последнюю точку
+        updatedData[lastIndex] = {
             ...updatedData[lastIndex],
             price: newPrice,
-            date: formattedDate,
-          }
-          
-          setChartData(updatedData)
+            date: formattedDate, // Теперь UTC время!
+        }
+        setChartData(updatedData)
         }
       }
     } catch (err) {
