@@ -128,7 +128,7 @@ export const useLiveChartData = ({
         setCurrentPrice(newPrice)
         previousPriceRef.current = newPrice
         
-        // Просто обновляем цену, не трогая время
+        // Обновляем последнюю точку графика с правильным локальным временем
         setChartData(prev => {
             if (prev.length === 0) return prev
             
@@ -138,7 +138,7 @@ export const useLiveChartData = ({
             updatedData[lastIndex] = {
             ...updatedData[lastIndex],
             price: newPrice,
-            // Время оставляем как есть
+            date: getCurrentLocalTime() // Используем локальное время для последней точки
             }
             
             return updatedData
@@ -147,7 +147,7 @@ export const useLiveChartData = ({
     } catch (err) {
         console.error('Failed to update price:', err)
     }
-    }, [coinId]) // <-- Только coinId
+    }, [coinId])
 
   /**
    * Инициализация: загрузка данных графика
