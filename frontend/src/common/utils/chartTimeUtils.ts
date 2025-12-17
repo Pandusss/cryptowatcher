@@ -11,42 +11,38 @@ import { ChartDataPoint } from '../../services/api'
 // chartTimeUtils.ts
 export const convertServerDateToLocal = (serverDateStr: string): string => {
   try {
-    // Если это уже ISO формат (новый серверный формат)
+    // Если это ISO формат с часовым поясом
     if (serverDateStr.includes('T')) {
       const date = new Date(serverDateStr);
-      
-      // Конвертируем в локальное время в формате "YYYY-MM-DD HH:MM"
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      const hours = String(date.getHours()).padStart(2, '0');
-      const minutes = String(date.getMinutes()).padStart(2, '0');
-      
-      return `${year}-${month}-${day} ${hours}:${minutes}`;
+      return formatLocalDateTime(date);
     }
     
-    // Старый формат "YYYY-MM-DD HH:MM" (предполагаем UTC)
+    // Старый формат "YYYY-MM-DD HH:MM" - предполагаем UTC
     const [datePart, timePart] = serverDateStr.split(' ');
     if (!datePart || !timePart) return serverDateStr;
     
     const [year, month, day] = datePart.split('-').map(Number);
     const [hours, minutes] = timePart.split(':').map(Number);
     
-    // Предполагаем, что сервер отдает UTC
+    // Создаем дату в UTC
     const utcDate = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0));
     
     // Конвертируем в локальное время
-    const localYear = utcDate.getFullYear();
-    const localMonth = String(utcDate.getMonth() + 1).padStart(2, '0');
-    const localDay = String(utcDate.getDate()).padStart(2, '0');
-    const localHours = String(utcDate.getHours()).padStart(2, '0');
-    const localMinutes = String(utcDate.getMinutes()).padStart(2, '0');
-    
-    return `${localYear}-${localMonth}-${localDay} ${localHours}:${localMinutes}`;
+    return formatLocalDateTime(utcDate);
   } catch (error) {
     console.error('Error converting date:', error, serverDateStr);
     return serverDateStr;
   }
+};
+
+const formatLocalDateTime = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
 };
 
 /**
@@ -66,17 +62,17 @@ export const getCurrentLocalTime = (): string => {
 /**
  * Парсит дату из любого формата в объект Date
  * Поддерживает:
- * - "YYYY-MM-DD HH:MM" (локальное время)
- * - ISO формат "2025-12-17T18:12:12+00:00"
+ * - "YYYY-MM-DD HH:MM" (локальное время после конвертации через convertServerDateToLocal)
+ * - ISO формат "2025-12-17T18:12:12+00:00" (с часовым поясом)
  */
 export const parseDateString = (dateStr: string): Date => {
   try {
     // Если это ISO формат с часовым поясом
-    if (dateStr.includes('T') && dateStr.includes('+')) {
+    if (dateStr.includes('T')) {
       return new Date(dateStr)
     }
     
-    // Если это "YYYY-MM-DD HH:MM" (уже локальное время)
+    // Если это "YYYY-MM-DD HH:MM" (локальное время после конвертации)
     const [datePart, timePart] = dateStr.split(' ')
     if (!datePart || !timePart) {
       return new Date(dateStr) // пробуем стандартный парсинг
@@ -85,6 +81,8 @@ export const parseDateString = (dateStr: string): Date => {
     const [year, month, day] = datePart.split('-').map(Number)
     const [hours, minutes] = timePart.split(':').map(Number)
     
+    // Создаем дату в локальном времени
+    // Важно: после convertServerDateToLocal даты уже в локальном времени
     return new Date(year, month - 1, day, hours, minutes, 0)
   } catch (error) {
     console.error('Error parsing date string:', error, dateStr)
@@ -194,7 +192,12 @@ export const getXAxisTicks = (data: ChartDataPoint[], period: ChartPeriod): stri
       }
     }
     
-    return ticks.length > 0 ? ticks.sort() : undefined
+    // Сортируем тики по дате
+    return ticks.length > 0 ? ticks.sort((a, b) => {
+      const dateA = parseDateString(a).getTime()
+      const dateB = parseDateString(b).getTime()
+      return dateA - dateB
+    }) : undefined
   }
   
   // Для остальных периодов стандартная логика
