@@ -30,7 +30,7 @@ CryptoWatcher is a Telegram Mini App for real-time cryptocurrency price monitori
                       └─────────────────────────────────────────┘
                                           │
              ┌────────────────────────────┼────────────────────────────┐
-             ▼                            ▼                           ▼
+             ▼                            ▼                            ▼
     ┌─────────────────┐          ┌─────────────────┐          ┌─────────────────┐
     │  Telegram Bot   │          │  React Mini App │          │   REST API      │
     │   (polling)     │          │   (WebApp)      │          │   /api/v1/*     │
