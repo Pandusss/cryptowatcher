@@ -1,20 +1,20 @@
 /**
- * Утилиты для работы с ценами криптовалют
+ * Utilities for working with cryptocurrency prices
  */
 
 /**
- * Определяет количество знаков после запятой на основе цены
- * @param price - Цена криптовалюты
- * @param cachedDecimals - Опциональное кэшированное значение из API
- * @returns Количество знаков после запятой (от 2 до 10)
+ * Determines the number of decimal places based on the price
+ * @param price - Price of the cryptocurrency
+ * @param cachedDecimals - Optional cached value from the API
+ * @returns The number of decimal places (from 2 to 10)
  */
 export const getPriceDecimals = (price: number, cachedDecimals?: number): number => {
-  // Если есть кэшированное значение из API, используем его
+  // If there is a cached value from the API, use it
   if (cachedDecimals !== undefined) {
     return cachedDecimals
   }
   
-  // Иначе вычисляем локально на основе цены
+  // Otherwise, calculate locally based on the price
   if (price >= 1) return 2
   if (price >= 0.1) return 3
   if (price >= 0.01) return 4

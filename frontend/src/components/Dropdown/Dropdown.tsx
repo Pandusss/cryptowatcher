@@ -35,11 +35,11 @@ export const Dropdown = ({
       return
     }
 
-    // Сбрасываем maxHeight перед позиционированием
+    // Reset maxHeight before positioning
     const dropdownElement = dropdownRef.current
     dropdownElement.style.maxHeight = ''
 
-    // Используем requestAnimationFrame чтобы dropdown успел отрендериться
+    // Use requestAnimationFrame to ensure dropdown has rendered
     requestAnimationFrame(() => {
       if (!triggerRef?.current || !dropdownRef.current) {
         return
@@ -48,35 +48,34 @@ export const Dropdown = ({
       const triggerRect = triggerRef.current.getBoundingClientRect()
       const viewportHeight = window.innerHeight
       const viewportWidth = window.innerWidth
-      const spacing = 8 // Отступ от триггера
+      const spacing = 8
 
-      // Получаем реальные размеры dropdown после рендера
+      // Get real sizes of dropdown after rendering
       const dropdownRect = dropdownElement.getBoundingClientRect()
       const dropdownHeight = dropdownRect.height || 300
       const dropdownWidth = dropdownRect.width || 200
 
-      // Вычисляем доступное пространство
+      // Calculate available space
       const spaceBelow = viewportHeight - triggerRect.bottom - spacing
       const spaceAbove = triggerRect.top - spacing
 
-      // Вычисляем позицию снизу (по умолчанию)
+      // Calculate position from below (default)
       let top = triggerRect.bottom + spacing
       let right = viewportWidth - triggerRect.right
 
-      // Если не помещается снизу, но помещается сверху - открываем сверху
+      // If it doesn't fit below, but fits above - open above
       if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
         top = triggerRect.top - dropdownHeight - spacing
-        // Если все равно не помещается, прижимаем к верху и ограничиваем высоту
         if (top < spacing) {
           top = spacing
           dropdownElement.style.maxHeight = `${spaceAbove - spacing * 2}px`
         }
       } else if (spaceBelow < dropdownHeight) {
-        // Если снизу мало места, ограничиваем высоту
+        // If there is little space below, limit the height
         dropdownElement.style.maxHeight = `${spaceBelow - spacing}px`
       }
 
-      // Проверяем горизонтальные границы
+      // Check horizontal boundaries
       if (right < spacing) {
         right = spacing
       }

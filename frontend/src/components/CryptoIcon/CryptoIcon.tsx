@@ -7,19 +7,19 @@ interface CryptoIconProps {
   name?: string
   size?: number
   className?: string
-  imageUrl?: string  // URL изображения из API (приоритетный источник)
+  imageUrl?: string  // URL image from API (primary source)
 }
 
 /**
- * Маппинг символов криптовалют к CoinGecko ID
+ * Mapping of cryptocurrency symbols to CoinGecko ID
  * 
- * CoinGecko использует ID как строку (например, "bitcoin", "ethereum")
+ * CoinGecko uses ID as a string (e.g., "bitcoin", "ethereum")
  * 
- * Как найти ID для новой монеты:
- * 1. Откройте https://www.coingecko.com
- * 2. Найдите монету через поиск
- * 3. Откройте страницу монеты
- * 4. ID можно найти в URL: https://www.coingecko.com/en/coins/bitcoin → ID = "bitcoin"
+ * How to find ID for a new coin:
+ * 1. Open https://www.coingecko.com
+ * 2. Find the coin through search
+ * 3. Open the coin page
+ * 4. ID can be found in the URL: https://www.coingecko.com/en/coins/bitcoin → ID = "bitcoin"
  */
 const COINGECKO_IDS: Record<string, string> = {
   BTC: 'bitcoin',
@@ -61,18 +61,18 @@ export const CryptoIcon = ({
   const lowerSymbol = symbol.toLowerCase()
   const cgId = getCoinGeckoId(upperSymbol)
 
-  // Формируем список URL в порядке приоритета
+  // Form a list of URLs in order of priority
   const allUrls: string[] = []
   
-  // 1. imageUrl из API (приоритетный источник, если передан)
+  // 1. imageUrl from API (primary source, if passed)
   if (imageUrl) {
     allUrls.push(imageUrl)
   }
   
-  // 2. CoinGecko CDN (если есть ID) - используем формат из API ответа
-  // CoinGecko возвращает image URL напрямую в API, поэтому этот fallback используется редко
+  // 2. CoinGecko CDN (if there is ID) - use the format from the API response
+  // CoinGecko returns image URL directly in the API, so this fallback is used rarely
   
-  // 3. CryptoIcons CDN (fallback - работает по символам)
+  // 3. CryptoIcons CDN (fallback - works by symbols)
   allUrls.push(`https://cryptoicons.org/api/icon/${lowerSymbol}/200`)
   allUrls.push(`https://cryptoicons.org/api/icon/${lowerSymbol}/100`)
 
@@ -80,16 +80,13 @@ export const CryptoIcon = ({
 
   const handleError = () => {
     if (currentUrlIndex < allUrls.length - 1) {
-      // Пробуем следующий URL
       setCurrentUrlIndex(currentUrlIndex + 1)
     } else {
-      // Все URL не загрузились
       setHasError(true)
     }
   }
 
   if (hasError || !currentUrl) {
-    // Fallback - показываем первую букву символа
     return (
       <div
         className={className}

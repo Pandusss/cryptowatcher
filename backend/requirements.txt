@@ -1,36 +1,37 @@
-# FastAPI и сервер
+# FastAPI and server
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 python-multipart==0.0.6
 
-# База данных
+# Database
 sqlalchemy==2.0.23
 alembic==1.12.1
 psycopg2-binary==2.9.9
 
 # Redis
 redis==5.0.1
-# hiredis==2.2.3  # Опционально, требует компиляцию C-кода. Redis работает без него.
+# hiredis==2.2.3  # Optional, requires C compilation. Redis works without it.
 
-# HTTP клиент для API
+# HTTP client for API
 httpx==0.25.1
 aiohttp==3.9.1
 
-# WebSocket клиент для Binance
+# WebSocket client for exchanges
 websockets==12.0
 
-# Переменные окружения
+# Environment variables
 python-dotenv==1.0.0
 
-# Валидация и сериализация
+# Validation and serialization
 pydantic==2.5.0
 pydantic-settings==2.1.0
 
-# Утилиты
+# Utilities
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 pyyaml==6.0.1
+protobuf
 
-# Логирование
+# Logging
 loguru==0.7.2
 

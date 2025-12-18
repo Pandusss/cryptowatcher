@@ -12,7 +12,7 @@ interface GroupProps {
   onClick?: () => void
   disabled?: boolean
   chevron?: boolean
-  chevronType?: 'single' | 'double' // 'single' для навигации, 'double' для dropdown
+  chevronType?: 'single' | 'double' // 'single' for navigation, 'double' for dropdown
   className?: string
 }
 

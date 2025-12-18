@@ -34,7 +34,6 @@ export const NumberInput = ({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value
-    // Разрешаем пустую строку, числа и десятичные числа
     if (newValue === '' || /^-?\d*\.?\d*$/.test(newValue)) {
       onChange(newValue)
     }
@@ -60,7 +59,7 @@ export const NumberInput = ({
       onFocus()
     }
     
-    // На мобильных устройствах прокручиваем поле ввода в видимую область
+    // On mobile devices, scroll the input field into the visible area
     setTimeout(() => {
       e.target.scrollIntoView({ 
         behavior: 'smooth', 

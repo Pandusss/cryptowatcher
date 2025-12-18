@@ -22,20 +22,20 @@ export const DndSettingsPage = () => {
   const navigate = useNavigate()
   const location = useLocation()
   
-  // Получаем начальные значения из location state или используем дефолтные
+  // Get initial values from location state or use defaults
   const initialStartTime = location.state?.startTime || null
   const initialEndTime = location.state?.endTime || null
   
-  // Определяем, включен ли DND (если оба времени не null)
+  // Determine if DND is enabled (if both times are not null)
   const [isDndEnabled, setIsDndEnabled] = useState(initialStartTime !== null && initialEndTime !== null)
   const [startTime, setStartTime] = useState(initialStartTime || '12:00')
   const [endTime, setEndTime] = useState(initialEndTime || '07:00')
   const [isSaving, setIsSaving] = useState(false)
 
-  // Управление кнопкой "Назад" в Telegram Mini App
+  // Manage Telegram Mini App back button
   useTelegramBackButton()
 
-  // Форматирование времени для отображения (12:00 -> 12 PM, 07:00 -> 7 AM)
+  // Format time for display (12:00 -> 12 PM, 07:00 -> 7 AM)
   const formatTimeForDisplay = (time: string) => {
     const [hours, minutes] = time.split(':')
     const hour = parseInt(hours, 10)
@@ -55,7 +55,7 @@ export const DndSettingsPage = () => {
     return `${displayHour}:${minute.toString().padStart(2, '0')} ${period}`
   }
 
-  // Форматирование для отображения диапазона
+  // Formatting for display of the range
   const formatTimeRange = () => {
     return `${formatTimeForDisplay(startTime)} - ${formatTimeForDisplay(endTime)}`
   }
@@ -68,20 +68,20 @@ export const DndSettingsPage = () => {
       return
     }
 
-    // Если DND отключен, отправляем null
+    // If DND is disabled, send null
     const dndStartTime = isDndEnabled ? startTime : null
     const dndEndTime = isDndEnabled ? endTime : null
 
     setIsSaving(true)
     try {
-      // Сохраняем настройки через API
+      // Save settings through API
       const result = await apiService.updateDndSettings(userId, {
         dnd_start_time: dndStartTime,
         dnd_end_time: dndEndTime,
       })
 
 
-      // Возвращаемся назад с данными
+      // Return back with data
       navigate(ROUTES_NAME.MAIN, {
         state: {
           dndSettings: {
@@ -99,7 +99,7 @@ export const DndSettingsPage = () => {
         response: error?.response,
         stack: error?.stack,
       })
-      // Показываем ошибку пользователю
+      // Show error to user
       alert(`Failed to save settings: ${error?.message || 'Unknown error'}`)
       setIsSaving(false)
     }

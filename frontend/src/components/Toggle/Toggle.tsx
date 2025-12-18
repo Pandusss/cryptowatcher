@@ -19,7 +19,6 @@ export const Toggle = ({ checked, onChange, disabled = false, className }: Toggl
     setIsAnimating(true)
     onChange(!checked)
     
-    // Сбрасываем флаг анимации после завершения
     setTimeout(() => {
       setIsAnimating(false)
     }, 300)

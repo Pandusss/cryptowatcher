@@ -32,7 +32,7 @@ export const CoinDetailsPage = () => {
   const [coin, setCoin] = useState<CryptoCurrency | null>(null)
   const [selectedPeriod, setSelectedPeriod] = useState<'1d' | '7d' | '30d' | '1y'>('7d')
 
-  // Используем хук для управления данными графика
+  // Use hook to manage chart data
   const {
     chartData,
     currentPrice,
@@ -51,7 +51,7 @@ export const CoinDetailsPage = () => {
     autoUpdateChart: true,
   })
 
-  // Управление кнопкой "Назад" в Telegram Mini App
+  // Manage Telegram Mini App back button
   useTelegramBackButton()
 
   useEffect(() => {
@@ -60,7 +60,7 @@ export const CoinDetailsPage = () => {
       const coinFromState = location.state?.coin || location.state?.selectedCoin
       
       if (coinFromState) {
-        // Convert from ChooseCoinPage format to CryptoCurrency format
+        // Convert from ChooseCoinPage format to CoinListItem format
         const cryptoCurrency: CryptoCurrency = {
           id: coinFromState.id || id || '',
           symbol: coinFromState.symbol || '',
@@ -69,7 +69,7 @@ export const CoinDetailsPage = () => {
           priceChange24h: coinFromState.priceChange24h,
           priceChangePercent24h: coinFromState.priceChangePercent24h,
           imageUrl: coinFromState.imageUrl,
-          priceDecimals: coinFromState.priceDecimals,  // Используем кэшированное значение из API
+          priceDecimals: coinFromState.priceDecimals,  // Use cached value from API
         }
         setCoin(cryptoCurrency)
         setCurrentPrice(cryptoCurrency.currentPrice)
@@ -86,7 +86,7 @@ export const CoinDetailsPage = () => {
               priceChange24h: coinDetails.priceChange24h,
               priceChangePercent24h: coinDetails.priceChangePercent24h,
               imageUrl: coinDetails.imageUrl,
-              priceDecimals: coinDetails.priceDecimals,  // Используем кэшированное значение из API
+              priceDecimals: coinDetails.priceDecimals,  // Use cached value from API
             }
             setCoin(cryptoCurrency)
             setCurrentPrice(cryptoCurrency.currentPrice)
@@ -100,7 +100,7 @@ export const CoinDetailsPage = () => {
     fetchCoinData()
   }, [location.state, id, setCurrentPrice])
 
-  // Загружаем данные графика при изменении периода
+  // Load chart data when period changes
   useEffect(() => {
     if (coin?.id) {
       loadChartData(selectedPeriod)
@@ -109,7 +109,7 @@ export const CoinDetailsPage = () => {
 
   const handleChooseCoin = () => {
     if (coin) {
-      // Проверяем, есть ли информация о режиме редактирования в location state
+      // Check if there is information about edit mode in location state
       const isEditMode = location.state?.isEditMode === true
       const notificationId = location.state?.notificationId
       
@@ -124,18 +124,18 @@ export const CoinDetailsPage = () => {
 
   const formatPrice = (price: number) => {
     const decimals = coin ? getPriceDecimals(coin.currentPrice, coin.priceDecimals) : 2
-    // Форматируем с точками для тысяч и запятой для десятичных (например: 89.357,00)
+    // Format with dots for thousands and comma for decimals (e.g.: 89.357,00)
     const parts = price.toFixed(decimals).split('.')
     const integerPart = parts[0]
     const decimalPart = parts[1] || '0'.repeat(decimals)
     
-    // Добавляем точки для разделения тысяч
+    // Add dots for thousands separation
     const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
     
     return `${formattedInteger},${decimalPart}`
   }
 
-  // Используем useMemo для пересчета при изменении coin.currentPrice
+  // Use useMemo to recalculate when coin.currentPrice changes
   const formattedPrice = useMemo(() => {
     return coin ? `$${formatPrice(coin.currentPrice)}` : '-'
   }, [coin?.currentPrice, coin?.priceDecimals])

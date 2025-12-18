@@ -15,7 +15,6 @@
   outline: none;
   box-sizing: border-box;
   
-  // Скрываем стандартный крестик для type="search"
   &::-webkit-search-cancel-button {
     display: none;
   }

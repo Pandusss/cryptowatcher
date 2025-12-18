@@ -1,11 +1,10 @@
 /**
- * Утилиты для работы с графиками криптовалют
+ * Utilities for working with cryptocurrency charts
  */
 
 import { ChartPeriod } from '../../types/chart.types'
 import { ChartDataPoint } from '../../services/api'
 
-// Импортируем функции для работы с датами из отдельного файла
 import { 
   formatDateForAxis, 
   formatDateForTooltip, 
@@ -13,7 +12,7 @@ import {
 } from './chartTimeUtils'
 
 /**
- * Определяет цвет графика на основе тренда
+ * Determines the color of the chart based on the trend
  */
 export const getChartColor = (data: ChartDataPoint[]): string => {
   if (data.length < 2) {
@@ -27,7 +26,7 @@ export const getChartColor = (data: ChartDataPoint[]): string => {
 }
 
 /**
- * Рассчитывает равномерный диапазон для оси Y
+ * Calculates a uniform range for the Y axis
  */
 export const getYAxisDomain = (
   data: ChartDataPoint[], 
@@ -42,7 +41,7 @@ export const getYAxisDomain = (
   let minPrice = Math.min(...prices)
   let maxPrice = Math.max(...prices)
   
-  // Если есть уровни триггеров, учитываем их в расчете диапазона
+  // If there are trigger levels, consider them in the range calculation
   if (triggerLevels) {
     if (triggerLevels.upper !== undefined) {
       minPrice = Math.min(minPrice, triggerLevels.upper)
@@ -57,31 +56,31 @@ export const getYAxisDomain = (
   const range = maxPrice - minPrice
   const avgPrice = (minPrice + maxPrice) / 2
   
-  // Используем процентное соотношение для всех монет:
-  // Для 1D таймфрейма используем меньший процент (8%), для остальных - 15%
+  // Use percentage relationship for all coins:
+  // For 1D timeframe, use a smaller percentage (8%), for the rest - 15%
   const relativeRangePercent = avgPrice > 0 ? range / avgPrice : 0
-  const targetPercent = period === '1d' ? 0.08 : 0.15 // 8% для 1D, 15% для остальных
+  const targetPercent = period === '1d' ? 0.08 : 0.15 // 8% for 1D, 15% for the rest
   
   let adjustedMin = minPrice
   let adjustedMax = maxPrice
   
   if (avgPrice > 0 && relativeRangePercent < targetPercent) {
-    // Расширяем диапазон до targetPercent от средней цены для лучшей видимости
+    // Expand the range to targetPercent from the average price for better visibility
     const targetRange = avgPrice * targetPercent
     
-    // Вычисляем, насколько данные смещены от центра
+    // Calculate how much data is offset from the center
     const dataCenter = avgPrice
     const dataRange = range
     
-    // Расширяем пропорционально: больше расширяем в сторону, где больше данных
+    // Expand proportionally: expand more in the direction where there is more data
     const expansionNeeded = targetRange - dataRange
     
     if (expansionNeeded > 0) {
-      // Вычисляем смещение данных от центра диапазона
+      // Calculate the offset of data from the center of the range
       const rangeCenter = (minPrice + maxPrice) / 2
       const offsetFromCenter = dataCenter - rangeCenter
       
-      // Расширяем больше в сторону смещения данных
+      // Expand more in the direction of the data offset
       const expansionDown = expansionNeeded * (0.5 + Math.max(0, -offsetFromCenter) / dataRange)
       const expansionUp = expansionNeeded * (0.5 + Math.max(0, offsetFromCenter) / dataRange)
       
@@ -89,13 +88,13 @@ export const getYAxisDomain = (
       adjustedMax = maxPrice + expansionUp
     }
   } else {
-    // Если диапазон уже достаточно большой, используем стандартный padding
+    // If the range is already large enough, use standard padding
     const padding = Math.max(range * 0.05, minPrice * 0.01)
     adjustedMin = Math.max(0, minPrice - padding)
     adjustedMax = maxPrice + padding
   }
   
-  // Определяем шаг округления на основе диапазона
+  // Determine the rounding step based on the range
   const finalRange = adjustedMax - adjustedMin
   let step: number
   if (finalRange >= 10000) {
@@ -124,11 +123,11 @@ export const getYAxisDomain = (
     step = 0.00000002
   }
   
-  // Округляем до ближайшего значения с учетом шага
+  // Round to the nearest value with the step
   adjustedMin = Math.floor(adjustedMin / step) * step
   adjustedMax = Math.ceil(adjustedMax / step) * step
   
-  // Убеждаемся, что min < max
+  // Make sure min < max
   if (adjustedMin >= adjustedMax) {
     adjustedMax = adjustedMin + step * 2
   }
@@ -137,7 +136,7 @@ export const getYAxisDomain = (
 }
 
 /**
- * Генерирует тики для оси Y
+ * Generates ticks for the Y axis
  */
 export const getYAxisTicks = (domain: [number, number], tickCount: number = 5): number[] | undefined => {
   const [min, max] = domain
@@ -145,7 +144,7 @@ export const getYAxisTicks = (domain: [number, number], tickCount: number = 5): 
   
   if (range === 0) return undefined
   
-  // Определяем количество значащих цифр для округления на основе диапазона
+  // Determine the number of significant digits for rounding based on the range
   const getSignificantDigits = (val: number): number => {
     if (val >= 1000) return 0
     if (val >= 100) return 1
@@ -172,14 +171,14 @@ export const getYAxisTicks = (domain: [number, number], tickCount: number = 5): 
     ticks.push(roundedTick)
   }
   
-  // Убираем дубликаты
+  // Remove duplicates
   const uniqueTicks = Array.from(new Set(ticks))
   
   return uniqueTicks.length > 0 ? uniqueTicks : undefined
 }
 
 /**
- * Рассчитывает домен для объемов - ограничиваем их высоту до 30% от графика
+ * Calculates the domain for volumes - limit their height to 30% of the chart
  */
 export const getVolumeDomain = (data: ChartDataPoint[]): [number, number] => {
   if (data.length === 0) return [0, 1]
@@ -188,12 +187,12 @@ export const getVolumeDomain = (data: ChartDataPoint[]): [number, number] => {
   if (volumes.length === 0) return [0, 1]
   
   const maxVolume = Math.max(...volumes)
-  // Увеличиваем максимальное значение в 2 раза, чтобы объемы занимали только ~30% высоты
+  // Increase the maximum value by 2 times, so that volumes occupy only ~30% of the height
   return [0, maxVolume * 2]
 }
 
 /**
- * Форматирование объема
+ * Formatting the volume
  */
 export const formatVolume = (volume: number): string => {
   if (volume >= 1000000000) {
@@ -209,7 +208,7 @@ export const formatVolume = (volume: number): string => {
 }
 
 /**
- * Форматирование цены для оси Y (с K для тысяч, M для миллионов)
+ * Formatting the price for the Y axis (with K for thousands, M for millions)
  */
 export const formatPriceForYAxis = (value: number, priceDecimals: number = 2): string => {
   if (value >= 1000000) {
@@ -229,7 +228,7 @@ export const formatPriceForYAxis = (value: number, priceDecimals: number = 2): s
   if (value < 100) {
     return `$${value.toFixed(Math.min(priceDecimals, 1)).replace('.', ',')}`
   }
-  // Для больших значений добавляем точки для тысяч
+  // For large values, add dots for thousands
   const parts = value.toFixed(0).split('.')
   const integerPart = parts[0]
   const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
@@ -237,7 +236,7 @@ export const formatPriceForYAxis = (value: number, priceDecimals: number = 2): s
 }
 
 /**
- * Форматирование цены для tooltip (с K для тысяч, M для миллионов)
+ * Formatting the price for tooltip (with K for thousands, M for millions)
  */
 export const formatPriceForTooltip = (price: number, priceDecimals: number = 2): string => {
   if (price >= 1000000) {
@@ -253,7 +252,7 @@ export const formatPriceForTooltip = (price: number, priceDecimals: number = 2):
 }
 
 /**
- * Рассчитывает все необходимые значения для графика
+ * Calculates all necessary values for the chart
  */
 export const calculateChartValues = (
   data: ChartDataPoint[],
@@ -280,7 +279,7 @@ export const calculateChartValues = (
   }
 }
 
-// Экспортируем функции для работы с датами для обратной совместимости
+// Export functions for working with dates for backward compatibility
 export { 
   formatDateForAxis, 
   formatDateForTooltip, 

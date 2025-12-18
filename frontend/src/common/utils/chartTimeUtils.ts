@@ -1,88 +1,92 @@
 import { ChartPeriod } from '../../types/chart.types'
 import { ChartDataPoint } from '../../services/api'
 
-/**
- * Конвертирует UTC дату с сервера в локальное время пользователя
- * Сервер отдает: "2025-12-17T18:12:12+00:00" (ISO формат с часовым поясом)
- */
-/**
- * Конвертирует дату сервера (UTC) в локальное время пользователя
- */
-// chartTimeUtils.ts
-export const convertServerDateToLocal = (serverDateStr: string): string => {
-  try {
-    // Если это ISO формат с часовым поясом
-    if (serverDateStr.includes('T')) {
-      const date = new Date(serverDateStr);
-      return formatLocalDateTime(date);
-    }
-    
-    // Старый формат "YYYY-MM-DD HH:MM" - предполагаем UTC
-    const [datePart, timePart] = serverDateStr.split(' ');
-    if (!datePart || !timePart) return serverDateStr;
-    
-    const [year, month, day] = datePart.split('-').map(Number);
-    const [hours, minutes] = timePart.split(':').map(Number);
-    
-    // Создаем дату в UTC
-    const utcDate = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0));
-    
-    // Конвертируем в локальное время
-    return formatLocalDateTime(utcDate);
-  } catch (error) {
-    console.error('Error converting date:', error, serverDateStr);
-    return serverDateStr;
-  }
-};
+// Cached constants for date formatting
+const WEEKDAYS = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб']
+const MONTHS = [
+  'янв', 'фев', 'мар', 'апр', 'май', 'июн',
+  'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'
+]
 
-const formatLocalDateTime = (date: Date): string => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
+/**
+ * Formats a Date object to string
+ * @param date - Date object to format
+ * @param format - 'full' returns "YYYY-MM-DD HH:MM", 'time-only' returns "HH:MM"
+ */
+const formatDateTime = (date: Date, format: 'full' | 'time-only' = 'full'): string => {
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
   
-  return `${year}-${month}-${day} ${hours}:${minutes}`;
-};
-
-/**
- * Получает текущее время для последней точки (в локальном времени пользователя)
- */
-export const getCurrentLocalTime = (): string => {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-  const hours = String(now.getHours()).padStart(2, '0')
-  const minutes = String(now.getMinutes()).padStart(2, '0')
+  if (format === 'time-only') {
+    return `${hours}:${minutes}`
+  }
+  
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
   
   return `${year}-${month}-${day} ${hours}:${minutes}`
 }
 
 /**
- * Парсит дату из любого формата в объект Date
- * Поддерживает:
- * - "YYYY-MM-DD HH:MM" (локальное время после конвертации через convertServerDateToLocal)
- * - ISO формат "2025-12-17T18:12:12+00:00" (с часовым поясом)
+ * Converts the server date (UTC) to the local time of the user
+ */
+export const convertServerDateToLocal = (serverDateStr: string): string => {
+  try {
+    // If this is an ISO format with a time zone
+    if (serverDateStr.includes('T')) {
+      const date = new Date(serverDateStr)
+      return formatDateTime(date)
+    }
+    
+    const [datePart, timePart] = serverDateStr.split(' ')
+    if (!datePart || !timePart) return serverDateStr
+    
+    const [year, month, day] = datePart.split('-').map(Number)
+    const [hours, minutes] = timePart.split(':').map(Number)
+    
+    // Create a date in UTC (explicit to ensure cross-browser compatibility)
+    const utcDate = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0))
+    
+    // Convert to local time
+    return formatDateTime(utcDate)
+  } catch (error) {
+    console.error('Error converting date:', error, serverDateStr)
+    return serverDateStr
+  }
+}
+
+/**
+ * Gets the current time for the last point (in the local time of the user)
+ */
+export const getCurrentLocalTime = (): string => {
+  return formatDateTime(new Date())
+}
+
+/**
+ * Parses a date from any format into a Date object
+ * Supports:
+ * - "YYYY-MM-DD HH:MM" (local time after conversion via convertServerDateToLocal)
+ * - ISO format "2025-12-17T18:12:12+00:00" (with a time zone)
  */
 export const parseDateString = (dateStr: string): Date => {
   try {
-    // Если это ISO формат с часовым поясом
+    // If this is an ISO format with a time zone
     if (dateStr.includes('T')) {
       return new Date(dateStr)
     }
     
-    // Если это "YYYY-MM-DD HH:MM" (локальное время после конвертации)
+    // If this is "YYYY-MM-DD HH:MM" (local time after conversion)
     const [datePart, timePart] = dateStr.split(' ')
     if (!datePart || !timePart) {
-      return new Date(dateStr) // пробуем стандартный парсинг
+      return new Date(dateStr) // try standard parsing
     }
     
     const [year, month, day] = datePart.split('-').map(Number)
     const [hours, minutes] = timePart.split(':').map(Number)
     
-    // Создаем дату в локальном времени
-    // Важно: после convertServerDateToLocal даты уже в локальном времени
+    // Create a date in local time
+    // Important: after convertServerDateToLocal, dates are already in local time
     return new Date(year, month - 1, day, hours, minutes, 0)
   } catch (error) {
     console.error('Error parsing date string:', error, dateStr)
@@ -91,7 +95,7 @@ export const parseDateString = (dateStr: string): Date => {
 }
 
 /**
- * Форматирует дату для оси X в зависимости от периода
+ * Formats the date for the X axis depending on the period
  */
 export const formatDateForAxis = (dateStr: string, period: ChartPeriod): string => {
   try {
@@ -99,26 +103,17 @@ export const formatDateForAxis = (dateStr: string, period: ChartPeriod): string 
     
     switch (period) {
       case '1d':
-        // Часы:минуты (например: "15:30")
-        const hours = String(date.getHours()).padStart(2, '0')
-        const minutes = String(date.getMinutes()).padStart(2, '0')
-        return `${hours}:${minutes}`
+        // Hours:minutes (e.g. "15:30")
+        return formatDateTime(date, 'time-only')
         
       case '7d':
-        // День недели (например: "Пн", "Вт")
-        const weekdays = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб']
-        return weekdays[date.getDay()]
+        // Day of the week (e.g. "Mon", "Tue")
+        return WEEKDAYS[date.getDay()]
         
       case '30d':
       case '1y':
-        // Дата в формате "17 дек"
-        const months = [
-          'янв', 'фев', 'мар', 'апр', 'май', 'июн',
-          'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'
-        ]
-        const day = date.getDate()
-        const monthIndex = date.getMonth()
-        return `${day} ${months[monthIndex]}`
+        // Date in the format "17 dec"
+        return `${date.getDate()} ${MONTHS[date.getMonth()]}`
         
       default:
         return dateStr
@@ -130,13 +125,13 @@ export const formatDateForAxis = (dateStr: string, period: ChartPeriod): string 
 }
 
 /**
- * Форматирует дату для тултипа в локальном времени
+ * Formats the date for the tooltip in local time
  */
 export const formatDateForTooltip = (dateStr: string, period: ChartPeriod): string => {
   try {
     const date = parseDateString(dateStr)
     
-    // Форматируем полную дату и время
+    // Format the full date and time
     const formattedDate = date.toLocaleString('ru-RU', {
       day: 'numeric',
       month: 'long',
@@ -154,28 +149,28 @@ export const formatDateForTooltip = (dateStr: string, period: ChartPeriod): stri
 }
 
 /**
- * Получает тики для оси X с учетом локального времени
+ * Gets ticks for the X axis taking into account local time
  */
 export const getXAxisTicks = (data: ChartDataPoint[], period: ChartPeriod): string[] | undefined => {
   if (data.length === 0) return undefined
   
-  // Для 1D показываем каждые 3 часа в локальном времени
+  // For 1D, show every 3 hours in local time
   if (period === '1d') {
     const ticks: string[] = []
     
-    // Преобразуем все даты в объекты Date
+    // Convert all dates to Date objects
     const dates = data.map(point => parseDateString(point.date))
     
-    // Находим минимальный и максимальный час в локальном времени
+    // Find the minimum and maximum hour in local time
     const minHour = Math.min(...dates.map(d => d.getHours()))
     const maxHour = Math.max(...dates.map(d => d.getHours()))
     
-    // Генерируем часы, кратные 3
+    // Generate hours, multiple of 3
     const startHour = Math.floor(minHour / 3) * 3
     const endHour = Math.ceil(maxHour / 3) * 3
     
     for (let hour = startHour; hour <= endHour; hour += 3) {
-      // Находим ближайшую точку к этому часу
+      // Find the closest point to this hour
       let closestIndex = 0
       let minDiff = Infinity
       
@@ -192,7 +187,7 @@ export const getXAxisTicks = (data: ChartDataPoint[], period: ChartPeriod): stri
       }
     }
     
-    // Сортируем тики по дате
+    // Sort ticks by date
     return ticks.length > 0 ? ticks.sort((a, b) => {
       const dateA = parseDateString(a).getTime()
       const dateB = parseDateString(b).getTime()
@@ -200,7 +195,7 @@ export const getXAxisTicks = (data: ChartDataPoint[], period: ChartPeriod): stri
     }) : undefined
   }
   
-  // Для остальных периодов стандартная логика
+  // For the rest of the periods, the standard logic
   const optimalCount = period === '7d' ? 7 : 6
   const totalPoints = data.length
   

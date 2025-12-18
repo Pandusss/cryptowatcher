@@ -21,7 +21,7 @@ export const MainPage = () => {
   const navigate = useNavigate()
   const location = useLocation()
   
-  // Состояние для настроек DND
+  // State for DND settings
   const [dndDisplay, setDndDisplay] = useState('Always')
   const [dndStartTime, setDndStartTime] = useState<string | null>(null)
   const [dndEndTime, setDndEndTime] = useState<string | null>(null)
@@ -30,7 +30,7 @@ export const MainPage = () => {
   const [logoAnimation, setLogoAnimation] = useState<any>(null)
   
   useEffect(() => {
-    // Загружаем Lottie анимацию
+    // Load Lottie animation
     fetch('/icons/logo.json')
       .then((res) => res.json())
       .then((data) => setLogoAnimation(data))
@@ -38,7 +38,7 @@ export const MainPage = () => {
   }, [])
 
   useEffect(() => {
-    // Получаем настройки DND из location state (при возврате со страницы настроек)
+    // Get DND settings from location state (when returning from settings page)
     if (location.state?.dndSettings?.display) {
       setDndDisplay(location.state.dndSettings.display)
       setDndStartTime(location.state.dndSettings.startTime || null)
@@ -47,7 +47,7 @@ export const MainPage = () => {
   }, [location.state])
 
   useEffect(() => {
-    // Загружаем DND настройки с сервера при первой загрузке
+    // Load DND settings from server on first load
     const loadDndSettings = async () => {
       const userId = getTelegramUserId()
       if (!userId) {
@@ -57,11 +57,11 @@ export const MainPage = () => {
       try {
         const settings = await apiService.getDndSettings(userId)
         if (settings.dnd_start_time && settings.dnd_end_time) {
-          // Сохраняем время в формате HH:MM
+          // Save time in format HH:MM
           setDndStartTime(settings.dnd_start_time)
           setDndEndTime(settings.dnd_end_time)
           
-          // Форматируем время для отображения
+          // Format time for display
           const formatTimeForDisplay = (time: string) => {
             const [hours, minutes] = time.split(':')
             const hour = parseInt(hours, 10)
@@ -84,7 +84,7 @@ export const MainPage = () => {
           const display = `${formatTimeForDisplay(settings.dnd_start_time)} - ${formatTimeForDisplay(settings.dnd_end_time)}`
           setDndDisplay(display)
         } else {
-          // Если оба времени null, значит DND отключен
+          // If both times are null, then DND is disabled
           setDndDisplay('Always')
           setDndStartTime(null as any)
           setDndEndTime(null as any)
@@ -94,11 +94,11 @@ export const MainPage = () => {
       }
     }
 
-    // Загружаем только если нет данных в location.state (первая загрузка)
+    // Load only if there is no data in location.state (first load)
     if (!location.state?.dndSettings?.display) {
       loadDndSettings()
     }
-  }, []) // Запускаем только один раз при монтировании
+  }, []) // Run only once when mounting
 
   useEffect(() => {
     const userId = getTelegramUserId()
@@ -107,7 +107,7 @@ export const MainPage = () => {
       return
     }
 
-    // Загружаем список уведомлений
+    // Load list of notifications
     const loadNotifications = async (showLoading = true) => {
       try {
         if (showLoading) {
@@ -124,21 +124,21 @@ export const MainPage = () => {
       }
     }
 
-    // Загружаем сразу при монтировании или изменении пути (с индикатором загрузки)
+    // Load immediately when mounting or changing path (with loading indicator)
     loadNotifications(true)
 
-    // Обновляем список каждые 30 секунд в фоне (без индикатора загрузки)
+    // Update list every 30 seconds in background (without loading indicator)
     const intervalId = setInterval(() => {
       loadNotifications(false)
-    }, 30000) // 30 секунд
+    }, 30000) // 30 seconds
 
-    // Очищаем интервал при размонтировании
+    // Clear interval when unmounting
     return () => {
       clearInterval(intervalId)
     }
-  }, [location.pathname, location.key]) // Обновляем при изменении пути или ключа (возврат на главную)
+  }, [location.pathname, location.key]) // Update when path or key changes (return to main page)
 
-  // Форматируем описание уведомления для отображения
+  // Format notification description for display
   const formatNotificationDescription = (notification: NotificationResponse) => {
     const directionMap: Record<string, string> = {
       'rise': 'Rise',
@@ -175,7 +175,7 @@ export const MainPage = () => {
             justifyContent: 'center',
           }}
         >
-          {logoAnimation ? (
+          {logoAnimation && (
             <Lottie
               animationData={logoAnimation}
               loop={true}
@@ -184,16 +184,6 @@ export const MainPage = () => {
                 width: '80px',
                 height: '80px',
               }}
-            />
-          ) : (
-            <img 
-              src="/icons/logo.webp" 
-              alt="Crypto Watcher" 
-              style={{ 
-                width: '80px', 
-                height: '80px', 
-                objectFit: 'contain'
-              }} 
             />
           )}
         </div>
@@ -208,7 +198,7 @@ export const MainPage = () => {
         </Text>
       </Block>
 
-      {/* Don't Disturb - отдельный островок */}
+      {/* Don't Disturb - separate island */}
       <Block margin="top" marginValue={12}>
         <Group>
           <GroupItem

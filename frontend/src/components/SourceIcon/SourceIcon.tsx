@@ -9,9 +9,9 @@ interface SourceIconProps {
 }
 
 /**
- * Компонент для отображения иконки источника данных
- * Поддерживает локальные файлы из папки assets/icons/sources/
- * Формат файлов: {sourceId}.png, {sourceId}.svg, {sourceId}.jpg
+ * Component for displaying the source icon
+ * Supports local files from the assets/icons/sources/ folder
+ * File format: {sourceId}.png, {sourceId}.svg, {sourceId}.jpg
  */
 export const SourceIcon = ({
   sourceId,
@@ -21,9 +21,8 @@ export const SourceIcon = ({
   const [currentUrlIndex, setCurrentUrlIndex] = useState(0)
   const [hasError, setHasError] = useState(false)
 
-  // Путь к локальным иконкам
-  // Пользователь должен поместить файлы в frontend/public/icons/sources/
-  // Vite автоматически обслуживает файлы из папки public
+  // Path to local icons
+  // Vite automatically serves files from the public folder
   const iconPaths = [
     `/icons/sources/${sourceId}.png`,
     `/icons/sources/${sourceId}.svg`,
@@ -33,16 +32,13 @@ export const SourceIcon = ({
 
   const handleError = () => {
     if (currentUrlIndex < iconPaths.length - 1) {
-      // Пробуем следующий формат (SVG)
       setCurrentUrlIndex(currentUrlIndex + 1)
     } else {
-      // Все форматы не загрузились
       setHasError(true)
     }
   }
 
   if (hasError || !currentPath) {
-    // Fallback - показываем первую букву названия источника
     return (
       <div
         className={className}

@@ -1,7 +1,7 @@
 .dropdown {
   position: fixed;
   min-width: 80px;
-  max-height: 50vh; // Максимальная высота - 50% экрана
+  max-height: 50vh;
   border-radius: 12px;
   background-color: var(--color-backgroundTertiary);
   backdrop-filter: blur(25px);
@@ -11,7 +11,7 @@
   transform: scale(0.3);
   opacity: 0;
   transform-origin: top right;
-  overflow: hidden; // Скрываем содержимое за скругленными углами
+  overflow: hidden;
   pointer-events: none;
   display: flex;
   flex-direction: column;
@@ -29,12 +29,11 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  overflow-y: auto; // Скролл для длинных списков
+  overflow-y: auto;
   overflow-x: hidden;
-  max-height: 100%; // Не превышать высоту dropdown
-  -webkit-overflow-scrolling: touch; // Плавный скролл на iOS
+  max-height: 100%;
+  -webkit-overflow-scrolling: touch; 
   
-  // Стилизация скроллбара (для WebKit браузеров)
   &::-webkit-scrollbar {
     width: 4px;
   }

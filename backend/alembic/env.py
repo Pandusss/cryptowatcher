@@ -5,7 +5,7 @@ from alembic import context
 import os
 import sys
 
-# Добавляем корневую директорию в путь
+# Add root directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from app.core.database import Base
@@ -15,7 +15,7 @@ from app.models import User, Notification
 # this is the Alembic Config object
 config = context.config
 
-# Устанавливаем URL базы данных из настроек
+# Set database URL from settings
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 # Interpret the config file for Python logging.

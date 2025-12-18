@@ -67,8 +67,8 @@ export const ListInput: React.FC<ListInputProps> = ({
       onFocus()
     }
     
-    // На мобильных устройствах прокручиваем поле ввода в видимую область
-    // с небольшой задержкой, чтобы дать клавиатуре время открыться
+    // On mobile devices, scroll the input field into the visible area
+    // with a small delay, to give the keyboard time to open
     setTimeout(() => {
       e.target.scrollIntoView({ 
         behavior: 'smooth', 

@@ -65,7 +65,7 @@ class TelegramService:
                         error_message += f" (Telegram API {error_code}: {description})"
                     else:
                         error_message += f": {e.response.text[:200]}"
-                except:
+                except Exception:
                     error_message += f": {e.response.text[:200]}"
             else:
                 error_message += f": {e.response.text[:200]}"
@@ -96,10 +96,10 @@ class TelegramService:
         
         # Determine direction for text
         direction_text = {
-            "rise": "выросла",
-            "fall": "упала",
-            "both": "изменилась",
-        }.get(direction, "изменилась")
+            "rise": "rose",
+            "fall": "fell",
+            "both": "changed",
+        }.get(direction, "changed")
         
         # Determine trigger type for text
         trigger_text = {

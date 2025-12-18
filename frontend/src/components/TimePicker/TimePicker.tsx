@@ -18,7 +18,7 @@ export const TimePicker = ({ value, onChange }: TimePickerProps) => {
 
   const triggerRef = useRef<HTMLDivElement>(null)
 
-  // Генерируем опции для часов (0-23) с форматированием для отображения
+  // Generate options for hours (0-23) with formatting for display
   const hourOptions = Array.from({ length: 24 }, (_, i) => {
     const hour24 = i
     const hour12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24
@@ -31,7 +31,7 @@ export const TimePicker = ({ value, onChange }: TimePickerProps) => {
     }
   })
 
-  // Генерируем опции для минут (0, 15, 30, 45)
+  // Generate options for minutes (0, 15, 30, 45)
   const minuteOptions = [
     { label: '00', value: '00' },
     { label: '15', value: '15' },
@@ -39,7 +39,7 @@ export const TimePicker = ({ value, onChange }: TimePickerProps) => {
     { label: '45', value: '45' },
   ]
 
-  // Парсим значение при монтировании и изменении
+  // Parse value when mounting and changing
   useEffect(() => {
     if (value) {
       const [hour, minute] = value.split(':')
@@ -48,7 +48,7 @@ export const TimePicker = ({ value, onChange }: TimePickerProps) => {
     }
   }, [value])
 
-  // Форматируем время для отображения (12:00 -> 12 PM)
+  // Format time for display (12:00 -> 12 PM)
   const formatTimeForDisplay = (hour: string, minute: string) => {
     const hourNum = parseInt(hour, 10)
     const minuteNum = parseInt(minute, 10)
@@ -70,8 +70,8 @@ export const TimePicker = ({ value, onChange }: TimePickerProps) => {
   const handleHourSelect = (hour: string) => {
     setSelectedHour(hour)
     onChange(`${hour}:${selectedMinute}`)
-    // После выбора часа переключаемся на выбор минут
-    // Используем setTimeout, чтобы dropdown успел закрыться и открыться заново
+    // After selecting the hour, switch to selecting minutes
+    // Use setTimeout to ensure the dropdown closes and opens again
     setTimeout(() => {
       setActivePicker('minute')
     }, 50)
@@ -83,7 +83,7 @@ export const TimePicker = ({ value, onChange }: TimePickerProps) => {
     setActivePicker(null)
   }
 
-  // Определяем текущие опции и обработчик в зависимости от activePicker
+  // Determine the current options and handler depending on activePicker
   const currentOptions = activePicker === 'hour' ? hourOptions : minuteOptions
   const currentSelectedValue = activePicker === 'hour' ? selectedHour : selectedMinute
   const handleSelect = activePicker === 'hour' ? handleHourSelect : handleMinuteSelect
@@ -106,7 +106,7 @@ export const TimePicker = ({ value, onChange }: TimePickerProps) => {
         selectedValue={currentSelectedValue}
         onSelect={handleSelect}
         onClose={() => {
-          // Закрываем только если не переключаемся на выбор минут
+          // Close only if not switching to selecting minutes
           if (activePicker !== 'hour') {
             setActivePicker(null)
           }

@@ -28,7 +28,7 @@ export interface CoinDetailsResponse {
     priceChange24h?: number
     priceChangePercent24h?: number
     imageUrl?: string
-    priceDecimals?: number  // Количество знаков после запятой (кэшируется в Redis на 1 день)
+    priceDecimals?: number  // Number of decimal places (cached in Redis for 1 day)
   }
 }
 
@@ -52,7 +52,7 @@ export interface CoinsListResponse {
   data: CoinListItem[]
 }
 
-// Backend использует snake_case, поэтому создаем интерфейсы для API
+// Backend uses snake_case, so we create interfaces for API
 export interface CreateNotificationRequest {
   user_id: number
   crypto_id: string
@@ -63,7 +63,7 @@ export interface CreateNotificationRequest {
   value_type: NotificationValueType
   value: number
   current_price: number
-  expire_time_hours?: number | null  // null означает бессрочное уведомление
+  expire_time_hours?: number | null  // null means no expiration
 }
 
 export interface UpdateNotificationRequest {
@@ -72,7 +72,7 @@ export interface UpdateNotificationRequest {
   value_type?: NotificationValueType
   value?: number
   is_active?: boolean
-  expire_time_hours?: number | null  // null означает бессрочное уведомление
+  expire_time_hours?: number | null  // null means no expiration
 }
 
 export interface NotificationResponse {
@@ -90,7 +90,7 @@ export interface NotificationResponse {
   created_at: string
   updated_at?: string
   triggered_at?: string
-  expire_time_hours?: number | null  // null означает бессрочное уведомление
+  expire_time_hours?: number | null  // null means no expiration
   crypto_image_url?: string  // URL изображения монеты из CoinGecko
 }
 

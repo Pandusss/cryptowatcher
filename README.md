@@ -13,7 +13,6 @@ CryptoWatcher is a Telegram Mini App for real-time cryptocurrency price monitori
 - **Interactive Charts:** Historical price charts with 1d, 7d, 30d, and 1y periods
 - **Multi-Exchange Aggregation:** Automatic price source selection based on availability and priority
 - **Do Not Disturb Mode:** Configurable quiet hours to pause notifications
-- **Telegram Integration:** Native Mini App experience with theme support
 
 ## Technology Stack
 
@@ -26,18 +25,18 @@ CryptoWatcher is a Telegram Mini App for real-time cryptocurrency price monitori
 ## Architecture
 
 ```
-                            ┌─────────────────────────────────────────┐
-                            │              CLIENTS                     │
-                            └─────────────────────────────────────────┘
+                      ┌─────────────────────────────────────────┐
+                      │                 CLIENTS                 │
+                      └─────────────────────────────────────────┘
                                           │
-            ┌─────────────────────────────┼─────────────────────────────┐
-            ▼                             ▼                             ▼
-   ┌─────────────────┐          ┌─────────────────┐          ┌─────────────────┐
-   │  Telegram Bot   │          │  React Mini App │          │   REST API      │
-   │   (polling)     │          │   (WebApp)      │          │   /api/v1/*     │
-   └────────┬────────┘          └────────┬────────┘          └────────┬────────┘
-            │                            │                            │
-            └─────────────────────────────┼─────────────────────────────┘
+             ┌────────────────────────────┼────────────────────────────┐
+             ▼                            ▼                           ▼
+    ┌─────────────────┐          ┌─────────────────┐          ┌─────────────────┐
+    │  Telegram Bot   │          │  React Mini App │          │   REST API      │
+    │   (polling)     │          │   (WebApp)      │          │   /api/v1/*     │
+    └────────┬────────┘          └────────┬────────┘          └────────┬────────┘
+             │                            │                            │
+             └────────────────────────────┼────────────────────────────┘
                                           ▼
                             ┌─────────────────────────────┐
                             │      FastAPI Backend        │
@@ -63,10 +62,10 @@ CryptoWatcher is a Telegram Mini App for real-time cryptocurrency price monitori
 │  └─────────────┘  │            │  ┌─────────────┐  │            │  │  • Icons    │  │
 │                   │            │  │     OKX     │  │            │  │  • Symbols  │  │
 │  ┌─────────────┐  │            │  │  WebSocket  │  │            │  └─────────────┘  │
-│  │    Redis    │  │◀───────────│  └─────────────┘  │            │                   │
+│  │    Redis    │  │◀──────────│  └─────────────┘  │            │                   │
 │  │  • Prices   │  │  prices    │  ┌─────────────┐  │            │                   │
 │  │  • Charts   │  │            │  │    MEXC     │  │            │                   │
-│  │  • Static   │  │◀───────────│  │  WebSocket  │  │            │                   │
+│  │  • Static   │  │◀──────────│  │  WebSocket  │  │            │                   │
 │  └─────────────┘  │  cache     │  └─────────────┘  │            │                   │
 └───────────────────┘            └───────────────────┘            └───────────────────┘
 ```
@@ -75,31 +74,31 @@ CryptoWatcher is a Telegram Mini App for real-time cryptocurrency price monitori
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────┐
-│                              PRICE UPDATE FLOW                                    │
+│                             PRICE UPDATE FLOW                                    │
 ├──────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                   │
-│   Binance/OKX/MEXC ──WebSocket──▶ Backend ──▶ Redis Cache ──▶ API ──▶ Frontend   │
-│        (tickers)                  (parse)      (store)       (serve)  (display)  │
-│                                                                                   │
+│                                                                                  │
+│  Binance/OKX/MEXC ─▶ WebSocket ─▶ Backend ─▶ RedisCache ─▶ API ─▶ Frontend    │
+│         (tickers)                  (parse)     (store)     (serve)  (display)    │
+│                                                                                  │
 └──────────────────────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────────────────────────┐
-│                           NOTIFICATION FLOW                                       │
+│                               NOTIFICATION FLOW                                  │
 ├──────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                   │
-│   User creates alert ──▶ PostgreSQL ──▶ Checker (every 60s) ──▶ Telegram Bot     │
-│   (Mini App)              (store)        compares with Redis      (send message) │
-│                                          cached prices                            │
-│                                                                                   │
+│                                                                                  │
+│    User creates alert ─▶ PostgreSQL ─▶ Checker (every 60s) ─▶ Telegram Bot     │
+│       (Mini App)           (store)      (compares with Redis)  (send message)    │
+│                                            (cached prices)                       │
+│                                                                                  │
 └──────────────────────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────────────────────────┐
-│                            STATIC DATA FLOW                                       │
+│                            STATIC DATA FLOW                                      │
 ├──────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                   │
-│   CoinGecko API ──▶ Backend ──▶ Redis Cache (1h TTL) ──▶ API ──▶ Frontend        │
-│   (names, icons)    (fetch)      (store)                 (serve)  (display)      │
-│                                                                                   │
+│                                                                                  │
+│         CoinGecko API ─▶ Backend ─▶ Redis Cache ─▶ API ─▶ Frontend             │
+│         (names, icons)    (fetch)      (store)     (serve)  (display)            │
+│                                                                                  │
 └──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -116,8 +115,8 @@ CryptoWatcher is a Telegram Mini App for real-time cryptocurrency price monitori
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/CryptoWatcher.git
-   cd CryptoWatcher
+   git clone https://github.com/Pandusss/cryptowatcher.git
+   cd cryptowatcher
    ```
 
 2. Configure environment variables (see [Configuration](#configuration) section)
@@ -153,11 +152,10 @@ CryptoWatcher is a Telegram Mini App for real-time cryptocurrency price monitori
 
 - The API should be accessible at `http://localhost:8000`
 - The frontend should be accessible at `http://localhost:5173`
-- Health check endpoint: `http://localhost:8000/health`
 
 ## Configuration
 
-Create a `.env` file in the `backend/` directory:
+Create a `.env` file in the project root directory:
 
 ```env
 # Application

@@ -78,7 +78,7 @@ export const CreateNotificationPage = () => {
   const { id } = useParams<{ id?: string }>()
   const isEditMode = !!id
 
-  // Управление кнопкой "Назад" в Telegram Mini App
+  // Manage Telegram Mini App back button
   useTelegramBackButton()
 
   // Form state
@@ -87,16 +87,16 @@ export const CreateNotificationPage = () => {
   const [trigger, setTrigger] = useState<NotificationTrigger>('stop-loss')
   const [valueType, setValueType] = useState<NotificationValueType>('percent')
   const [value, setValue] = useState<string>('')
-  const [expireTime, setExpireTime] = useState<number | null>(null) // null = без времени
+  const [expireTime, setExpireTime] = useState<number | null>(null) // null = no expiration
   const [isLoading, setIsLoading] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [chartData, setChartData] = useState<ChartDataPoint[]>([])
   const [chartLoading, setChartLoading] = useState(false)
-  const [selectedPeriod, setSelectedPeriod] = useState('7d') // Таймфрейм для графика
-  const [priceUpdated, setPriceUpdated] = useState(false) // Флаг для анимации обновления цены
-  const [priceDirection, setPriceDirection] = useState<'up' | 'down' | 'neutral' | null>(null) // Направление изменения цены
+  const [selectedPeriod, setSelectedPeriod] = useState('7d') // Chart timeframe
+  const [priceUpdated, setPriceUpdated] = useState(false) // Flag for price update animation
+  const [priceDirection, setPriceDirection] = useState<'up' | 'down' | 'neutral' | null>(null) // Price change direction
 
   // Dropdown states
   const [directionDropdownOpen, setDirectionDropdownOpen] = useState(false)
@@ -118,13 +118,13 @@ export const CreateNotificationPage = () => {
     if (isNaN(numValue)) return null
 
     if (valueType === 'percent') {
-      // Если процент, показываем абсолютное значение в USD
+      // If percent, show absolute value in USD
       return (crypto.price * numValue) / 100
     } else if (valueType === 'absolute') {
-      // Если абсолютное значение, показываем процент
+      // If absolute value, show percent
       return (numValue / crypto.price) * 100
     } else {
-      // Если цена, показываем разницу в процентах и абсолютном значении
+      // If price, show difference in percent and absolute value
       const priceDiff = numValue - crypto.price
       const percentDiff = (priceDiff / crypto.price) * 100
       return { priceDiff, percentDiff }
@@ -140,18 +140,18 @@ export const CreateNotificationPage = () => {
           setError(null)
           const notification = await apiService.getNotification(parseInt(id))
           
-          // Получаем актуальную цену и imageUrl из API параллельно
+          // Get current price and imageUrl from API in parallel
           let imageUrl: string | undefined
           let currentPrice = notification.current_price || 0
           let priceDecimals: number | undefined
           
-          // Запускаем запросы параллельно для ускорения загрузки
+          // Run requests in parallel for faster loading
           const [coinsListResult, coinDetailsResult] = await Promise.allSettled([
             apiService.getCoinsList(250, 1),
             apiService.getCoinDetails(notification.crypto_id),
           ])
           
-          // Обрабатываем результат списка монет
+          // Process coin list result
           if (coinsListResult.status === 'fulfilled') {
             const coin = coinsListResult.value.find(c => c.id === notification.crypto_id)
             if (coin?.imageUrl) {
@@ -163,29 +163,29 @@ export const CreateNotificationPage = () => {
           } else {
           }
           
-          // Обрабатываем результат деталей монеты
+          // Process coin details result
           if (coinDetailsResult.status === 'fulfilled' && coinDetailsResult.value) {
             currentPrice = coinDetailsResult.value.currentPrice
-            // Если imageUrl не был получен из списка, используем из деталей
+            // If imageUrl wasn't obtained from list, use from details
             if (!imageUrl && coinDetailsResult.value.imageUrl) {
               imageUrl = coinDetailsResult.value.imageUrl
             }
-            // Используем priceDecimals из деталей, если не был получен из списка
+            // Use priceDecimals from details if not obtained from list
             if (priceDecimals === undefined && coinDetailsResult.value.priceDecimals !== undefined) {
               priceDecimals = coinDetailsResult.value.priceDecimals
             }
           } else {
-            // Используем сохраненную цену если не удалось получить актуальную
+            // Use saved price if couldn't get current one
           }
           
-          // Заполняем форму данными уведомления
+          // Fill form with notification data
           setCrypto({
             id: notification.crypto_id,
             symbol: notification.crypto_symbol,
             name: notification.crypto_name,
             price: currentPrice,
             imageUrl,
-            priceDecimals,  // Используем кэшированное значение из API
+            priceDecimals,  // Use cached value from API
           })
           setDirection(notification.direction)
           setTrigger(notification.trigger)
@@ -202,17 +202,17 @@ export const CreateNotificationPage = () => {
       return
     }
 
-    // Получаем выбранную криптовалюту из navigation state
+    // Get selected cryptocurrency from navigation state
     const selectedCoin = location.state?.selectedCoin as
       | { id: string; symbol: string; name: string; price?: number; currentPrice?: number; imageUrl?: string; priceDecimals?: number }
       | undefined
 
-    // Проверяем, пришли ли мы по кнопке "Назад"
+    // Check if we came back via the Back button
     const isReturningBack = location.state?.fromBackButton === true
 
     if (selectedCoin) {
-      // Используем выбранную криптовалюту
-      // Поддерживаем оба формата: price и currentPrice
+      // Use selected cryptocurrency
+      // Support both formats: price and currentPrice
       const price = selectedCoin.price ?? selectedCoin.currentPrice ?? 0
       setCrypto({
         id: selectedCoin.id,
@@ -223,16 +223,16 @@ export const CreateNotificationPage = () => {
         priceDecimals: selectedCoin.priceDecimals,  // Используем кэшированное значение из API
       })
     } else if (!crypto && !isReturningBack && !isEditMode) {
-      // Если криптовалюта не выбрана и это не возврат по кнопке "Назад" и не режим редактирования,
-      // перенаправляем на выбор (только при первом открытии страницы создания)
-      // Используем replace вместо navigate, чтобы не добавлять в историю
+      // If cryptocurrency not selected and this is not back button return and not edit mode,
+      // redirect to selection (only on first create page open)
+      // Use replace instead of navigate to not add to history
       navigate(ROUTES_NAME.CHOOSE_COIN, { replace: true })
     }
-    // Если isReturningBack === true и нет selectedCoin, просто показываем страницу
-    // без автоматического редиректа, чтобы избежать цикла
+    // If isReturningBack === true and no selectedCoin, just show the page
+    // without automatic redirect to avoid a loop
   }, [id, isEditMode, location.state?.selectedCoin, location.state?.fromBackButton, navigate])
 
-  // Загружаем данные графика когда есть crypto (и при создании, и при редактировании)
+  // Load chart data when crypto is available (both for create and edit modes)
   useEffect(() => {
     if (crypto?.id) {
       const loadChartData = async () => {
@@ -253,13 +253,13 @@ export const CreateNotificationPage = () => {
     }
   }, [crypto?.id, selectedPeriod])
 
-  // Обновляем цену каждые 5 секунд из кэша Redis
+  // Update price every 5 seconds from Redis cache
   useEffect(() => {
     if (!crypto?.id) {
       return
     }
 
-    const coinId = crypto.id // Сохраняем ID в локальную переменную для использования в замыкании
+    const coinId = crypto.id // Save ID to local variable for use in closure
 
     // Function to update price and last chart point
     const updatePrice = async () => {
@@ -354,7 +354,7 @@ export const CreateNotificationPage = () => {
 
     try {
       if (isEditMode && id) {
-        // Обновление существующего уведомления
+        // Update existing notification
         await apiService.updateNotification(parseInt(id), {
           direction,
           trigger,
@@ -363,7 +363,7 @@ export const CreateNotificationPage = () => {
           expire_time_hours: expireTime,
         })
       } else {
-        // Создание нового уведомления
+        // Create new notification
         await apiService.createNotification({
           user_id: userId,
           crypto_id: crypto.id,
@@ -378,8 +378,8 @@ export const CreateNotificationPage = () => {
         })
       }
 
-      // Успешно создано/обновлено
-      // Используем replace: true чтобы очистить историю и обновить список на главной
+      // Successfully created/updated
+      // Use replace: true to clear history and refresh list on main page
       navigate(ROUTES_NAME.MAIN, { replace: true })
     } catch {
       setError('Failed to save notification. Please try again.')
@@ -395,7 +395,7 @@ export const CreateNotificationPage = () => {
 
     try {
       await apiService.deleteNotification(parseInt(id))
-      // Успешно удалено
+      // Successfully deleted
       navigate(ROUTES_NAME.MAIN, { replace: true })
     } catch {
       setError('Failed to delete notification. Please try again.')
@@ -406,12 +406,12 @@ export const CreateNotificationPage = () => {
   // Format number with spaces for thousands and comma for decimals
   const formatPrice = (price: number) => {
     const decimals = crypto ? getPriceDecimals(crypto.price, crypto.priceDecimals) : 2
-    // Форматируем с точками для тысяч и запятой для десятичных (например: 89.357,00)
+    // Format with dots for thousands and comma for decimals (e.g.: 89.357,00)
     const parts = price.toFixed(decimals).split('.')
     const integerPart = parts[0]
     const decimalPart = parts[1] || '0'.repeat(decimals)
     
-    // Добавляем точки для разделения тысяч
+    // Add dots for thousands separator
     const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
     
     return `${formattedInteger},${decimalPart}`
@@ -426,8 +426,8 @@ export const CreateNotificationPage = () => {
     }).replace(/,/g, ' ').replace('.', ',')
   }
 
-  // Вычисляем уровень триггера для отображения на графике
-  // Позиция линии зависит только от Direction и Value, Trigger - это просто метка
+  // Calculate trigger level for chart display
+  // Line position depends only on Direction and Value, Trigger is just a label
   const getTriggerLevel = (): number | null => {
     if (!crypto || !value) return null
 
@@ -437,35 +437,35 @@ export const CreateNotificationPage = () => {
     const currentPrice = crypto.price
 
     if (valueType === 'percent') {
-      // Если процент, вычисляем абсолютное значение
+      // If percent, calculate absolute value
       if (direction === 'rise') {
-        // Rise: цена выше текущей на X%
+        // Rise: price above current by X%
         return currentPrice * (1 + numValue / 100)
       } else if (direction === 'fall') {
-        // Fall: цена ниже текущей на X%
+        // Fall: price below current by X%
         return currentPrice * (1 - numValue / 100)
       } else {
-        // Both: показываем обе линии (выше и ниже)
-        // Для упрощения показываем только верхнюю линию
+        // Both: show both lines (above and below)
+        // For simplicity, show only upper line
         return currentPrice * (1 + numValue / 100)
       }
     } else {
-      // Если абсолютное значение
+      // If absolute value
       if (direction === 'rise') {
-        // Rise: цена выше текущей на X USD
+        // Rise: price above current by X USD
         return currentPrice + numValue
       } else if (direction === 'fall') {
-        // Fall: цена ниже текущей на X USD
+        // Fall: price below current by X USD
         return currentPrice - numValue
       } else {
-        // Both: показываем обе линии (выше и ниже)
-        // Для упрощения показываем только верхнюю линию
+        // Both: show both lines (above and below)
+        // For simplicity, show only upper line
         return currentPrice + numValue
       }
     }
   }
 
-  // Для Both показываем две линии (выше и ниже)
+  // For Both show two lines (above and below)
   const getTriggerLevels = (): { upper: number | null; lower: number | null } => {
     if (!crypto || !value) return { upper: null, lower: null }
 
@@ -474,20 +474,20 @@ export const CreateNotificationPage = () => {
 
     const currentPrice = crypto.price
 
-    // Если тип "price", используем указанную цену для обоих направлений
+    // If type is "price", use specified price for both directions
     if (valueType === 'price') {
       if (direction === 'rise') {
         return { upper: numValue, lower: null }
       } else if (direction === 'fall') {
         return { upper: null, lower: numValue }
       } else {
-        // Both: показываем одну линию на указанной цене
+        // Both: show one line at specified price
         return { upper: numValue, lower: numValue }
       }
     }
 
     if (direction === 'both') {
-      // Both: показываем обе линии
+      // Both: show both lines
       if (valueType === 'percent') {
         return {
           upper: currentPrice * (1 + numValue / 100),
@@ -500,7 +500,7 @@ export const CreateNotificationPage = () => {
         }
       }
     } else {
-      // Для Rise или Fall показываем только одну линию
+      // For Rise or Fall show only one line
       const singleLevel = getTriggerLevel()
       return {
         upper: direction === 'rise' ? singleLevel : null,
@@ -513,7 +513,7 @@ export const CreateNotificationPage = () => {
   const triggerLevels = getTriggerLevels()
 
 
-  // Определяем цвет графика на основе тренда (как в CoinDetailsPage)
+  // Determine chart color based on trend (like in CoinDetailsPage)
   const getChartColor = () => {
     if (chartData.length < 2) {
       return 'var(--color-state-success)'
@@ -527,7 +527,7 @@ export const CreateNotificationPage = () => {
 
   const chartColor = getChartColor()
 
-  // Рассчитываем равномерный диапазон для Y-axis
+  // Calculate uniform range for Y-axis
   const getYAxisDomain = () => {
     if (chartData.length === 0) return ['dataMin', 'dataMax']
     
@@ -539,7 +539,7 @@ export const CreateNotificationPage = () => {
     const range = maxPrice - minPrice
     const avgPrice = (minPrice + maxPrice) / 2
     
-    // Если есть уровни триггеров, учитываем их в расчете диапазона
+    // If trigger levels exist, include them in range calculation
     let effectiveMin = minPrice
     let effectiveMax = maxPrice
     
@@ -555,35 +555,35 @@ export const CreateNotificationPage = () => {
     const effectiveRange = effectiveMax - effectiveMin
     const effectiveAvg = (effectiveMin + effectiveMax) / 2
     
-    // Используем процентное соотношение для всех монет:
-    // Для 1D таймфрейма используем меньший процент (8%), для остальных - 15%
-    // Это предотвращает создание слишком большого пустого пространства на 1D
+    // Use percentage ratio for all coins:
+    // For 1D timeframe use smaller percent (8%), for others - 15%
+    // This prevents creating too much empty space on 1D
     const relativeRangePercent = effectiveAvg > 0 ? effectiveRange / effectiveAvg : 0
-    const targetPercent = selectedPeriod === '1d' ? 0.08 : 0.15 // 8% для 1D, 15% для остальных
+    const targetPercent = selectedPeriod === '1d' ? 0.08 : 0.15 // 8% for 1D, 15% for others
     
     let adjustedMin = effectiveMin
     let adjustedMax = effectiveMax
     
     if (effectiveAvg > 0 && relativeRangePercent < targetPercent) {
-      // Расширяем диапазон до targetPercent от средней цены для лучшей видимости
-      // Но учитываем реальное распределение данных - расширяем больше там, где есть данные
+      // Expand range to targetPercent of average price for better visibility
+      // But consider real data distribution - expand more where data exists
       const targetRange = effectiveAvg * targetPercent
       
-      // Вычисляем, насколько данные смещены от центра
+      // Calculate how much data is offset from center
       const dataCenter = effectiveAvg
       const dataRange = effectiveRange
       
-      // Расширяем пропорционально: больше расширяем в сторону, где больше данных
-      // Если данные ближе к минимуму, расширяем больше вниз
-      // Если данные ближе к максимуму, расширяем больше вверх
+      // Expand proportionally: expand more towards where more data exists
+      // If data is closer to minimum, expand more downward
+      // If data is closer to maximum, expand more upward
       const expansionNeeded = targetRange - dataRange
       
       if (expansionNeeded > 0) {
-        // Вычисляем смещение данных от центра диапазона
+        // Calculate data offset from range center
         const rangeCenter = (effectiveMin + effectiveMax) / 2
         const offsetFromCenter = dataCenter - rangeCenter
         
-        // Расширяем больше в сторону смещения данных
+        // Expand more towards data offset direction
         const expansionDown = expansionNeeded * (0.5 + Math.max(0, -offsetFromCenter) / dataRange)
         const expansionUp = expansionNeeded * (0.5 + Math.max(0, offsetFromCenter) / dataRange)
         
@@ -591,13 +591,13 @@ export const CreateNotificationPage = () => {
         adjustedMax = effectiveMax + expansionUp
       }
     } else {
-      // Если диапазон уже достаточно большой, используем стандартный padding
+      // If range is already large enough, use standard padding
       const padding = Math.max(effectiveRange * 0.05, effectiveMin * 0.01)
       adjustedMin = Math.max(0, effectiveMin - padding)
       adjustedMax = effectiveMax + padding
     }
     
-    // Определяем шаг округления на основе диапазона
+    // Determine rounding step based on range
     const finalRange = adjustedMax - adjustedMin
     let step: number
     if (finalRange >= 10000) {
@@ -626,11 +626,11 @@ export const CreateNotificationPage = () => {
       step = 0.00000002
     }
     
-    // Округляем до ближайшего значения с учетом шага
+    // Round to nearest value considering the step
     adjustedMin = Math.floor(adjustedMin / step) * step
     adjustedMax = Math.ceil(adjustedMax / step) * step
     
-    // Убеждаемся, что min < max
+    // Ensure min < max
     if (adjustedMin >= adjustedMax) {
       adjustedMax = adjustedMin + step * 2
     }
@@ -638,7 +638,7 @@ export const CreateNotificationPage = () => {
     return [adjustedMin, adjustedMax]
   }
 
-  // Генерируем тики для оси Y
+  // Generate ticks for Y axis
   const getYAxisTicks = () => {
     if (chartData.length === 0) return undefined
     
@@ -653,7 +653,7 @@ export const CreateNotificationPage = () => {
     
     if (range === 0) return undefined
     
-    // Определяем количество значащих цифр для округления на основе диапазона
+    // Determine number of significant digits for rounding based on range
     const getSignificantDigits = (val: number): number => {
       if (val >= 1000) return 0
       if (val >= 100) return 1
@@ -681,13 +681,13 @@ export const CreateNotificationPage = () => {
       ticks.push(roundedTick)
     }
     
-    // Убираем дубликаты
+    // Remove duplicates
     const uniqueTicks = Array.from(new Set(ticks))
     
     return uniqueTicks.length > 0 ? uniqueTicks : undefined
   }
 
-  // Форматирование цены для Y оси (как в CoinDetailsPage)
+  // Format price for Y axis (like in CoinDetailsPage)
   const formatPriceForYAxis = (value: number) => {
     const decimals = crypto ? getPriceDecimals(crypto.price, crypto.priceDecimals) : 2
     
@@ -714,7 +714,7 @@ export const CreateNotificationPage = () => {
     return `$${formattedInteger}`
   }
 
-  // Форматирование даты для tooltip (как в CoinDetailsPage)
+  // Format date for tooltip (like in CoinDetailsPage)
   const formatDateForTooltip = (dateStr: string) => {
     try {
       const date = new Date(dateStr)
@@ -728,7 +728,7 @@ export const CreateNotificationPage = () => {
     }
   }
 
-  // Рассчитываем домен для объемов - ограничиваем их высоту до 30% от графика
+  // Calculate domain for volumes - limit their height to 30% of chart
   const getVolumeDomain = (): [number, number] => {
     if (chartData.length === 0) return [0, 1]
     
@@ -736,13 +736,13 @@ export const CreateNotificationPage = () => {
     if (volumes.length === 0) return [0, 1]
     
     const maxVolume = Math.max(...volumes)
-    // Увеличиваем максимальное значение в 2 раза, чтобы объемы занимали только ~30% высоты
+    // Double max value so volumes take only ~30% of height
     return [0, maxVolume * 2]
   }
 
   const volumeDomain = getVolumeDomain()
 
-  // Форматирование объема
+  // Format volume
   const formatVolume = (volume: number) => {
     if (volume >= 1000000000) {
       return `$${(volume / 1000000000).toFixed(2)}B`
@@ -756,38 +756,38 @@ export const CreateNotificationPage = () => {
     return `$${volume.toFixed(2)}`
   }
 
-  // Получаем тики для оси X
+  // Get ticks for X axis
   const getXAxisTicks = () => {
     if (chartData.length === 0) return undefined
     
-    // Для 1D таймфрейма показываем фиксированные временные метки каждые 3 часа
+    // For 1D timeframe show fixed time labels every 3 hours
     if (selectedPeriod === '1d') {
       if (chartData.length === 0) return undefined
       
       const ticks: string[] = []
-      const threeHoursInMs = 3 * 60 * 60 * 1000 // 3 часа в миллисекундах
+      const threeHoursInMs = 3 * 60 * 60 * 1000 // 3 hours in milliseconds
       
       const firstDate = new Date(chartData[0].date)
       const lastDate = new Date(chartData[chartData.length - 1].date)
       const firstTime = firstDate.getTime()
       const lastTime = lastDate.getTime()
       
-      // Находим первый час, кратный 3, который >= первой даты
+      // Find first hour divisible by 3 that is >= first date
       const firstHour = firstDate.getHours()
       const firstRoundedHour = Math.floor(firstHour / 3) * 3
       const startTick = new Date(firstDate)
       startTick.setHours(firstRoundedHour, 0, 0, 0)
       
-      // Если округленный час меньше текущего часа, добавляем 3 часа
+      // If rounded hour is less than current hour, add 3 hours
       if (startTick.getTime() < firstTime) {
         startTick.setHours(startTick.getHours() + 3)
       }
       
-      // Генерируем фиксированные временные метки каждые 3 часа
+      // Generate fixed time labels every 3 hours
       let currentTick = startTick.getTime()
       
       while (currentTick <= lastTime) {
-        // Находим ближайшую точку данных к текущему тику
+        // Find closest data point to current tick
         let closestIndex = 0
         let minDiff = Math.abs(new Date(chartData[0].date).getTime() - currentTick)
         
@@ -799,20 +799,20 @@ export const CreateNotificationPage = () => {
           }
         }
         
-        // Добавляем тик, если он еще не добавлен
+        // Add tick if not already added
         const tickDate = chartData[closestIndex].date
         if (!ticks.includes(tickDate)) {
           ticks.push(tickDate)
         }
         
-        // Переходим к следующему 3-часовому интервалу
+        // Move to next 3-hour interval
         currentTick += threeHoursInMs
       }
       
       return ticks.length > 0 ? ticks : undefined
     }
     
-    // Для остальных таймфреймов используем стандартную логику
+    // For other timeframes use standard logic
     const optimalCount = 7
     const totalPoints = chartData.length
     
@@ -843,29 +843,29 @@ export const CreateNotificationPage = () => {
     return ticks.length > 0 ? ticks : undefined
   }
 
-  // Рендер кастомного тика для X оси
+  // Render custom tick for X axis
   const renderCustomTick = (props: any) => {
     const { x, y, payload } = props
     
-    // Для 1D таймфрейма показываем фиксированное время (HH:00)
+    // For 1D timeframe show fixed time (HH:00)
     if (selectedPeriod === '1d') {
       try {
         const date = new Date(payload.value)
         const hours = date.getHours()
         const minutes = date.getMinutes()
         
-        // Вычисляем фиксированное время метки: округляем до ближайшего часа, кратного 3
-        // Если текущее время 17:00, показываем 15:00 (округляем вниз)
-        // Если текущее время 18:30, показываем 18:00 (округляем вверх)
+        // Calculate fixed label time: round to nearest hour divisible by 3
+        // If current time is 17:00, show 15:00 (round down)
+        // If current time is 18:30, show 18:00 (round up)
         let roundedHour = Math.floor(hours / 3) * 3
         
-        // Если мы прошли больше половины интервала (>= 1.5 часа), показываем следующий час
+        // If we passed more than half of interval (>= 1.5 hours), show next hour
         const remainder = hours % 3
         if (remainder >= 2 || (remainder === 1 && minutes >= 30)) {
           roundedHour = (Math.floor(hours / 3) + 1) * 3
         }
         
-        // Обрабатываем переход через полночь
+        // Handle midnight transition
         roundedHour = roundedHour % 24
         
         return (
@@ -887,7 +887,7 @@ export const CreateNotificationPage = () => {
       }
     }
     
-    // Для остальных таймфреймов показываем дату
+    // For other timeframes show date
     const date = new Date(payload.value)
     const day = date.getDate()
     const month = date.toLocaleDateString('en-US', { month: 'short' })
@@ -939,7 +939,7 @@ export const CreateNotificationPage = () => {
             }
             chevron
             onClick={() => {
-              // При редактировании передаем текущую криптовалюту в state
+              // When editing, pass current cryptocurrency in state
               navigate(ROUTES_NAME.CHOOSE_COIN, {
                 state: isEditMode && crypto ? {
                   selectedCoin: {
@@ -1168,7 +1168,7 @@ export const CreateNotificationPage = () => {
                 margin={{ 
                   top: 10, 
                   right: 5, 
-                  left: 15,  // Увеличиваем отступ слева для метки Stop-loss/Take-profit
+                  left: 15,  // Increase left margin for Stop-loss/Take-profit label
                   bottom: 5
                 }}
               >
@@ -1286,17 +1286,17 @@ export const CreateNotificationPage = () => {
                         position: 'left',
                         content: ({ viewBox }: any) => {
                           if (!viewBox) return null
-                          // Получаем цвет из CSS переменных
+                          // Get color from CSS variables
                           const root = document.documentElement
                           const color = trigger === 'stop-loss' 
                             ? getComputedStyle(root).getPropertyValue('--color-state-destructive').trim() || '#ff3b30'
                             : getComputedStyle(root).getPropertyValue('--color-state-success').trim() || '#34c759'
                           const text = trigger === 'stop-loss' ? 'Stop-loss' : 'Take-profit'
                           const textWidth = text.length * 7 + 8
-                          // Позиционируем прямоугольник слева от линии, но внутри области графика
-                          // viewBox.x - это координата точки на линии относительно начала графика
-                          // Учитываем отступ слева графика (70px), поэтому метка должна быть на позиции 0-60px
-                          const rectX = Math.max(0, viewBox.x - textWidth - 4) // Не выходим за левую границу (0)
+                          // Position rectangle to the left of line, but inside chart area
+                          // viewBox.x is the coordinate of point on line relative to chart start
+                          // Account for left chart margin (70px), so label should be at position 0-60px
+                          const rectX = Math.max(0, viewBox.x - textWidth - 4) // Don't go beyond left border (0)
                           return (
                             <g>
                               <rect
@@ -1351,17 +1351,17 @@ export const CreateNotificationPage = () => {
                         position: 'left',
                         content: ({ viewBox }: any) => {
                           if (!viewBox) return null
-                          // Получаем цвет из CSS переменных
+                          // Get color from CSS variables
                           const root = document.documentElement
                           const color = trigger === 'stop-loss' 
                             ? getComputedStyle(root).getPropertyValue('--color-state-destructive').trim() || '#ff3b30'
                             : getComputedStyle(root).getPropertyValue('--color-state-success').trim() || '#34c759'
                           const text = trigger === 'stop-loss' ? 'Stop-loss' : 'Take-profit'
                           const textWidth = text.length * 7 + 8
-                          // Позиционируем прямоугольник слева от линии, но внутри области графика
-                          // viewBox.x - это координата точки на линии относительно начала графика
-                          // Учитываем отступ слева графика (70px), поэтому метка должна быть на позиции 0-60px
-                          const rectX = Math.max(0, viewBox.x - textWidth - 4) // Не выходим за левую границу (0)
+                          // Position rectangle to the left of line, but inside chart area
+                          // viewBox.x is the coordinate of point on line relative to chart start
+                          // Account for left chart margin (70px), so label should be at position 0-60px
+                          const rectX = Math.max(0, viewBox.x - textWidth - 4) // Don't go beyond left border (0)
                           return (
                             <g>
                               <rect

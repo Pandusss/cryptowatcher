@@ -53,9 +53,9 @@ const CryptoChart: React.FC<CryptoChartProps> = ({
     tooltipFormatter,
   } = options
 
-  // Рассчитываем значения для графика
+  // Calculate values for the chart
   const chartCalculations = useMemo(() => {
-    // Преобразуем triggerLines в triggerLevels для calculateChartValues
+    // Convert triggerLines to triggerLevels for calculateChartValues
     const triggerLevels = triggerLines ? {
       upper: triggerLines.upper?.value,
       lower: triggerLines.lower?.value,
@@ -63,17 +63,17 @@ const CryptoChart: React.FC<CryptoChartProps> = ({
     return calculateChartValues(data, period, priceDecimals, triggerLevels)
   }, [data, period, priceDecimals, triggerLines])
 
-  // Определяем цвет графика
+  // Determine the color of the chart
   const chartColor = customColor || chartCalculations.chartColor
 
-  // Кастомный рендеринг тиков для смещения крайних меток
+  // Custom rendering of ticks to shift extreme marks
   const renderCustomTick = (props: any) => {
     const { x, y, payload, index } = props
     const ticks = chartCalculations.xAxisTicks
     const isFirst = index === 0
     const isLast = ticks && index === ticks.length - 1
     
-    // Смещение: первая метка вправо на 8px, последняя влево на 8px
+    // Shift: first mark to the right by 8px, last mark to the left by 8px
     const offsetX = isFirst ? 8 : isLast ? -8 : 0
     
     return (
@@ -89,22 +89,22 @@ const CryptoChart: React.FC<CryptoChartProps> = ({
     )
   }
 
-  // Форматирование для оси Y
+  // Formatting for the Y axis
   const yAxisTickFormatter = yAxisFormatter 
     ? yAxisFormatter 
     : (value: number) => formatPriceForYAxis(value, priceDecimals)
 
-  // Форматирование для тултипа цены
+  // Formatting for the price tooltip
   const priceTooltipFormatter = tooltipFormatter?.price 
     ? tooltipFormatter.price 
     : (value: number) => formatPriceForTooltip(value, priceDecimals)
 
-  // Форматирование для тултипа объема
+  // Formatting for the volume tooltip
   const volumeTooltipFormatter = tooltipFormatter?.volume 
     ? tooltipFormatter.volume 
     : formatVolume
 
-  // Форматирование для тултипа даты
+  // Formatting for the date tooltip
   const dateTooltipFormatter = tooltipFormatter?.date 
     ? tooltipFormatter.date 
     : (dateStr: string) => formatDateForTooltip(dateStr, period)
@@ -112,7 +112,7 @@ const CryptoChart: React.FC<CryptoChartProps> = ({
   if (isLoading) {
     return (
       <div className={styles.chartContainer} style={{ height }}>
-        <div className={styles.loading}>Загрузка графика...</div>
+        <div className={styles.loading}>Loading chart...</div>
       </div>
     )
   }
@@ -128,7 +128,7 @@ const CryptoChart: React.FC<CryptoChartProps> = ({
   if (data.length === 0) {
     return (
       <div className={styles.chartContainer} style={{ height }}>
-        <div className={styles.empty}>Нет данных для отображения</div>
+        <div className={styles.empty}>No data to display</div>
       </div>
     )
   }
@@ -147,7 +147,7 @@ const CryptoChart: React.FC<CryptoChartProps> = ({
             </linearGradient>
           </defs>
           
-          {/* Ось X */}
+          {/* X axis */}
           <XAxis 
             dataKey="date" 
             axisLine={{ stroke: 'var(--color-border-separator)' }}
@@ -160,7 +160,7 @@ const CryptoChart: React.FC<CryptoChartProps> = ({
             minTickGap={period === '1d' ? 12 : period === '30d' || period === '1y' ? 8 : 6}
           />
           
-          {/* Ось Y для цены */}
+          {/* Y axis for price */}
           <YAxis 
             yAxisId="price"
             orientation="right"
@@ -174,7 +174,7 @@ const CryptoChart: React.FC<CryptoChartProps> = ({
             tickFormatter={yAxisTickFormatter}
           />
           
-          {/* Ось Y для объема (скрыта) */}
+          {/* Y axis for volume (hidden) */}
           {showVolume && (
             <YAxis 
               yAxisId="volume"
@@ -184,7 +184,7 @@ const CryptoChart: React.FC<CryptoChartProps> = ({
             />
           )}
           
-          {/* Тултип */}
+          {/* Tooltip */}
           <Tooltip
             contentStyle={{
               backgroundColor: 'var(--color-background-modal)',
@@ -214,7 +214,7 @@ const CryptoChart: React.FC<CryptoChartProps> = ({
             cursor={{ stroke: chartColor, strokeWidth: 1, strokeDasharray: '3 3' }}
           />
           
-          {/* График цены */}
+          {/* Price chart */}
           <Area
             yAxisId="price"
             type="monotone"
@@ -232,7 +232,7 @@ const CryptoChart: React.FC<CryptoChartProps> = ({
             connectNulls={false}
           />
           
-          {/* Объемы */}
+          {/* Volumes */}
           {showVolume && (
             <Bar
               yAxisId="volume"
@@ -243,7 +243,7 @@ const CryptoChart: React.FC<CryptoChartProps> = ({
             />
           )}
           
-          {/* Линия текущей цены */}
+          {/* Current price line */}
           {showCurrentPriceLine && currentPrice != null && (
             <ReferenceLine
               yAxisId="price"
@@ -260,7 +260,7 @@ const CryptoChart: React.FC<CryptoChartProps> = ({
             />
           )}
           
-          {/* Линии триггеров */}
+          {/* Trigger lines */}
           {showTriggerLines && triggerLines?.upper !== undefined && (
             <ReferenceLine
               yAxisId="price"

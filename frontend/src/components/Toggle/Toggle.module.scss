@@ -24,17 +24,15 @@
   overflow: hidden;
   transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   
-  // В темной теме используем более светлый серый для видимости
   [data-theme='dark'] & {
     background-color: rgba(255, 255, 255, 0.2);
   }
   
-  // В светлой теме используем темно-серый
   [data-theme='light'] & {
     background-color: rgba(0, 0, 0, 0.15);
   }
   
-  // Fallback для случаев, когда тема не определена
+  // Fallback for cases when theme is not defined
   background-color: rgba(128, 128, 128, 0.3);
 }
 
@@ -46,28 +44,25 @@
   background-color: var(--color-backgroundPrimary);
   border-radius: 50%;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  transform: translateX(0); // По умолчанию слева (выключено)
+  transform: translateX(0);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
-// В темной теме knob должен быть белым/светлым
 [data-theme='dark'] .thumb {
   background-color: var(--color-textIconsWhite);
 }
 
-// В светлой теме knob должен быть белым
 [data-theme='light'] .thumb {
   background-color: var(--color-backgroundPrimary);
 }
 
-// Когда включен - knob справа, трек меняет цвет на акцентный
 .checked {
   .track {
     background-color: var(--color-accentsBrandCommunity);
   }
   
   .thumb {
-    transform: translateX(20px); // Справа когда включен
+    transform: translateX(20px);
   }
 }
 

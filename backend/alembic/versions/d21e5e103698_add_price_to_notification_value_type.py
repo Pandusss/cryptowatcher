@@ -17,14 +17,14 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Добавляем новое значение 'PRICE' в enum 'notificationvaluetype'
+    # Add new value 'PRICE' to enum 'notificationvaluetype'
     op.execute("ALTER TYPE notificationvaluetype ADD VALUE IF NOT EXISTS 'PRICE'")
 
 
 def downgrade() -> None:
-    # В PostgreSQL нельзя удалить значение из enum напрямую
-    # Нужно создать новый enum без этого значения и заменить старый
-    # Это сложная операция, поэтому оставляем пустым или реализуем при необходимости
-    # Для продакшена лучше не делать downgrade для enum изменений
+    # PostgreSQL does not support removing values from enums directly.
+    # Would need to create a new enum without this value and replace the old one.
+    # This is a complex operation, so leaving empty or implement if needed.
+    # For production, it's better not to downgrade enum changes.
     pass
 

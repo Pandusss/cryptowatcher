@@ -23,16 +23,16 @@ export const ChooseCoinPage = () => {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const hasFetchedRef = useRef(false)
-  // Состояние для анимации цен: Map<coinId, 'up' | 'down' | 'neutral' | null>
+  // State for price animations: Map<coinId, 'up' | 'down' | 'neutral' | null>
   const [priceAnimations, setPriceAnimations] = useState<Map<string, 'up' | 'down' | 'neutral' | null>>(new Map())
-  // Ref для хранения текущего списка монет (чтобы избежать проблем с зависимостями)
+  // Ref for storing current coin list (to avoid dependency issues)
   const coinsRef = useRef<CoinListItem[]>([])
 
-  // Управление кнопкой "Назад" в Telegram Mini App
+  // Manage Telegram Mini App back button
   useTelegramBackButton()
 
   useEffect(() => {
-    // Защита от повторных запросов в StrictMode
+    // Prevent duplicate requests in StrictMode
     if (hasFetchedRef.current) {
       return
     }
@@ -42,12 +42,12 @@ export const ChooseCoinPage = () => {
       try {
         setLoading(true)
         
-        // Загружаем все данные из кэша (статика + цены) - быстро
-        // Цены обновляются каждые 10 секунд в фоновом режиме, поэтому всегда актуальны
+        // Load all data from cache (static + prices) - fast
+        // Prices are updated every 10 seconds in background, so always current
         const coins = await apiService.getCoinsListStatic(100, 1)
         setCoins(coins)
-        coinsRef.current = coins // Обновляем ref
-        setLoading(false) // Показываем список сразу
+        coinsRef.current = coins // Update ref
+        setLoading(false) // Show list immediately
       } catch {
         setLoading(false)
       }
@@ -56,7 +56,7 @@ export const ChooseCoinPage = () => {
     fetchCoins()
   }, [])
 
-  // Обновляем цены каждые 5 секунд
+  // Update prices every 5 seconds
   useEffect(() => {
     if (coins.length === 0 || loading) {
       return
@@ -64,29 +64,29 @@ export const ChooseCoinPage = () => {
 
     const updatePrices = async () => {
       try {
-        // Используем текущий список монет из ref
+        // Use current coin list from ref
         const currentCoins = coinsRef.current
         if (currentCoins.length === 0) {
           return
         }
 
-        // Получаем все ID монет
+        // Get all coin IDs
         const coinIds = currentCoins.map((coin) => coin.id)
 
-        // Делаем один batch запрос для получения всех цен
+        // Make one batch request to get all prices
         const pricesData = await apiService.getCoinsListPrices(coinIds)
 
-        // Обновляем цены для всех монет
+        // Update prices for all coins
         const updatedCoins = currentCoins.map((coin) => {
           const priceData = pricesData[coin.id]
           if (priceData && priceData.price !== undefined && priceData.price > 0) {
             const newPrice = priceData.price
             const oldPrice = coin.quote.USD.price
 
-            // Определяем направление изменения цены (учитываем погрешность для float)
+            // Determine price change direction (account for float precision)
             let direction: 'up' | 'down' | 'neutral' | null = null
             const priceDiff = Math.abs(oldPrice - newPrice)
-            // Для цен > 1 используем погрешность 0.01, для меньших - относительную
+            // For prices > 1 use threshold 0.01, for smaller - relative
             const threshold = oldPrice >= 1 ? 0.01 : oldPrice * 0.0001
             
             if (priceDiff > threshold) {
@@ -95,14 +95,14 @@ export const ChooseCoinPage = () => {
               direction = 'neutral'
             }
 
-            // ВСЕГДА запускаем анимацию (даже если neutral)
+            // ALWAYS trigger animation (even if neutral)
             setPriceAnimations((prev) => {
               const newMap = new Map(prev)
               newMap.set(coin.id, direction)
               return newMap
             })
 
-            // Убираем анимацию через 800ms
+            // Remove animation after 800ms
             setTimeout(() => {
               setPriceAnimations((prev) => {
                 const newMap = new Map(prev)
@@ -111,7 +111,7 @@ export const ChooseCoinPage = () => {
               })
             }, 800)
 
-            // Возвращаем обновленную монету
+            // Return updated coin
             return {
               ...coin,
               quote: {
@@ -128,7 +128,7 @@ export const ChooseCoinPage = () => {
           return coin
         })
 
-        // Обновляем состояние и ref один раз после всех обновлений
+        // Update state and ref once after all updates
         setCoins(updatedCoins)
         coinsRef.current = updatedCoins
       } catch {
