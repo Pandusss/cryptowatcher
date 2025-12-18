@@ -62,9 +62,7 @@ class BaseChartAdapter(ABC):
             # Process and format candles
             return self._process_candles(candles, period)
             
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
+        except Exception:
             return None
     
     def _process_candles(self, candles: List, period: str) -> List[Dict]:   

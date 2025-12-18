@@ -92,7 +92,7 @@ async def process_price_update(
         price_cache_key = f"coin_price:{coin_id}"
         await redis.setex(
             price_cache_key,
-            60,  # TTL in seconds
+            86400,  # TTL 24 hours - price persists until overwritten
             json.dumps(price_data)
         )
         

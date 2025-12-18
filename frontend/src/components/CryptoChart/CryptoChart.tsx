@@ -10,6 +10,11 @@ import {
   YAxis,
 } from 'recharts'
 
+import { 
+  convertServerDateToLocal, 
+  getCurrentLocalTime 
+} from '../../common/utils/chartTimeUtils'
+
 import { ChartDataPoint } from '../../services/api'
 import { ChartPeriod, CryptoChartProps } from '../../types/chart.types'
 import {

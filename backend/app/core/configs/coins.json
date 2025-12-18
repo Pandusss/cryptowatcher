@@ -9,7 +9,8 @@
       "external_ids": {
         "binance": "BTCUSDT",
         "coingecko": "bitcoin",
-        "okx": "BTC-USDT"
+        "okx": "BTC-USDT",
+        "mexc": "BTCUSDT"
       },
       "price_priority": [
         "binance"
@@ -23,7 +24,8 @@
       "external_ids": {
         "binance": "ETHUSDT",
         "coingecko": "ethereum",
-        "okx": "ETH-USDT"
+        "okx": "ETH-USDT",
+        "mexc": "ETHUSDT"
       },
       "price_priority": [
         "binance"
@@ -37,7 +39,8 @@
       "external_ids": {
         "binance": "SOLUSDT",
         "coingecko": "solana",
-        "okx": "SOL-USDT"
+        "okx": "SOL-USDT",
+        "mexc": "SOLUSDT"
       },
       "price_priority": [
         "binance"
@@ -51,7 +54,8 @@
       "external_ids": {
         "binance": "ZECUSDT",
         "coingecko": "zcash",
-        "okx": "ZEC-USDT"
+        "okx": "ZEC-USDT",
+        "mexc": "ZECUSDT"
       },
       "price_priority": [
         "binance"
@@ -65,7 +69,8 @@
       "external_ids": {
         "binance": "XRPUSDT",
         "coingecko": "ripple",
-        "okx": "XRP-USDT"
+        "okx": "XRP-USDT",
+        "mexc": "XRPUSDT"
       },
       "price_priority": [
         "binance"
@@ -79,7 +84,8 @@
       "external_ids": {
         "binance": "BNBUSDT",
         "coingecko": "binancecoin",
-        "okx": "BNB-USDT"
+        "okx": "BNB-USDT",
+        "mexc": "BNBUSDT"
       },
       "price_priority": [
         "binance"
@@ -93,7 +99,8 @@
       "external_ids": {
         "binance": "LUNAUSDT",
         "coingecko": "terra-luna-2",
-        "okx": "LUNA-USDT"
+        "okx": "LUNA-USDT",
+        "mexc": "LUNAUSDT"
       },
       "price_priority": [
         "binance"
@@ -107,7 +114,8 @@
       "external_ids": {
         "binance": "DOGEUSDT",
         "coingecko": "dogecoin",
-        "okx": "DOGE-USDT"
+        "okx": "DOGE-USDT",
+        "mexc": "DOGEUSDT"
       },
       "price_priority": [
         "binance"
@@ -121,7 +129,8 @@
       "external_ids": {
         "binance": "ADAUSDT",
         "coingecko": "cardano",
-        "okx": "ADA-USDT"
+        "okx": "ADA-USDT",
+        "mexc": "ADAUSDT"
       },
       "price_priority": [
         "binance"
@@ -135,10 +144,24 @@
       "external_ids": {
         "coingecko": "notcoin",
         "okx": "NOT-USDT",
-        "binance": "NOTUSDT"
+        "binance": "NOTUSDT",
+        "mexc": "NOTUSDT"
       },
       "price_priority": [
         "okx"
+      ]
+    },
+    "notpixel": {
+      "id": "notpixel",
+      "name": "PX",
+      "symbol": "PX",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "not-pixel",
+        "mexc": "PXUSDT"
+      },
+      "price_priority": [
+        "mexc"
       ]
     },
     "at": {
@@ -148,7 +171,8 @@
       "enabled": true,
       "external_ids": {
         "binance": "ATUSDT",
-        "coingecko": "apro"
+        "coingecko": "apro",
+        "mexc": "ATUSDT"
       },
       "price_priority": [
         "binance"
@@ -162,7 +186,8 @@
       "external_ids": {
         "binance": "SUIUSDT",
         "coingecko": "sui",
-        "okx": "SUI-USDT"
+        "okx": "SUI-USDT",
+        "mexc": "SUIUSDT"
       },
       "price_priority": [
         "binance"
@@ -176,7 +201,8 @@
       "external_ids": {
         "binance": "TRXUSDT",
         "coingecko": "tron",
-        "okx": "TRX-USDT"
+        "okx": "TRX-USDT",
+        "mexc": "TRXUSDT"
       },
       "price_priority": [
         "binance"
@@ -190,7 +216,8 @@
       "external_ids": {
         "binance": "ASTERUSDT",
         "coingecko": "aster-2",
-        "okx": "ASTER-USDT"
+        "okx": "ASTER-USDT",
+        "mexc": "ASTERUSDT"
       },
       "price_priority": [
         "binance"
@@ -204,7 +231,8 @@
       "external_ids": {
         "binance": "AVAXUSDT",
         "coingecko": "avalanche-2",
-        "okx": "AVAX-USDT"
+        "okx": "AVAX-USDT",
+        "mexc": "AVAXUSDT"
       },
       "price_priority": [
         "binance"
@@ -217,7 +245,8 @@
       "enabled": true,
       "external_ids": {
         "binance": "LUNCUSDT",
-        "coingecko": "terra-luna"
+        "coingecko": "terra-luna",
+        "mexc": "LUNCUSDT"
       },
       "price_priority": [
         "binance"
@@ -231,7 +260,8 @@
       "external_ids": {
         "binance": "LINKUSDT",
         "coingecko": "chainlink",
-        "okx": "LINK-USDT"
+        "okx": "LINK-USDT",
+        "mexc": "LINKUSDT"
       },
       "price_priority": [
         "binance"
@@ -245,7 +275,8 @@
       "external_ids": {
         "binance": "PEPEUSDT",
         "coingecko": "pepe",
-        "okx": "PEPE-USDT"
+        "okx": "PEPE-USDT",
+        "mexc": "PEPEUSDT"
       },
       "price_priority": [
         "binance"
@@ -259,7 +290,8 @@
       "external_ids": {
         "binance": "LTCUSDT",
         "coingecko": "litecoin",
-        "okx": "LTC-USDT"
+        "okx": "LTC-USDT",
+        "mexc": "LTCUSDT"
       },
       "price_priority": [
         "okx"
@@ -273,7 +305,8 @@
       "external_ids": {
         "binance": "SEIUSDT",
         "coingecko": "sei-network",
-        "okx": "SEI-USDT"
+        "okx": "SEI-USDT",
+        "mexc": "SEIUSDT"
       },
       "price_priority": [
         "binance"
@@ -287,7 +320,8 @@
       "external_ids": {
         "binance": "ENAUSDT",
         "coingecko": "ethena",
-        "okx": "ENA-USDT"
+        "okx": "ENA-USDT",
+        "mexc": "ENAUSDT"
       },
       "price_priority": [
         "binance"
@@ -300,7 +334,8 @@
       "enabled": true,
       "external_ids": {
         "binance": "TAOUSDT",
-        "coingecko": "bittensor"
+        "coingecko": "bittensor",
+        "mexc": "TAOUSDT"
       },
       "price_priority": [
         "binance"
@@ -314,7 +349,8 @@
       "external_ids": {
         "binance": "BARDUSDT",
         "coingecko": "lombard-protocol",
-        "okx": "BARD-USDT"
+        "okx": "BARD-USDT",
+        "mexc": "BARDUSDT"
       },
       "price_priority": [
         "binance"
@@ -328,7 +364,8 @@
       "external_ids": {
         "binance": "LRCUSDT",
         "coingecko": "loopring",
-        "okx": "LRC-USDT"
+        "okx": "LRC-USDT",
+        "mexc": "LRCUSDT"
       },
       "price_priority": [
         "binance"
@@ -342,7 +379,8 @@
       "external_ids": {
         "binance": "DOGSUSDT",
         "coingecko": "dogs-2",
-        "okx": "DOGS-USDT"
+        "okx": "DOGS-USDT",
+        "mexc": "DOGSUSDT"
       },
       "price_priority": [
         "binance"
@@ -356,7 +394,8 @@
       "external_ids": {
         "binance": "NEARUSDT",
         "coingecko": "near",
-        "okx": "NEAR-USDT"
+        "okx": "NEAR-USDT",
+        "mexc": "NEARUSDT"
       },
       "price_priority": [
         "binance"
@@ -370,7 +409,8 @@
       "external_ids": {
         "binance": "PAXGUSDT",
         "coingecko": "pax-gold",
-        "okx": "PAXG-USDT"
+        "okx": "PAXG-USDT",
+        "mexc": "PAXGUSDT"
       },
       "price_priority": [
         "binance"
@@ -384,7 +424,8 @@
       "external_ids": {
         "binance": "PENGUUSDT",
         "coingecko": "pudgy-penguins",
-        "okx": "PENGU-USDT"
+        "okx": "PENGU-USDT",
+        "mexc": "PENGUUSDT"
       },
       "price_priority": [
         "binance"
@@ -398,7 +439,8 @@
       "external_ids": {
         "binance": "BCHUSDT",
         "coingecko": "bitcoin-cash",
-        "okx": "BCH-USDT"
+        "okx": "BCH-USDT",
+        "mexc": "BCHUSDT"
       },
       "price_priority": [
         "binance"
@@ -411,7 +453,8 @@
       "enabled": true,
       "external_ids": {
         "binance": "GIGGLEUSDT",
-        "coingecko": "giggle-fund"
+        "coingecko": "giggle-fund",
+        "mexc": "GIGGLEUSDT"
       },
       "price_priority": [
         "binance"
@@ -425,7 +468,8 @@
       "external_ids": {
         "binance": "DOTUSDT",
         "coingecko": "polkadot",
-        "okx": "DOT-USDT"
+        "okx": "DOT-USDT",
+        "mexc": "DOTUSDT"
       },
       "price_priority": [
         "binance"
@@ -439,7 +483,8 @@
       "external_ids": {
         "binance": "UNIUSDT",
         "coingecko": "uniswap",
-        "okx": "UNI-USDT"
+        "okx": "UNI-USDT",
+        "mexc": "UNIUSDT"
       },
       "price_priority": [
         "binance"
@@ -453,7 +498,8 @@
       "external_ids": {
         "binance": "XPLUSDT",
         "coingecko": "plasma",
-        "okx": "XPL-USDT"
+        "okx": "XPL-USDT",
+        "mexc": "XPLUSDT"
       },
       "price_priority": [
         "binance"
@@ -467,7 +513,8 @@
       "external_ids": {
         "binance": "FILUSDT",
         "coingecko": "filecoin",
-        "okx": "FIL-USDT"
+        "okx": "FIL-USDT",
+        "mexc": "FILUSDT"
       },
       "price_priority": [
         "binance"
@@ -481,7 +528,8 @@
       "external_ids": {
         "binance": "HBARUSDT",
         "coingecko": "hedera-hashgraph",
-        "okx": "HBAR-USDT"
+        "okx": "HBAR-USDT",
+        "mexc": "HBARUSDT"
       },
       "price_priority": [
         "binance"
@@ -495,7 +543,8 @@
       "external_ids": {
         "binance": "WIFUSDT",
         "coingecko": "dogwifcoin",
-        "okx": "WIF-USDT"
+        "okx": "WIF-USDT",
+        "mexc": "WIFUSDT"
       },
       "price_priority": [
         "binance"
@@ -509,7 +558,8 @@
       "external_ids": {
         "binance": "AAVEUSDT",
         "coingecko": "aave",
-        "okx": "AAVE-USDT"
+        "okx": "AAVE-USDT",
+        "mexc": "AAVEUSDT"
       },
       "price_priority": [
         "binance"
@@ -523,7 +573,8 @@
       "external_ids": {
         "binance": "DASHUSDT",
         "coingecko": "dash",
-        "okx": "DASH-USDT"
+        "okx": "DASH-USDT",
+        "mexc": "DASHUSDT"
       },
       "price_priority": [
         "binance"
@@ -536,7 +587,8 @@
       "enabled": true,
       "external_ids": {
         "binance": "USTCUSDT",
-        "coingecko": "terrausd"
+        "coingecko": "terrausd",
+        "mexc": "USTCUSDT"
       },
       "price_priority": [
         "binance"
@@ -550,7 +602,8 @@
       "external_ids": {
         "binance": "PUMPUSDT",
         "coingecko": "pump-fun",
-        "okx": "PUMP-USDT"
+        "okx": "PUMP-USDT",
+        "mexc": "PUMPUSDT"
       },
       "price_priority": [
         "binance"
@@ -564,7 +617,8 @@
       "external_ids": {
         "binance": "WLDUSDT",
         "coingecko": "worldcoin-wld",
-        "okx": "WLD-USDT"
+        "okx": "WLD-USDT",
+        "mexc": "WLDUSDT"
       },
       "price_priority": [
         "binance"
@@ -578,7 +632,8 @@
       "external_ids": {
         "binance": "APTUSDT",
         "coingecko": "aptos",
-        "okx": "APT-USDT"
+        "okx": "APT-USDT",
+        "mexc": "APTUSDT"
       },
       "price_priority": [
         "binance"
@@ -592,7 +647,8 @@
       "external_ids": {
         "binance": "BONKUSDT",
         "coingecko": "bonk",
-        "okx": "BONK-USDT"
+        "okx": "BONK-USDT",
+        "mexc": "BONKUSDT"
       },
       "price_priority": [
         "binance"
@@ -606,7 +662,8 @@
       "external_ids": {
         "binance": "ZENUSDT",
         "coingecko": "zenai",
-        "okx": "ZEN-USDT"
+        "okx": "ZEN-USDT",
+        "mexc": "ZENUSDT"
       },
       "price_priority": [
         "binance"
@@ -620,7 +677,8 @@
       "external_ids": {
         "binance": "ARBUSDT",
         "coingecko": "arbitrum",
-        "okx": "ARB-USDT"
+        "okx": "ARB-USDT",
+        "mexc": "ARBUSDT"
       },
       "price_priority": [
         "binance"
@@ -634,7 +692,8 @@
       "external_ids": {
         "binance": "ICPUSDT",
         "coingecko": "internet-computer",
-        "okx": "ICP-USDT"
+        "okx": "ICP-USDT",
+        "mexc": "ICPUSDT"
       },
       "price_priority": [
         "binance"
@@ -648,7 +707,8 @@
       "external_ids": {
         "binance": "HYPERUSDT",
         "coingecko": "hyperliquid",
-        "okx": "HYPE-USDT"
+        "okx": "HYPE-USDT",
+        "mexc": "HYPERUSDT"
       },
       "price_priority": [
         "okx"
@@ -661,7 +721,8 @@
       "enabled": true,
       "external_ids": {
         "binance": "SAPIENUSDT",
-        "coingecko": "sapien-2"
+        "coingecko": "sapien-2",
+        "mexc": "SAPIENUSDT"
       },
       "price_priority": [
         "binance"
@@ -675,7 +736,8 @@
       "external_ids": {
         "binance": "VIRTUALUSDT",
         "coingecko": "virtual-protocol",
-        "okx": "VIRTUAL-USDT"
+        "okx": "VIRTUAL-USDT",
+        "mexc": "VIRTUALUSDT"
       },
       "price_priority": [
         "binance"
@@ -689,7 +751,8 @@
       "external_ids": {
         "binance": "STRKUSDT",
         "coingecko": "starknet",
-        "okx": "STRK-USDT"
+        "okx": "STRK-USDT",
+        "mexc": "STRKUSDT"
       },
       "price_priority": [
         "binance"
@@ -703,7 +766,8 @@
       "external_ids": {
         "binance": "TONUSDT",
         "coingecko": "the-open-network",
-        "okx": "TON-USDT"
+        "okx": "TON-USDT",
+        "mexc": "TONUSDT"
       },
       "price_priority": [
         "binance"
@@ -717,7 +781,8 @@
       "external_ids": {
         "binance": "XLMUSDT",
         "coingecko": "stellar",
-        "okx": "XLM-USDT"
+        "okx": "XLM-USDT",
+        "mexc": "XLMUSDT"
       },
       "price_priority": [
         "binance"
@@ -731,7 +796,8 @@
       "external_ids": {
         "binance": "SHIBUSDT",
         "coingecko": "shiba-inu",
-        "okx": "SHIB-USDT"
+        "okx": "SHIB-USDT",
+        "mexc": "SHIBUSDT"
       },
       "price_priority": [
         "binance"
@@ -745,7 +811,8 @@
       "external_ids": {
         "binance": "WLFIUSDT",
         "coingecko": "world-liberty-financial",
-        "okx": "WLFI-USDT"
+        "okx": "WLFI-USDT",
+        "mexc": "WLFIUSDT"
       },
       "price_priority": [
         "binance"
@@ -758,7 +825,8 @@
       "enabled": true,
       "external_ids": {
         "binance": "SOMIUSDT",
-        "coingecko": "somnia"
+        "coingecko": "somnia",
+        "mexc": "SOMIUSDT"
       },
       "price_priority": [
         "binance"
@@ -772,7 +840,8 @@
       "external_ids": {
         "binance": "EIGENUSDT",
         "coingecko": "eigenlayer",
-        "okx": "EIGEN-USDT"
+        "okx": "EIGEN-USDT",
+        "mexc": "EIGENUSDT"
       },
       "price_priority": [
         "binance"
@@ -786,7 +855,8 @@
       "external_ids": {
         "binance": "CRVUSDT",
         "coingecko": "curve-dao-token",
-        "okx": "CRV-USDT"
+        "okx": "CRV-USDT",
+        "mexc": "CRVUSDT"
       },
       "price_priority": [
         "binance"
@@ -800,7 +870,8 @@
       "external_ids": {
         "binance": "FLOKIUSDT",
         "coingecko": "floki",
-        "okx": "FLOKI-USDT"
+        "okx": "FLOKI-USDT",
+        "mexc": "FLOKIUSDT"
       },
       "price_priority": [
         "binance"
@@ -814,7 +885,8 @@
       "external_ids": {
         "binance": "BIOUSDT",
         "coingecko": "bionergy",
-        "okx": "BIO-USDT"
+        "okx": "BIO-USDT",
+        "mexc": "BIOUSDT"
       },
       "price_priority": [
         "binance"
@@ -828,7 +900,8 @@
       "external_ids": {
         "binance": "INJUSDT",
         "coingecko": "injective-protocol",
-        "okx": "INJ-USDT"
+        "okx": "INJ-USDT",
+        "mexc": "INJUSDT"
       },
       "price_priority": [
         "binance"
@@ -842,7 +915,8 @@
       "external_ids": {
         "binance": "ONDOUSDT",
         "coingecko": "ondo-finance",
-        "okx": "ONDO-USDT"
+        "okx": "ONDO-USDT",
+        "mexc": "ONDOUSDT"
       },
       "price_priority": [
         "binance"
@@ -856,7 +930,8 @@
       "external_ids": {
         "binance": "TRUMPUSDT",
         "coingecko": "official-trump",
-        "okx": "TRUMP-USDT"
+        "okx": "TRUMP-USDT",
+        "mexc": "TRUMPUSDT"
       },
       "price_priority": [
         "binance"
@@ -870,7 +945,8 @@
       "external_ids": {
         "binance": "ETHFIUSDT",
         "coingecko": "ether-fi",
-        "okx": "ETHFI-USDT"
+        "okx": "ETHFI-USDT",
+        "mexc": "ETHFIUSDT"
       },
       "price_priority": [
         "binance"
@@ -883,7 +959,8 @@
       "enabled": true,
       "external_ids": {
         "binance": "WBTCUSDT",
-        "coingecko": "wrapped-bitcoin"
+        "coingecko": "wrapped-bitcoin",
+        "mexc": "WBTCUSDT"
       },
       "price_priority": [
         "binance"
@@ -896,7 +973,8 @@
       "enabled": true,
       "external_ids": {
         "binance": "CAKEUSDT",
-        "coingecko": "pancakeswap-token"
+        "coingecko": "pancakeswap-token",
+        "mexc": "CAKEUSDT"
       },
       "price_priority": [
         "binance"
@@ -910,7 +988,8 @@
       "external_ids": {
         "binance": "OPUSDT",
         "coingecko": "optimism",
-        "okx": "OP-USDT"
+        "okx": "OP-USDT",
+        "mexc": "OPUSDT"
       },
       "price_priority": [
         "binance"
@@ -924,7 +1003,8 @@
       "external_ids": {
         "binance": "POLUSDT",
         "coingecko": "polygon-ecosystem-token",
-        "okx": "POL-USDT"
+        "okx": "POL-USDT",
+        "mexc": "POLUSDT"
       },
       "price_priority": [
         "binance"
@@ -937,7 +1017,8 @@
       "enabled": true,
       "external_ids": {
         "binance": "THEUSDT",
-        "coingecko": "the-coin"
+        "coingecko": "the-coin",
+        "mexc": "THEUSDT"
       },
       "price_priority": [
         "binance"
@@ -951,7 +1032,8 @@
       "external_ids": {
         "binance": "NEIROUSDT",
         "coingecko": "neiro",
-        "okx": "NEIRO-USDT"
+        "okx": "NEIRO-USDT",
+        "mexc": "NEIROUSDT"
       },
       "price_priority": [
         "binance"
@@ -964,7 +1046,8 @@
       "enabled": true,
       "external_ids": {
         "binance": "SYRUPUSDT",
-        "coingecko": "syrup"
+        "coingecko": "syrup",
+        "mexc": "SYRUPUSDT"
       },
       "price_priority": [
         "binance"
@@ -978,7 +1061,8 @@
       "external_ids": {
         "binance": "LDOUSDT",
         "coingecko": "lido-dao",
-        "okx": "LDO-USDT"
+        "okx": "LDO-USDT",
+        "mexc": "LDOUSDT"
       },
       "price_priority": [
         "binance"
@@ -992,7 +1076,8 @@
       "external_ids": {
         "binance": "TIAUSDT",
         "coingecko": "celestia",
-        "okx": "TIA-USDT"
+        "okx": "TIA-USDT",
+        "mexc": "TIAUSDT"
       },
       "price_priority": [
         "binance"
@@ -1006,7 +1091,8 @@
       "external_ids": {
         "binance": "METUSDT",
         "coingecko": "met-ai",
-        "okx": "MET-USDT"
+        "okx": "MET-USDT",
+        "mexc": "METUSDT"
       },
       "price_priority": [
         "binance"
@@ -1020,7 +1106,8 @@
       "external_ids": {
         "binance": "ETCUSDT",
         "coingecko": "ethereum-classic",
-        "okx": "ETC-USDT"
+        "okx": "ETC-USDT",
+        "mexc": "ETCUSDT"
       },
       "price_priority": [
         "binance"
@@ -1034,7 +1121,8 @@
       "external_ids": {
         "binance": "CHZUSDT",
         "coingecko": "chiliz",
-        "okx": "CHZ-USDT"
+        "okx": "CHZ-USDT",
+        "mexc": "CHZUSDT"
       },
       "price_priority": [
         "binance"
@@ -1048,7 +1136,8 @@
       "external_ids": {
         "binance": "PNUTUSDT",
         "coingecko": "peanut-3",
-        "okx": "PNUT-USDT"
+        "okx": "PNUT-USDT",
+        "mexc": "PNUTUSDT"
       },
       "price_priority": [
         "binance"
@@ -1062,7 +1151,8 @@
       "external_ids": {
         "binance": "ZKUSDT",
         "coingecko": "zksync",
-        "okx": "ZK-USDT"
+        "okx": "ZK-USDT",
+        "mexc": "ZKUSDT"
       },
       "price_priority": [
         "binance"
@@ -1075,7 +1165,8 @@
       "enabled": true,
       "external_ids": {
         "binance": "SHELLUSDT",
-        "coingecko": "myshell"
+        "coingecko": "myshell",
+        "mexc": "SHELLUSDT"
       },
       "price_priority": [
         "binance"
@@ -1089,7 +1180,8 @@
       "external_ids": {
         "binance": "BATUSDT",
         "coingecko": "basic-attention-token",
-        "okx": "BAT-USDT"
+        "okx": "BAT-USDT",
+        "mexc": "BATUSDT"
       },
       "price_priority": [
         "binance"
@@ -1102,7 +1194,8 @@
       "enabled": true,
       "external_ids": {
         "binance": "BANANAS31USDT",
-        "coingecko": "banana-for-scale-2"
+        "coingecko": "banana-for-scale-2",
+        "mexc": "BANANAS31USDT"
       },
       "price_priority": [
         "binance"
@@ -1115,7 +1208,8 @@
       "enabled": true,
       "external_ids": {
         "binance": "MDTUSDT",
-        "coingecko": "measurable-data-token"
+        "coingecko": "measurable-data-token",
+        "mexc": "MDTUSDT"
       },
       "price_priority": [
         "binance"
@@ -1129,7 +1223,8 @@
       "external_ids": {
         "binance": "ALLOUSDT",
         "coingecko": "allora",
-        "okx": "ALLO-USDT"
+        "okx": "ALLO-USDT",
+        "mexc": "ALLOUSDT"
       },
       "price_priority": [
         "binance"
@@ -1143,7 +1238,8 @@
       "external_ids": {
         "binance": "PENDLEUSDT",
         "coingecko": "pendle",
-        "okx": "PENDLE-USDT"
+        "okx": "PENDLE-USDT",
+        "mexc": "PENDLEUSDT"
       },
       "price_priority": [
         "binance"
@@ -1157,7 +1253,8 @@
       "external_ids": {
         "binance": "ATOMUSDT",
         "coingecko": "cosmos",
-        "okx": "ATOM-USDT"
+        "okx": "ATOM-USDT",
+        "mexc": "ATOMUSDT"
       },
       "price_priority": [
         "binance"
@@ -1170,7 +1267,8 @@
       "enabled": true,
       "external_ids": {
         "binance": "SXPUSDT",
-        "coingecko": "swipe"
+        "coingecko": "swipe",
+        "mexc": "SXPUSDT"
       },
       "price_priority": [
         "binance"
@@ -1184,7 +1282,8 @@
       "external_ids": {
         "binance": "ORDIUSDT",
         "coingecko": "ordinals",
-        "okx": "ORDI-USDT"
+        "okx": "ORDI-USDT",
+        "mexc": "ORDIUSDT"
       },
       "price_priority": [
         "binance"
@@ -1198,7 +1297,8 @@
       "external_ids": {
         "binance": "ALGOUSDT",
         "coingecko": "algorand",
-        "okx": "ALGO-USDT"
+        "okx": "ALGO-USDT",
+        "mexc": "ALGOUSDT"
       },
       "price_priority": [
         "binance"
@@ -1212,7 +1312,8 @@
       "external_ids": {
         "binance": "XTZUSDT",
         "coingecko": "tezos",
-        "okx": "XTZ-USDT"
+        "okx": "XTZ-USDT",
+        "mexc": "XTZUSDT"
       },
       "price_priority": [
         "binance"
@@ -1226,7 +1327,8 @@
       "external_ids": {
         "binance": "SUSDT",
         "coingecko": "sonic-3",
-        "okx": "S-USDT"
+        "okx": "S-USDT",
+        "mexc": "SUSDT"
       },
       "price_priority": [
         "binance"
@@ -1240,20 +1342,8 @@
       "external_ids": {
         "binance": "KITEUSDT",
         "coingecko": "kite",
-        "okx": "KITE-USDT"
-      },
-      "price_priority": [
-        "binance"
-      ]
-    },
-    "fis": {
-      "id": "fis",
-      "name": "FIS",
-      "symbol": "FIS",
-      "enabled": true,
-      "external_ids": {
-        "binance": "FISUSDT",
-        "coingecko": "stafi"
+        "okx": "KITE-USDT",
+        "mexc": "KITEUSDT"
       },
       "price_priority": [
         "binance"
@@ -1267,7 +1357,8 @@
       "external_ids": {
         "binance": "ARKMUSDT",
         "coingecko": "arkham",
-        "okx": "ARKM-USDT"
+        "okx": "ARKM-USDT",
+        "mexc": "ARKMUSDT"
       },
       "price_priority": [
         "binance"
@@ -1281,7 +1372,8 @@
       "external_ids": {
         "binance": "RENDERUSDT",
         "coingecko": "render-token",
-        "okx": "RENDER-USDT"
+        "okx": "RENDER-USDT",
+        "mexc": "RENDERUSDT"
       },
       "price_priority": [
         "binance"
@@ -1294,7 +1386,8 @@
       "enabled": true,
       "external_ids": {
         "binance": "VETUSDT",
-        "coingecko": "vechain"
+        "coingecko": "vechain",
+        "mexc": "VETUSDT"
       },
       "price_priority": [
         "binance"

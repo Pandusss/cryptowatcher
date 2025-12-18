@@ -1,42 +1,32 @@
 /**
- * Утилиты для работы с Telegram WebApp
+ * Utilities for working with Telegram WebApp
  */
 
 /**
- * Получить user_id из Telegram WebApp
- * @returns user_id или null, если не доступен
+ * Get user_id from Telegram WebApp
+ * @returns user_id or null if not available
  */
 export const getTelegramUserId = (): number | null => {
   try {
     const webApp = window.Telegram?.WebApp
     if (!webApp) {
-      console.warn('[Telegram] WebApp не доступен')
       return null
     }
 
-    const userId = webApp.initDataUnsafe?.user?.id
-    if (!userId) {
-      console.warn('[Telegram] user_id не найден в initDataUnsafe')
-      return null
-    }
-
-    return userId
-  } catch (error) {
-    console.error('[Telegram] Ошибка при получении user_id:', error)
+    return webApp.initDataUnsafe?.user?.id || null
+  } catch {
     return null
   }
 }
 
 /**
- * Получить данные пользователя из Telegram WebApp
+ * Get user data from Telegram WebApp
  */
 export const getTelegramUser = () => {
   try {
     const webApp = window.Telegram?.WebApp
     return webApp?.initDataUnsafe?.user || null
-  } catch (error) {
-    console.error('[Telegram] Ошибка при получении данных пользователя:', error)
+  } catch {
     return null
   }
 }
-

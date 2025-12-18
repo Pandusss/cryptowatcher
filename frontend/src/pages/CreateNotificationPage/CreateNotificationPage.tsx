@@ -156,7 +156,6 @@ export const CreateNotificationPage = () => {
             const coin = coinsListResult.value.find(c => c.id === notification.crypto_id)
             if (coin?.imageUrl) {
               imageUrl = coin.imageUrl
-              console.log('[CreateNotificationPage] Found imageUrl from coins list:', imageUrl)
             }
             if (coin?.priceDecimals !== undefined) {
               priceDecimals = coin.priceDecimals
@@ -193,11 +192,9 @@ export const CreateNotificationPage = () => {
           setValueType(notification.value_type)
           setValue(notification.value.toString())
           setExpireTime(notification.expire_time_hours ?? null)
-        } catch (error) {
-          console.error('Failed to load notification:', error)
-          setError('Не удалось загрузить уведомление. Попробуйте еще раз.')
+        } catch {
+          setError('Failed to load notification. Please try again.')
           setIsLoading(false)
-          // Не делаем автоматический редирект, показываем ошибку пользователю
         }
       }
       
@@ -243,8 +240,7 @@ export const CreateNotificationPage = () => {
           setChartLoading(true)
           const data = await apiService.getCoinChart(crypto.id, selectedPeriod)
           setChartData(data)
-        } catch (error) {
-          console.error('Failed to load chart data:', error)
+        } catch {
           setChartData([])
         } finally {
           setChartLoading(false)
@@ -265,49 +261,38 @@ export const CreateNotificationPage = () => {
 
     const coinId = crypto.id // Сохраняем ID в локальную переменную для использования в замыкании
 
-    // Функция обновления цены и последней точки графика
+    // Function to update price and last chart point
     const updatePrice = async () => {
       try {
-        console.log(`[CreateNotificationPage] Обновление цены для ${coinId}...`)
-        
-        // Получаем текущую цену монеты из кэша
         const coinDetails = await apiService.getCoinDetails(coinId)
         if (coinDetails && coinDetails.currentPrice) {
           const newPrice = coinDetails.currentPrice
-          console.log(`[CreateNotificationPage] Получена новая цена: $${newPrice}`)
           
-          // Обновляем текущую цену монеты
           setCrypto(prevCrypto => {
             if (!prevCrypto || prevCrypto.id !== coinId) {
-              console.warn(`[CreateNotificationPage] Пропуск обновления: prevCrypto=${!!prevCrypto}, id совпадает=${prevCrypto?.id === coinId}`)
               return prevCrypto
             }
             
-            // Запускаем анимацию подсветки
+            // Trigger highlight animation
             if (prevCrypto.price !== newPrice) {
-              // Цена изменилась - зеленая или красная анимация
               setPriceDirection(newPrice > prevCrypto.price ? 'up' : 'down')
             } else {
-              // Цена не изменилась - серая анимация
               setPriceDirection('neutral')
             }
-              setPriceUpdated(true)
-              // Убираем класс через 800ms (длительность анимации)
-              setTimeout(() => {
-                setPriceUpdated(false)
-                setPriceDirection(null)
-              }, 800)
+            setPriceUpdated(true)
+            setTimeout(() => {
+              setPriceUpdated(false)
+              setPriceDirection(null)
+            }, 800)
             
-            const updatedCrypto = {
+            return {
               ...prevCrypto,
               price: newPrice,
               priceDecimals: coinDetails.priceDecimals || prevCrypto.priceDecimals,
             }
-            console.log(`[CreateNotificationPage] ✅ Обновлена цена: $${prevCrypto.price} → $${newPrice}`)
-            return updatedCrypto
           })
 
-          // Обновляем только последнюю точку графика
+          // Update only the last chart point
           setChartData(prevData => {
             if (prevData.length === 0) {
               return prevData
@@ -316,7 +301,6 @@ export const CreateNotificationPage = () => {
             const updatedData = [...prevData]
             const lastIndex = updatedData.length - 1
             
-            // Форматируем дату в формате "YYYY-MM-DD HH:MM" (как в API)
             const now = new Date()
             const year = now.getFullYear()
             const month = String(now.getMonth() + 1).padStart(2, '0')
@@ -325,36 +309,27 @@ export const CreateNotificationPage = () => {
             const minutes = String(now.getMinutes()).padStart(2, '0')
             const formattedDate = `${year}-${month}-${day} ${hours}:${minutes}`
             
-            // Обновляем последнюю точку: цену и дату
             updatedData[lastIndex] = {
               ...updatedData[lastIndex],
               price: newPrice,
               date: formattedDate,
             }
             
-            console.log(`[CreateNotificationPage] ✅ Обновлена последняя точка графика: цена $${newPrice}`)
             return updatedData
           })
-        } else {
-          console.warn(`[CreateNotificationPage] Не удалось получить данные монеты ${coinId}`)
         }
-      } catch (error) {
-        console.error('[CreateNotificationPage] Ошибка обновления цены:', error)
+      } catch {
+        // Price update failed, will retry
       }
     }
 
-    // Обновляем цену сразу при монтировании
+    // Update price immediately on mount
     updatePrice()
 
-    // Обновляем цену каждые 5 секунд
-    console.log(`[CreateNotificationPage] ✅ Запуск интервала обновления каждые 5 секунд для ${coinId}`)
-    const intervalId = setInterval(() => {
-      updatePrice()
-    }, 5000) // 5000 мс = 5 секунд
+    // Update price every 5 seconds
+    const intervalId = setInterval(updatePrice, 5000)
 
-    // Очищаем интервал при размонтировании или изменении зависимостей
     return () => {
-      console.log(`[CreateNotificationPage] Очистка интервала обновления для ${coinId}`)
       clearInterval(intervalId)
     }
   }, [crypto?.id])
@@ -364,13 +339,13 @@ export const CreateNotificationPage = () => {
 
     const userId = getTelegramUserId()
     if (!userId) {
-      setError('Не удалось получить ID пользователя из Telegram')
+      setError('Could not get user ID from Telegram')
       return
     }
 
     const numValue = parseFloat(value)
     if (isNaN(numValue) || numValue <= 0) {
-      setError('Введите корректное значение')
+      setError('Please enter a valid value')
       return
     }
 
@@ -406,9 +381,8 @@ export const CreateNotificationPage = () => {
       // Успешно создано/обновлено
       // Используем replace: true чтобы очистить историю и обновить список на главной
       navigate(ROUTES_NAME.MAIN, { replace: true })
-    } catch (error) {
-      console.error('Failed to create/update notification:', error)
-      setError('Не удалось сохранить уведомление. Попробуйте еще раз.')
+    } catch {
+      setError('Failed to save notification. Please try again.')
       setIsSaving(false)
     }
   }
@@ -423,9 +397,8 @@ export const CreateNotificationPage = () => {
       await apiService.deleteNotification(parseInt(id))
       // Успешно удалено
       navigate(ROUTES_NAME.MAIN, { replace: true })
-    } catch (error) {
-      console.error('Failed to delete notification:', error)
-      setError('Не удалось удалить уведомление. Попробуйте еще раз.')
+    } catch {
+      setError('Failed to delete notification. Please try again.')
       setIsDeleting(false)
     }
   }

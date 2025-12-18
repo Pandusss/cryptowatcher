@@ -1,6 +1,6 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import asyncio
 
 from app.core.config import settings
 from app.api.v1.router import api_router
@@ -8,11 +8,48 @@ from app.services.bot_polling import bot_polling
 from app.services.notification_checker import notification_checker
 from app.providers.binance_websocket import binance_websocket_worker
 from app.providers.okx_websocket import okx_websocket_worker
+from app.providers.mexc_websocket import mexc_websocket_worker
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Application lifespan handler.
+    Manages startup and shutdown of background services.
+    """
+    import asyncio
+    
+    # Startup: Start all background services
+    asyncio.create_task(bot_polling.start())
+    asyncio.create_task(notification_checker.start())
+    asyncio.create_task(binance_websocket_worker.start())
+    asyncio.create_task(okx_websocket_worker.start())
+    asyncio.create_task(mexc_websocket_worker.start())
+    
+    yield
+    
+    # Shutdown: Stop all services and cleanup
+    bot_polling.stop()
+    notification_checker.stop()
+    binance_websocket_worker.stop()
+    okx_websocket_worker.stop()
+    mexc_websocket_worker.stop()
+    
+    # Close WebSocket connections
+    await binance_websocket_worker.close()
+    await okx_websocket_worker.close()
+    await mexc_websocket_worker.close()
+    
+    # Close shared HTTP client
+    from app.utils.http_client import SharedHTTPClient
+    await SharedHTTPClient.close()
+
 
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     debug=settings.DEBUG,
+    lifespan=lifespan,
 )
 
 # CORS middleware
@@ -37,34 +74,3 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
-
-
-@app.on_event("startup")
-async def startup_event():
-    # Start polling for bot command processing
-    asyncio.create_task(bot_polling.start())
-    
-    # Start notification checking
-    asyncio.create_task(notification_checker.start())
-    
-    # Start Binance WebSocket
-    asyncio.create_task(binance_websocket_worker.start())
-    
-    # Start OKX WebSocket
-    asyncio.create_task(okx_websocket_worker.start())
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    bot_polling.stop()
-    notification_checker.stop()
-    binance_websocket_worker.stop()  # Stop Binance WebSocket
-    okx_websocket_worker.stop()  # Stop OKX WebSocket
-    
-    # Close WebSocket connections to prevent memory leaks
-    await binance_websocket_worker.close()
-    await okx_websocket_worker.close()
-    
-    # Close shared HTTP client
-    from app.utils.http_client import SharedHTTPClient
-    await SharedHTTPClient.close()

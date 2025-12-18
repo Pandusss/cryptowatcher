@@ -48,8 +48,7 @@ export const ChooseCoinPage = () => {
         setCoins(coins)
         coinsRef.current = coins // Обновляем ref
         setLoading(false) // Показываем список сразу
-      } catch (error) {
-        console.error('Failed to fetch coins:', error)
+      } catch {
         setLoading(false)
       }
     }
@@ -76,8 +75,6 @@ export const ChooseCoinPage = () => {
 
         // Делаем один batch запрос для получения всех цен
         const pricesData = await apiService.getCoinsListPrices(coinIds)
-        
-        console.log(`[ChooseCoinPage] Получены цены для ${Object.keys(pricesData).length} монет из ${coinIds.length} запрошенных`)
 
         // Обновляем цены для всех монет
         const updatedCoins = currentCoins.map((coin) => {
@@ -94,13 +91,8 @@ export const ChooseCoinPage = () => {
             
             if (priceDiff > threshold) {
               direction = newPrice > oldPrice ? 'up' : 'down'
-              console.log(`[ChooseCoinPage] ${coin.symbol}: $${oldPrice.toFixed(4)} → $${newPrice.toFixed(4)} (${direction})`)
             } else {
               direction = 'neutral'
-              // Логируем даже если цена не изменилась, чтобы видеть что обновление работает
-              if (Math.random() < 0.1) { // Логируем 10% случаев чтобы не засорять консоль
-                console.log(`[ChooseCoinPage] ${coin.symbol}: цена не изменилась (${direction})`)
-              }
             }
 
             // ВСЕГДА запускаем анимацию (даже если neutral)
@@ -139,8 +131,8 @@ export const ChooseCoinPage = () => {
         // Обновляем состояние и ref один раз после всех обновлений
         setCoins(updatedCoins)
         coinsRef.current = updatedCoins
-      } catch (error) {
-        console.error('[ChooseCoinPage] Ошибка обновления цен:', error)
+      } catch {
+        // Price update failed, will retry on next interval
       }
     }
 

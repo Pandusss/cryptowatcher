@@ -96,9 +96,7 @@ class CoinRegistry:
             self._config_hash = new_config_hash
             
         except Exception as e:
-            logger.error(f"Configuration loading error: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"Configuration loading error: {e}", exc_info=True)
     
     def get_coin(self, coin_id: str) -> Optional[CoinConfig]:
         return self._coins.get(coin_id)

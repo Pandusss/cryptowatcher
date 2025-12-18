@@ -18,24 +18,19 @@ function App() {
     webApp?.expand()
     webApp?.disableVerticalSwipes()
     
-    // Регистрируем пользователя при первом открытии Mini App
+    // Register user on first Mini App open
     const registerUser = async () => {
       const userId = getTelegramUserId()
       const userData = getTelegramUser()
       
       if (userId && userData) {
-        try {
-          await apiService.registerUser({
-            id: userId,
-            username: userData.username,
-            first_name: userData.first_name,
-            last_name: userData.last_name,
-            language_code: userData.language_code,
-          })
-          console.log('[App] Пользователь зарегистрирован:', userId)
-        } catch (error) {
-          console.error('[App] Ошибка регистрации пользователя:', error)
-        }
+        await apiService.registerUser({
+          id: userId,
+          username: userData.username,
+          first_name: userData.first_name,
+          last_name: userData.last_name,
+          language_code: userData.language_code,
+        })
       }
     }
     

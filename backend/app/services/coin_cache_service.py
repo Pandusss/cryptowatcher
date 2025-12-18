@@ -2,10 +2,12 @@
 Service for working with coin cache (wrapper over CoinCacheManager)
 """
 from typing import Dict, List, Optional
+import logging
 
 from app.core.redis_client import get_redis
 from app.utils.cache import CoinCacheManager
 
+logger = logging.getLogger("CoinCacheService")
 
 class CoinCacheService:
     """
@@ -128,5 +130,5 @@ class CoinCacheService:
             
             return True
         except Exception as e:
-            print(f"[CoinCacheService] Error clearing static cache: {e}")
+            logger.error(f"Error clearing static cache: {e}")
             return False

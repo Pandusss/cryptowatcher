@@ -1,5 +1,5 @@
-// В разработке используем относительные пути (Vite proxy)
-// В продакшене будет один домен, поэтому тоже относительные пути
+// In development uses relative paths (Vite proxy)
+// In production, same domain, so also relative paths
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 
 import type {
@@ -103,7 +103,6 @@ class ApiService {
 
   private async fetch<T>(endpoint: string, options?: RequestInit): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`
-    console.log('API Request:', { url, method: options?.method || 'GET', body: options?.body })
     
     const response = await fetch(url, {
       ...options,
@@ -113,27 +112,20 @@ class ApiService {
       },
     })
 
-    console.log('API Response:', { status: response.status, statusText: response.statusText, ok: response.ok })
-
     if (!response.ok) {
       let errorMessage = `API Error: ${response.statusText}`
       try {
         const errorData = await response.json()
-        console.error('API Error data:', errorData)
         errorMessage = errorData.detail || errorData.message || errorMessage
-      } catch (e) {
-        // Если не удалось распарсить JSON, используем статус текст
-        const text = await response.text()
-        console.error('API Error text:', text)
+      } catch {
+        // If JSON parse fails, use status text
       }
-      const error: any = new Error(errorMessage)
+      const error: Error & { status?: number } = new Error(errorMessage)
       error.status = response.status
       throw error
     }
 
-    const data = await response.json()
-    console.log('API Response data:', data)
-    return data
+    return await response.json()
   }
 
   async getCoinChart(coinId: string, period: string = '7d'): Promise<ChartDataPoint[]> {
@@ -142,8 +134,7 @@ class ApiService {
         `/api/v1/coins/${coinId}/chart?period=${period}`
       )
       return response.data || []
-    } catch (error) {
-      console.error('Failed to fetch chart data:', error)
+    } catch {
       return []
     }
   }
@@ -152,8 +143,7 @@ class ApiService {
     try {
       const response = await this.fetch<CoinDetailsResponse>(`/api/v1/coins/${coinId}`)
       return response.data || null
-    } catch (error) {
-      console.error('Failed to fetch coin details:', error)
+    } catch {
       return null
     }
   }
@@ -164,8 +154,7 @@ class ApiService {
         `/api/v1/coins/list?limit=${limit}&start=${start}`
       )
       return response.data || []
-    } catch (error) {
-      console.error('Failed to fetch coins list:', error)
+    } catch {
       return []
     }
   }
@@ -176,8 +165,7 @@ class ApiService {
         `/api/v1/coins/list/static?limit=${limit}&start=${start}`
       )
       return response.data || []
-    } catch (error) {
-      console.error('Failed to fetch coins list static:', error)
+    } catch {
       return []
     }
   }
@@ -195,8 +183,7 @@ class ApiService {
         }
       )
       return response.data || {}
-    } catch (error) {
-      console.error('Failed to fetch coins prices:', error)
+    } catch {
       return {}
     }
   }
@@ -208,68 +195,44 @@ class ApiService {
         `/api/v1/notifications/?user_id=${userId}`
       )
       return response || []
-    } catch (error) {
-      console.error('Failed to fetch notifications:', error)
+    } catch {
       return []
     }
   }
 
   async getNotification(notificationId: number): Promise<NotificationResponse> {
-    try {
-      const response = await this.fetch<NotificationResponse>(
-        `/api/v1/notifications/${notificationId}`
-      )
-      return response
-    } catch (error) {
-      console.error('Failed to fetch notification:', error)
-      throw error
-    }
+    return await this.fetch<NotificationResponse>(
+      `/api/v1/notifications/${notificationId}`
+    )
   }
 
   async createNotification(data: CreateNotificationRequest): Promise<NotificationResponse> {
-    try {
-      const response = await this.fetch<NotificationResponse>(
-        '/api/v1/notifications/',
-        {
-          method: 'POST',
-          body: JSON.stringify(data),
-        }
-      )
-      return response
-    } catch (error) {
-      console.error('Failed to create notification:', error)
-      throw error
-    }
+    return await this.fetch<NotificationResponse>(
+      '/api/v1/notifications/',
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    )
   }
 
   async updateNotification(
     notificationId: number,
     data: UpdateNotificationRequest
   ): Promise<NotificationResponse> {
-    try {
-      const response = await this.fetch<NotificationResponse>(
-        `/api/v1/notifications/${notificationId}`,
-        {
-          method: 'PUT',
-          body: JSON.stringify(data),
-        }
-      )
-      return response
-    } catch (error) {
-      console.error('Failed to update notification:', error)
-      throw error
-    }
+    return await this.fetch<NotificationResponse>(
+      `/api/v1/notifications/${notificationId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }
+    )
   }
 
   async deleteNotification(notificationId: number): Promise<void> {
-    try {
-      await this.fetch(`/api/v1/notifications/${notificationId}`, {
-        method: 'DELETE',
-      })
-    } catch (error) {
-      console.error('Failed to delete notification:', error)
-      throw error
-    }
+    await this.fetch(`/api/v1/notifications/${notificationId}`, {
+      method: 'DELETE',
+    })
   }
 
   // Users API
@@ -285,21 +248,18 @@ class ApiService {
         method: 'POST',
         body: JSON.stringify(userData),
       })
-    } catch (error) {
-      console.error('Failed to register user:', error)
-      // Не бросаем ошибку, так как это не критично
+    } catch {
+      // Non-critical operation, silently ignore errors
     }
   }
 
   // DND Settings API
   async getDndSettings(userId: number): Promise<{ dnd_start_time: string | null; dnd_end_time: string | null }> {
     try {
-      const response = await this.fetch<{ dnd_start_time: string | null; dnd_end_time: string | null }>(
+      return await this.fetch<{ dnd_start_time: string | null; dnd_end_time: string | null }>(
         `/api/v1/users/${userId}/dnd-settings`
       )
-      return response
-    } catch (error) {
-      console.error('Failed to fetch DND settings:', error)
+    } catch {
       return { dnd_start_time: null, dnd_end_time: null }
     }
   }
@@ -308,19 +268,13 @@ class ApiService {
     userId: number,
     settings: { dnd_start_time?: string | null; dnd_end_time?: string | null }
   ): Promise<{ dnd_start_time: string | null; dnd_end_time: string | null }> {
-    try {
-      const response = await this.fetch<{ dnd_start_time: string | null; dnd_end_time: string | null }>(
-        `/api/v1/users/${userId}/dnd-settings`,
-        {
-          method: 'PUT',
-          body: JSON.stringify(settings),
-        }
-      )
-      return response
-    } catch (error) {
-      console.error('Failed to update DND settings:', error)
-      throw error
-    }
+    return await this.fetch<{ dnd_start_time: string | null; dnd_end_time: string | null }>(
+      `/api/v1/users/${userId}/dnd-settings`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(settings),
+      }
+    )
   }
 }
 

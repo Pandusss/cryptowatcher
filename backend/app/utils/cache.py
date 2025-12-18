@@ -13,7 +13,7 @@ class CoinCacheManager:
     
     # TTL for different data types
     CACHE_TTL_COIN_STATIC = 3600  # 1 hour for static data
-    CACHE_TTL_COIN_PRICE = 10  # 10 seconds for prices
+    CACHE_TTL_COIN_PRICE = 86400  # 24 hours - price persists until overwritten
     CACHE_TTL_IMAGE_URL = 604800  # 7 days for icons
     CACHE_TTL_CHART = 60  # 1 minute for charts
     

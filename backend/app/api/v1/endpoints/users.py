@@ -130,10 +130,8 @@ async def update_dnd_settings(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Unexpected error: {e}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        logger.error(f"Unexpected error updating DND settings: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/{user_id}/dnd-settings")

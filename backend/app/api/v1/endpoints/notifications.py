@@ -57,8 +57,6 @@ async def get_notifications(
             return crypto_id, image_url
         except Exception as e:
             logger.warning(f"Failed to get imageUrl for {crypto_id}: {e}")
-            import traceback
-            traceback.print_exc()
             return crypto_id, None
     
     # Run parallel requests
@@ -118,8 +116,6 @@ async def get_notification(
         image_url = await aggregation_service.get_coin_image_url(notification.crypto_id)
     except Exception as e:
         logger.warning(f"Failed to get imageUrl for {notification.crypto_id}: {e}")
-        import traceback
-        traceback.print_exc()
     
     # Create dictionary from notification with imageUrl
     notification_dict = {
