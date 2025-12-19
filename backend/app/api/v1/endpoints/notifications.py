@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Dict, Optional
 import asyncio
 import logging
 
@@ -8,10 +8,40 @@ from app.core.database import get_db
 from app.models.notification import Notification
 from app.schemas.notification import NotificationCreate, NotificationUpdate, NotificationResponse
 from app.services.user_service import get_or_create_user
-from app.core.coin_registry import coin_registry
+from app.services.aggregation_service import aggregation_service
 
 router = APIRouter()
 logger = logging.getLogger("EndpointNotifications")
+
+
+async def get_image_urls_for_notifications(notifications: List[Notification]) -> Dict[str, Optional[str]]:
+    """Get image URLs for multiple notifications efficiently"""
+    if not notifications:
+        return {}
+    
+    unique_crypto_ids = list(set([n.crypto_id for n in notifications]))
+    
+    async def get_image_url(crypto_id: str):
+        try:
+            # aggregation_service already handles coin_registry checks internally
+            image_url = await aggregation_service.get_coin_image_url(crypto_id)
+            return crypto_id, image_url
+        except Exception as e:
+            logger.warning(f"Failed to get imageUrl for {crypto_id}: {e}")
+            return crypto_id, None
+    
+    results = await asyncio.gather(
+        *[get_image_url(crypto_id) for crypto_id in unique_crypto_ids],
+        return_exceptions=True
+    )
+    
+    image_urls = {}
+    for result in results:
+        if isinstance(result, tuple):
+            crypto_id, image_url = result
+            image_urls[crypto_id] = image_url
+    
+    return image_urls
 
 
 
@@ -31,42 +61,8 @@ async def get_notifications(
             .all()
     )
     
-    # Create dictionary to store imageUrl by crypto_id
-    image_urls = {}
-    
-    # Get unique crypto_ids from notifications
-    unique_crypto_ids = list(set([n.crypto_id for n in notifications]))
-    
-    # Get imageUrl for each coin in parallel (using optimized method)
-    async def get_image_url(crypto_id: str):
-        try:
-            # Get CoinGecko ID from coin_registry
-            coin = coin_registry.get_coin(crypto_id)
-            if not coin:
-                logger.warning(f"Coin {crypto_id} not found in registry")
-                return crypto_id, None
-            
-            coingecko_id = coin.external_ids.get("coingecko")
-            if not coingecko_id:
-                logger.warning(f"Coin {crypto_id} doesn't have CoinGecko ID")
-                return crypto_id, None
-            
-            # Use aggregation_service to get imageUrl (correct method)
-            from app.services.aggregation_service import aggregation_service
-            image_url = await aggregation_service.get_coin_image_url(crypto_id)
-            return crypto_id, image_url
-        except Exception as e:
-            logger.warning(f"Failed to get imageUrl for {crypto_id}: {e}")
-            return crypto_id, None
-    
-    # Run parallel requests
-    results = await asyncio.gather(*[get_image_url(crypto_id) for crypto_id in unique_crypto_ids], return_exceptions=True)
-    
-    # Fill image_urls dictionary
-    for result in results:
-        if isinstance(result, tuple):
-            crypto_id, image_url = result
-            image_urls[crypto_id] = image_url
+    # Get image URLs for all notifications efficiently
+    image_urls = await get_image_urls_for_notifications(notifications)
     
     # Add imageUrl to each notification
     notifications_with_images = []
@@ -109,13 +105,9 @@ async def get_notification(
     if not notification:
         raise HTTPException(status_code=404, detail="Notification not found")
     
-    # Get imageUrl via aggregation_service (correct method using coin_registry)
-    image_url = None
-    try:
-        from app.services.aggregation_service import aggregation_service
-        image_url = await aggregation_service.get_coin_image_url(notification.crypto_id)
-    except Exception as e:
-        logger.warning(f"Failed to get imageUrl for {notification.crypto_id}: {e}")
+    # Get imageUrl using shared helper function
+    image_urls = await get_image_urls_for_notifications([notification])
+    image_url = image_urls.get(notification.crypto_id)
     
     # Create dictionary from notification with imageUrl
     notification_dict = {

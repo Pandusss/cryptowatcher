@@ -158,7 +158,6 @@ async def get_dnd_settings(
         dnd_end_time=user.dnd_end_time.strftime("%H:%M") if user.dnd_end_time else None,
     )
 
-
 @router.get("/{user_id}/favorite-tokens")
 async def get_favorite_tokens(
     user_id: int,
