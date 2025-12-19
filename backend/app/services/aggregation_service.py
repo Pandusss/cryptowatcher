@@ -10,12 +10,14 @@ import logging
 
 from app.core.coin_registry import coin_registry
 from app.providers.coingecko_static import coingecko_static_adapter
-from app.providers.binance_price import binance_price_adapter
-from app.providers.okx_price import okx_price_adapter
-from app.providers.mexc_price import mexc_price_adapter
-from app.providers.binance_chart import binance_chart_adapter
-from app.providers.okx_chart import okx_chart_adapter
-from app.providers.mexc_chart import mexc_chart_adapter
+from app.providers.dex.coingecko_price import coingecko_price_adapter
+from app.providers.dex.coingecko_chart import coingecko_chart_adapter
+from app.providers.cex.binance_price import binance_price_adapter
+from app.providers.cex.okx_price import okx_price_adapter
+from app.providers.cex.mexc_price import mexc_price_adapter
+from app.providers.cex.binance_chart import binance_chart_adapter
+from app.providers.cex.okx_chart import okx_chart_adapter
+from app.providers.cex.mexc_chart import mexc_chart_adapter
 from app.utils.cache import CoinCacheManager
 
 
@@ -34,12 +36,14 @@ class AggregationService:
             "binance": binance_price_adapter,
             "okx": okx_price_adapter,
             "mexc": mexc_price_adapter,
+            "coingecko": coingecko_price_adapter,
         }
         
         self.chart_providers = {
             "binance": binance_chart_adapter,
             "okx": okx_chart_adapter,
             "mexc": mexc_chart_adapter,
+            "coingecko": coingecko_chart_adapter,
         }
     
     async def get_coin_static_data(self, coin_id: str) -> Optional[Dict]:

@@ -151,6 +151,18 @@
         "okx"
       ]
     },
+    "build": {
+      "id": "build",
+      "name": "BUILD",
+      "symbol": "BUILD",
+      "enabled": true,
+      "external_ids": {
+        "coingecko": "build-4"
+      },
+      "price_priority": [
+        "coingecko"
+      ]
+    },
     "notpixel": {
       "id": "notpixel",
       "name": "PX",

@@ -8,7 +8,7 @@ CryptoWatcher is a Telegram Mini App for real-time cryptocurrency price monitori
 
 ## Key Features
 
-- **Real-time Price Tracking:** WebSocket connections to Binance, OKX, and MEXC for live price updates
+- **Real-time Price Tracking:** WebSocket connections to CEX (Binance, OKX, MEXC) and REST API polling for DEX/aggregators (CoinGecko) for live price updates
 - **Smart Notifications:** Customizable stop-loss and take-profit alerts with flexible trigger conditions
 - **Interactive Charts:** Historical price charts with 1d, 7d, 30d, and 1y periods
 - **Multi-Exchange Aggregation:** Automatic price source selection based on availability and priority
@@ -20,7 +20,7 @@ CryptoWatcher is a Telegram Mini App for real-time cryptocurrency price monitori
 - **Frontend:** React with TypeScript, built with Vite
 - **Database:** PostgreSQL for persistent storage
 - **Caching:** Redis for price data, charts, and static content
-- **External APIs:** CoinGecko (metadata), Binance/OKX/MEXC (prices and charts)
+- **External APIs:** CoinGecko (metadata, prices, charts), Binance/OKX/MEXC (prices and charts via WebSocket)
 
 ## Architecture
 
@@ -77,8 +77,9 @@ CryptoWatcher is a Telegram Mini App for real-time cryptocurrency price monitori
 │                             PRICE UPDATE FLOW                                    │
 ├──────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                  │
-│  Binance/OKX/MEXC ─▶ WebSocket ─▶ Backend ─▶ RedisCache ─▶ API ─▶ Frontend    │
-│         (tickers)                  (parse)     (store)     (serve)  (display)    │
+│  CEX (Binance/OKX/MEXC) ─▶ WebSocket ─▶ Backend ─▶ RedisCache ─▶ API ─▶ Frontend│
+│  DEX (CoinGecko) ─▶ REST API ─▶ Backend ─▶ RedisCache ─▶ API ─▶ Frontend      │
+│         (tickers/prices)            (parse)     (store)     (serve)  (display)    │
 │                                                                                  │
 └──────────────────────────────────────────────────────────────────────────────────┘
 
@@ -214,7 +215,8 @@ COINGECKO_API_KEY=
 | Component | Description |
 |-----------|-------------|
 | **API** | REST endpoints for coins, notifications, and users |
-| **WebSocket Workers** | Real-time price collection from Binance, OKX, MEXC |
+| **WebSocket Workers** | Real-time price collection from CEX (Binance, OKX, MEXC) |
+| **REST API Polling** | Periodic price updates from DEX/aggregators (CoinGecko) |
 | **Notification Checker** | Background task that checks alert conditions every 60s |
 | **Bot Polling** | Telegram bot for `/start` command and sending alerts |
 | **Aggregation Service** | Unified interface for multi-source data with fallback |
@@ -237,7 +239,10 @@ CryptoWatcher/
 │   │   ├── api/v1/          # REST API endpoints
 │   │   ├── core/            # Config, database, redis, coin registry
 │   │   ├── models/          # SQLAlchemy models (User, Notification)
-│   │   ├── providers/       # Exchange adapters (Binance, OKX, MEXC)
+│   │   ├── providers/       # Exchange adapters
+│   │   │   ├── cex/         # Centralized exchanges (Binance, OKX, MEXC)
+│   │   │   ├── dex/         # Decentralized exchanges / Aggregators (CoinGecko)
+│   │   │   └── base_*.py    # Base classes for adapters
 │   │   ├── services/        # Business logic layer
 │   │   └── utils/           # Helpers (cache, formatters, http client)
 │   ├── alembic/             # Database migrations
@@ -269,11 +274,20 @@ We welcome contributions to CryptoWatcher! Here's how you can contribute:
 
 ### Adding New Exchange
 
-1. Create WebSocket adapter in `backend/app/providers/`
+**For CEX (Centralized Exchange):**
+1. Create WebSocket adapter in `backend/app/providers/cex/`
 2. Implement `BaseWebSocketWorker` for real-time prices
 3. Implement `BaseChartAdapter` for historical data
 4. Add to `coins.json` configuration
 5. Register in `aggregation_service.py`
+
+**For DEX (Decentralized Exchange / Aggregator):**
+1. Create price/chart adapters in `backend/app/providers/dex/`
+2. Implement `BasePriceAdapter` for prices (via REST API)
+3. Implement `BaseChartAdapter` for historical data
+4. Create price updater service if needed (for periodic updates)
+5. Add to `coins.json` configuration
+6. Register in `aggregation_service.py`
 
 ### Coding Standards
 

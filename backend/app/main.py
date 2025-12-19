@@ -6,9 +6,10 @@ from app.core.config import settings
 from app.api.v1.router import api_router
 from app.services.bot_polling import bot_polling
 from app.services.notification_checker import notification_checker
-from app.providers.binance_websocket import binance_websocket_worker
-from app.providers.okx_websocket import okx_websocket_worker
-from app.providers.mexc_websocket import mexc_websocket_worker
+from app.providers.cex.binance_websocket import binance_websocket_worker
+from app.providers.cex.okx_websocket import okx_websocket_worker
+from app.providers.cex.mexc_websocket import mexc_websocket_worker
+from app.providers.dex.coingecko_price_updater import coingecko_price_updater
 
 
 @asynccontextmanager
@@ -25,6 +26,7 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(binance_websocket_worker.start())
     asyncio.create_task(okx_websocket_worker.start())
     asyncio.create_task(mexc_websocket_worker.start())
+    asyncio.create_task(coingecko_price_updater.start())
     
     yield
     
@@ -34,11 +36,13 @@ async def lifespan(app: FastAPI):
     binance_websocket_worker.stop()
     okx_websocket_worker.stop()
     mexc_websocket_worker.stop()
+    await coingecko_price_updater.stop()
     
     # Close WebSocket connections
     await binance_websocket_worker.close()
     await okx_websocket_worker.close()
     await mexc_websocket_worker.close()
+    await coingecko_price_updater.close()
     
     # Close shared HTTP client
     from app.utils.http_client import SharedHTTPClient
