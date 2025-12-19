@@ -44,30 +44,39 @@ CryptoWatcher is a Telegram Mini App for real-time cryptocurrency price monitori
                             │  │   Background Tasks    │  │
                             │  │ • Bot Polling         │  │
                             │  │ • Notification Checker│  │
-                            │  │ • WebSocket Workers   │  │
+                            │  │ • CEX WebSocket       │  │
+                            │  │ • DEX REST Polling    │  │
                             │  └───────────────────────┘  │
                             └──────────────┬──────────────┘
                                            │
           ┌────────────────────────────────┼────────────────────────────────┐
           │                                │                                │
           ▼                                ▼                                ▼
-┌───────────────────┐            ┌───────────────────┐            ┌───────────────────┐
-│      STORAGE      │            │    PRICE DATA     │            │   STATIC DATA     │
-├───────────────────┤            │   (Real-time)     │            │   (Metadata)      │
-│                   │            ├───────────────────┤            ├───────────────────┤
-│  ┌─────────────┐  │            │  ┌─────────────┐  │            │  ┌─────────────┐  │
-│  │ PostgreSQL  │  │            │  │   Binance   │  │            │  │  CoinGecko  │  │
-│  │  • Users    │  │            │  │  WebSocket  │  │            │  │    API      │  │
-│  │  • Alerts   │  │            │  └─────────────┘  │            │  │  • Names    │  │
-│  └─────────────┘  │            │  ┌─────────────┐  │            │  │  • Icons    │  │
-│                   │            │  │     OKX     │  │            │  │  • Symbols  │  │
-│  ┌─────────────┐  │            │  │  WebSocket  │  │            │  └─────────────┘  │
-│  │    Redis    │  │◀──────────│  └─────────────┘  │            │                   │
-│  │  • Prices   │  │  prices    │  ┌─────────────┐  │            │                   │
-│  │  • Charts   │  │            │  │    MEXC     │  │            │                   │
-│  │  • Static   │  │◀──────────│  │  WebSocket  │  │            │                   │
-│  └─────────────┘  │  cache     │  └─────────────┘  │            │                   │
-└───────────────────┘            └───────────────────┘            └───────────────────┘
+┌───────────────────┐             ┌───────────────────┐            ┌───────────────────┐
+│      STORAGE      │             │    PRICE DATA     │            │   STATIC DATA     │
+├───────────────────┤             │   (Real-time)     │            │   (Metadata)      │
+│                   │             ├───────────────────┤            ├───────────────────┤
+│  ┌─────────────┐  │             │  CEX (WebSocket)  │            │  ┌─────────────┐  │
+│  │ PostgreSQL  │  │             │  ┌─────────────┐  │            │  │  CoinGecko  │  │
+│  │  • Users    │  │             │  │   Binance   │  │            │  │    API      │  │
+│  │  • Alerts   │  │             │  │  WebSocket  │  │            │  │  • Names    │  │
+│  └─────────────┘  │             │  └─────────────┘  │            │  │  • Icons    │  │
+│                   │             │  ┌─────────────┐  │            │  │  • Symbols  │  │
+│  ┌─────────────┐  │             │  │     OKX     │  │            │  └─────────────┘  │
+│  │    Redis    │  │◀────────── │  │  WebSocket  │  │            │                   │
+│  │  • Prices   │  │  prices     │  └─────────────┘  │            │                   │
+│  │  • Charts   │  │             │  ┌─────────────┐  │            │                   │
+│  │  • Static   │  │             │  │    MEXC     │  │            │                   │
+│  └─────────────┘  │             │  │  WebSocket  │  │            │                   │
+└───────────────────┘             │  └─────────────┘  │            └───────────────────┘
+                                  ├───────────────────┤
+                                  │  DEX (REST API)   │
+                                  │  ┌─────────────┐  │
+                                  │  │  CoinGecko  │  │
+                                  │  │  REST API   │  │
+                                  │  │  (polling)  │  │
+                                  │  └─────────────┘  │
+                                  └───────────────────┘
 ```
 
 ### Data Flow
@@ -77,9 +86,9 @@ CryptoWatcher is a Telegram Mini App for real-time cryptocurrency price monitori
 │                             PRICE UPDATE FLOW                                    │
 ├──────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                  │
-│  CEX (Binance/OKX/MEXC) ─▶ WebSocket ─▶ Backend ─▶ RedisCache ─▶ API ─▶ Frontend│
+│CEX (Binance/OKX/MEXC) ─▶ WebSocket ─▶ Backend ─▶ RedisCache ─▶ API ─▶ Frontend│
 │  DEX (CoinGecko) ─▶ REST API ─▶ Backend ─▶ RedisCache ─▶ API ─▶ Frontend      │
-│         (tickers/prices)            (parse)     (store)     (serve)  (display)    │
+│       (tickers/prices)            (parse)     (store)     (serve)  (display)     │
 │                                                                                  │
 └──────────────────────────────────────────────────────────────────────────────────┘
 
