@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import time
 import asyncio
 import logging
@@ -31,6 +31,10 @@ class DndSettingsUpdate(BaseModel):
 class DndSettingsResponse(BaseModel):
     dnd_start_time: Optional[str] = None  # Format: "HH:MM"
     dnd_end_time: Optional[str] = None  # Format: "HH:MM"
+
+
+class FavoriteTokensResponse(BaseModel):
+    favorite_tokens: List[str]  # List of token IDs
 
 
 @router.get("/{user_id}")
@@ -153,3 +157,126 @@ async def get_dnd_settings(
         dnd_start_time=user.dnd_start_time.strftime("%H:%M") if user.dnd_start_time else None,
         dnd_end_time=user.dnd_end_time.strftime("%H:%M") if user.dnd_end_time else None,
     )
+
+
+@router.get("/{user_id}/favorite-tokens")
+async def get_favorite_tokens(
+    user_id: int,
+    db: Session = Depends(get_db),
+):
+    """Get favorite tokens for user"""
+    loop = asyncio.get_event_loop()
+    user = await loop.run_in_executor(
+        None,
+        lambda: db.query(User).filter(User.id == user_id).first()
+    )
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Return empty list if favorite_tokens is None
+    favorite_tokens = user.favorite_tokens if user.favorite_tokens is not None else []
+    return FavoriteTokensResponse(favorite_tokens=favorite_tokens)
+
+
+@router.put("/{user_id}/favorite-tokens")
+async def update_favorite_tokens(
+    user_id: int,
+    favorite_tokens: FavoriteTokensResponse,
+    db: Session = Depends(get_db),
+):
+    """Update favorite tokens for user"""
+    loop = asyncio.get_event_loop()
+    
+    def update_favorites():
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Ensure we store a list (remove duplicates, preserve order)
+        tokens_list = list(dict.fromkeys(favorite_tokens.favorite_tokens))  # Remove duplicates, keep order
+        user.favorite_tokens = tokens_list
+        db.commit()
+        db.refresh(user)
+        return user
+    
+    try:
+        user = await loop.run_in_executor(None, update_favorites)
+        return FavoriteTokensResponse(
+            favorite_tokens=user.favorite_tokens if user.favorite_tokens is not None else []
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error updating favorite tokens: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.post("/{user_id}/favorite-tokens/{token_id}")
+async def add_favorite_token(
+    user_id: int,
+    token_id: str,
+    db: Session = Depends(get_db),
+):
+    """Add a token to user's favorites"""
+    loop = asyncio.get_event_loop()
+    
+    def add_favorite():
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        current_favorites = user.favorite_tokens if user.favorite_tokens is not None else []
+        if token_id not in current_favorites:
+            # Create a new list instead of modifying the existing one
+            # This ensures SQLAlchemy detects the change
+            user.favorite_tokens = current_favorites + [token_id]
+            db.commit()
+            db.refresh(user)
+        return user
+    
+    try:
+        user = await loop.run_in_executor(None, add_favorite)
+        return FavoriteTokensResponse(
+            favorite_tokens=user.favorite_tokens if user.favorite_tokens is not None else []
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error adding favorite token: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.delete("/{user_id}/favorite-tokens/{token_id}")
+async def remove_favorite_token(
+    user_id: int,
+    token_id: str,
+    db: Session = Depends(get_db),
+):
+    """Remove a token from user's favorites"""
+    loop = asyncio.get_event_loop()
+    
+    def remove_favorite():
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        current_favorites = user.favorite_tokens if user.favorite_tokens is not None else []
+        if token_id in current_favorites:
+            # Create a new list instead of modifying the existing one
+            # This ensures SQLAlchemy detects the change
+            user.favorite_tokens = [t for t in current_favorites if t != token_id]
+            db.commit()
+            db.refresh(user)
+        return user
+    
+    try:
+        user = await loop.run_in_executor(None, remove_favorite)
+        return FavoriteTokensResponse(
+            favorite_tokens=user.favorite_tokens if user.favorite_tokens is not None else []
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error removing favorite token: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")

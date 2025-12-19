@@ -1132,10 +1132,10 @@ export const CreateNotificationPage = () => {
         triggerRef={expireTimeRef}
       />
 
-      {/* График с линией триггера (показываем когда выбрана монета) */}
+      {/* Chart with trigger line (show when coin is selected) */}
       {crypto && chartData.length > 0 && (
         <Block margin="top" marginValue={24}>
-          {/* Селектор таймфреймов */}
+          {/* Timeframe selector */}
           <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '16px' }}>
             {PERIOD_OPTIONS.map((period) => (
               <button
@@ -1254,7 +1254,7 @@ export const CreateNotificationPage = () => {
                   opacity={0.3}
                   radius={[2, 2, 0, 0]}
                 />
-                {/* Линия текущей цены */}
+                {/* Current price line */}
                 {crypto && (
                   <ReferenceLine
                     yAxisId="price"
@@ -1271,10 +1271,10 @@ export const CreateNotificationPage = () => {
                     }}
                   />
                 )}
-                {/* Отображаем линии в зависимости от Direction, цвет зависит от Trigger */}
+                {/* Display lines depending on Direction, color depends on Trigger */}
                 {triggerLevels.upper !== null && (
                   <>
-                    {/* Основная линия с меткой слева (Stop-loss/Take-profit) */}
+                    {/* Main line with label on the left (Stop-loss/Take-profit) */}
                     <ReferenceLine
                       yAxisId="price"
                       y={triggerLevels.upper}
@@ -1321,7 +1321,7 @@ export const CreateNotificationPage = () => {
                         },
                       }}
                     />
-                    {/* Невидимая линия с ценой справа */}
+                    {/* Invisible line with price on the right */}
                     <ReferenceLine
                       yAxisId="price"
                       y={triggerLevels.upper}
@@ -1339,7 +1339,7 @@ export const CreateNotificationPage = () => {
                 )}
                 {triggerLevels.lower !== null && (
                   <>
-                    {/* Основная линия с меткой слева (Stop-loss/Take-profit) */}
+                    {/* Main line with label on the left (Stop-loss/Take-profit) */}
                     <ReferenceLine
                       yAxisId="price"
                       y={triggerLevels.lower}
@@ -1386,7 +1386,7 @@ export const CreateNotificationPage = () => {
                         },
                       }}
                     />
-                    {/* Невидимая линия с ценой справа */}
+                    {/* Invisible line with price on the right */}
                     <ReferenceLine
                       yAxisId="price"
                       y={triggerLevels.lower}

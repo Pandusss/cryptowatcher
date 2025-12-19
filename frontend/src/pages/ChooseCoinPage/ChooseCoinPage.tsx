@@ -13,7 +13,7 @@ import { useNavigate } from 'react-router-dom'
 import { ROUTES_NAME } from '../../constants/routes'
 import { apiService, type CoinListItem } from '../../services/api'
 import { useTelegramBackButton } from '@hooks'
-import { getPriceDecimals } from '@utils'
+import { getPriceDecimals, getFavoriteTokens, toggleFavoriteToken } from '@utils'
 
 import styles from './ChooseCoinPage.module.scss'
 
@@ -27,6 +27,8 @@ export const ChooseCoinPage = () => {
   const [priceAnimations, setPriceAnimations] = useState<Map<string, 'up' | 'down' | 'neutral' | null>>(new Map())
   // Ref for storing current coin list (to avoid dependency issues)
   const coinsRef = useRef<CoinListItem[]>([])
+  // State for favorite tokens
+  const [favoriteTokens, setFavoriteTokens] = useState<Set<string>>(new Set())
 
   // Manage Telegram Mini App back button
   useTelegramBackButton()
@@ -38,22 +40,26 @@ export const ChooseCoinPage = () => {
     }
     hasFetchedRef.current = true
 
-    const fetchCoins = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true)
         
-        // Load all data from cache (static + prices) - fast
-        // Prices are updated every 10 seconds in background, so always current
-        const coins = await apiService.getCoinsListStatic(100, 1)
+        // Load coins and favorites in parallel
+        const [coins, favorites] = await Promise.all([
+          apiService.getCoinsListStatic(100, 1),
+          getFavoriteTokens(),
+        ])
+        
         setCoins(coins)
         coinsRef.current = coins // Update ref
+        setFavoriteTokens(new Set(favorites))
         setLoading(false) // Show list immediately
       } catch {
         setLoading(false)
       }
     }
 
-    fetchCoins()
+    fetchData()
   }, [])
 
   // Update prices every 5 seconds
@@ -164,19 +170,30 @@ export const ChooseCoinPage = () => {
     return `${formattedInteger},${decimalPart}`
   }
 
-  // Фильтрация монет по поисковому запросу
+  // Фильтрация и сортировка монет: избранные первыми, затем по поисковому запросу
   const filteredCoins = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return coins
+    let filtered = coins
+    
+    // Фильтрация по поисковому запросу
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim()
+      filtered = coins.filter((coin) => {
+        const nameMatch = coin.name.toLowerCase().includes(query)
+        const symbolMatch = coin.symbol.toLowerCase().includes(query)
+        return nameMatch || symbolMatch
+      })
     }
     
-    const query = searchQuery.toLowerCase().trim()
-    return coins.filter((coin) => {
-      const nameMatch = coin.name.toLowerCase().includes(query)
-      const symbolMatch = coin.symbol.toLowerCase().includes(query)
-      return nameMatch || symbolMatch
+    // Сортировка: избранные первыми
+    return [...filtered].sort((a, b) => {
+      const aIsFavorite = favoriteTokens.has(a.id)
+      const bIsFavorite = favoriteTokens.has(b.id)
+      
+      if (aIsFavorite && !bIsFavorite) return -1
+      if (!aIsFavorite && bIsFavorite) return 1
+      return 0
     })
-  }, [coins, searchQuery])
+  }, [coins, searchQuery, favoriteTokens])
 
   const handleSelectCoin = (coin: CoinListItem) => {
     // Возвращаемся на страницу создания уведомления с выбранной монетой
@@ -197,6 +214,13 @@ export const ChooseCoinPage = () => {
 
   const handleClearSearch = () => {
     setSearchQuery('')
+  }
+
+  const handleToggleFavorite = async (e: React.MouseEvent, coinId: string) => {
+    e.stopPropagation() // Предотвращаем клик на GroupItem
+    const currentFavorites = Array.from(favoriteTokens)
+    const updatedFavorites = await toggleFavoriteToken(coinId, currentFavorites)
+    setFavoriteTokens(new Set(updatedFavorites))
   }
 
   return (
@@ -280,36 +304,65 @@ export const ChooseCoinPage = () => {
           </Text>
         ) : (
           <Group>
-            {filteredCoins.map((coin) => (
-              <GroupItem
-                key={coin.id}
-                before={<CryptoIcon symbol={coin.symbol} name={coin.name} size={40} imageUrl={coin.imageUrl} />}
-                text={coin.name}
-                description={coin.symbol}
-                after={
-                  <Text 
-                    type="text" 
-                    color="secondary"
-                    className={
-                      priceAnimations.get(coin.id)
-                        ? priceAnimations.get(coin.id) === 'up'
-                          ? styles.priceUpdatedUp
-                          : priceAnimations.get(coin.id) === 'down'
-                          ? styles.priceUpdatedDown
-                          : styles.priceUpdatedNeutral
-                        : ''
-                    }
-                  >
-                    {coin.quote.USD.price > 0 
-                      ? `$${formatPrice(coin.quote.USD.price, coin)}`
-                      : '...'
-                    }
-                  </Text>
-                }
-                chevron
-                onClick={() => handleSelectCoin(coin)}
-              />
-            ))}
+            {filteredCoins.map((coin) => {
+              const isFavorite = favoriteTokens.has(coin.id)
+              return (
+                <GroupItem
+                  key={coin.id}
+                  before={<CryptoIcon symbol={coin.symbol} name={coin.name} size={40} imageUrl={coin.imageUrl} />}
+                  text={
+                    <div className={styles.coinNameContainer}>
+                      <span>{coin.name}</span>
+                      <button
+                        className={styles.favoriteButton}
+                        onClick={(e) => handleToggleFavorite(e, coin.id)}
+                        aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                      >
+                        <svg
+                          width="20"
+                          height="20"
+                          viewBox="0 0 16 16"
+                          fill={isFavorite ? 'currentColor' : 'none'}
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          xmlns="http://www.w3.org/2000/svg"
+                          className={isFavorite ? styles.favoriteIconActive : styles.favoriteIcon}
+                        >
+                          <path
+                            d="M8 2L9.09 5.26L12.5 5.61L10 8.14L10.82 11.5L8 9.77L5.18 11.5L6 8.14L3.5 5.61L6.91 5.26L8 2Z"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  }
+                  description={coin.symbol}
+                  after={
+                    <Text 
+                      type="text" 
+                      color="secondary"
+                      className={
+                        priceAnimations.get(coin.id)
+                          ? priceAnimations.get(coin.id) === 'up'
+                            ? styles.priceUpdatedUp
+                            : priceAnimations.get(coin.id) === 'down'
+                            ? styles.priceUpdatedDown
+                            : styles.priceUpdatedNeutral
+                          : ''
+                      }
+                    >
+                      {coin.quote.USD.price > 0 
+                        ? `$${formatPrice(coin.quote.USD.price, coin)}`
+                        : '...'
+                      }
+                    </Text>
+                  }
+                  chevron
+                  onClick={() => handleSelectCoin(coin)}
+                />
+              )
+            })}
           </Group>
         )}
       </Block>

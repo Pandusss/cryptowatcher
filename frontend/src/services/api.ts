@@ -276,6 +276,61 @@ class ApiService {
       }
     )
   }
+
+  // Favorite Tokens API
+  async getFavoriteTokens(userId: number): Promise<string[]> {
+    try {
+      const response = await this.fetch<{ favorite_tokens: string[] }>(
+        `/api/v1/users/${userId}/favorite-tokens`
+      )
+      return response.favorite_tokens || []
+    } catch {
+      return []
+    }
+  }
+
+  async addFavoriteToken(userId: number, tokenId: string): Promise<string[]> {
+    try {
+      const response = await this.fetch<{ favorite_tokens: string[] }>(
+        `/api/v1/users/${userId}/favorite-tokens/${tokenId}`,
+        {
+          method: 'POST',
+        }
+      )
+      return response.favorite_tokens || []
+    } catch {
+      return []
+    }
+  }
+
+  async removeFavoriteToken(userId: number, tokenId: string): Promise<string[]> {
+    try {
+      const response = await this.fetch<{ favorite_tokens: string[] }>(
+        `/api/v1/users/${userId}/favorite-tokens/${tokenId}`,
+        {
+          method: 'DELETE',
+        }
+      )
+      return response.favorite_tokens || []
+    } catch {
+      return []
+    }
+  }
+
+  async updateFavoriteTokens(userId: number, tokenIds: string[]): Promise<string[]> {
+    try {
+      const response = await this.fetch<{ favorite_tokens: string[] }>(
+        `/api/v1/users/${userId}/favorite-tokens`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ favorite_tokens: tokenIds }),
+        }
+      )
+      return response.favorite_tokens || []
+    } catch {
+      return []
+    }
+  }
 }
 
 export const apiService = new ApiService()

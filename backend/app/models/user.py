@@ -1,4 +1,4 @@
-from sqlalchemy import Column, BigInteger, String, DateTime, Boolean, Time
+from sqlalchemy import Column, BigInteger, String, DateTime, Boolean, Time, JSON
 from sqlalchemy.sql import func
 from app.core.database import Base
 
@@ -15,6 +15,8 @@ class User(Base):
     # Don't Disturb settings (time in UTC)
     dnd_start_time = Column(Time, nullable=True)  # Start time for DND (e.g., 12:00)
     dnd_end_time = Column(Time, nullable=True)  # End time for DND (e.g., 07:00)
+    # Favorite tokens (array of token IDs)
+    favorite_tokens = Column(JSON, nullable=True, default=list)  # List of token IDs as strings
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
