@@ -1,4 +1,8 @@
-# CryptoWatcher
+[![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
+# 👀 CryptoWatcher
+
+![](.github/assets/cryptowatcher.gif)
 
 ## Summary
 
