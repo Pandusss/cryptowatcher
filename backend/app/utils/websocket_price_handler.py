@@ -47,28 +47,23 @@ async def process_price_update(
                  "skipped_wrong_priority", "skipped_zero_price", "error"
         coin_id - internal coin ID or None
     """
-    # Extract symbol from ticker
     symbol = symbol_extractor(ticker)
     if not symbol:
         return "skipped_no_symbol", None
     
-    # Find coin in registry
     coin = coin_registry.find_coin_by_external_id(source, symbol)
     if not coin:
         return "skipped_not_in_map", None
     
     coin_id = coin.id
     
-    # Check if we're tracking this coin
     if coin_id not in tracked_coins:
         return "skipped_not_tracked", coin_id
     
-    # Check price_priority: source must be first priority
     price_priority = coin.price_priority
     if not price_priority or price_priority[0] != source:
         return "skipped_wrong_priority", coin_id
     
-    # Extract data from ticker
     price = price_extractor(ticker)
     if price <= 0:
         return "skipped_zero_price", coin_id
@@ -76,7 +71,6 @@ async def process_price_update(
     price_change_24h = price_change_extractor(ticker)
     volume_24h = volume_extractor(ticker)
     
-    # Form data for cache
     price_data = {
         "price": price,
         "percent_change_24h": price_change_24h,
@@ -84,7 +78,6 @@ async def process_price_update(
         "priceDecimals": get_price_decimals(price),
     }
     
-    # Write to Redis
     if not redis:
         return "error", coin_id
     
@@ -92,14 +85,19 @@ async def process_price_update(
         price_cache_key = f"coin_price:{coin_id}"
         await redis.setex(
             price_cache_key,
-            86400,  # TTL 24 hours - price persists until overwritten
+            86400,
             json.dumps(price_data)
         )
         
-        # Update statistics
         current_time = asyncio.get_event_loop().time()
         last_update_time[coin_id] = current_time
         coins_with_updates.add(coin_id)
+        
+        try:
+            from app.services.notification_checker import notification_checker
+            asyncio.create_task(notification_checker.check_notifications_for_coin(coin_id))
+        except Exception as e:
+            logger.error(f"Failed to trigger notification check for {coin_id}: {e}")
         
         return "updated", coin_id
         

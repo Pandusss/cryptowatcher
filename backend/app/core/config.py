@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     # Telegram Bot API
     TELEGRAM_BOT_TOKEN: str = Field(...)
 
-    # CORS - store as string, parse in main.py
+    # CORS origins (comma-separated). First origin is used for generating absolute URLs
     ALLOWED_ORIGINS: str = Field(...)
 
     model_config = SettingsConfigDict(
