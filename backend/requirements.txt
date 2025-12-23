@@ -14,7 +14,7 @@ redis==5.0.1
 httpx==0.25.1
 
 # WebSocket client for exchanges
-websockets==12.0в
+websockets==12.0
 # Validation and serialization
 pydantic==2.5.0
 pydantic-settings==2.1.0
