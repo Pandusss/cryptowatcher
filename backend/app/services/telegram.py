@@ -112,16 +112,29 @@ class TelegramService:
         }.get(trigger, ("Alert", "🔔"))
         trigger_text, trigger_emoji = trigger_info
         
-        # Format value
-        if value_type == "percent":
-            value_text = f"{value:+.2f}%"
-        else:
+        # Format value and message based on value type
+        if value_type == "price":
+            # For price type: "reached $X" or "increased/decreased to $X"
             value_text = format_price(value)
+            if direction == "rise":
+                change_text = f"increased to <b>{value_text}</b>"
+            elif direction == "fall":
+                change_text = f"decreased to <b>{value_text}</b>"
+            else:
+                change_text = f"reached <b>{value_text}</b>"
+        elif value_type == "percent":
+            # For percent type: "increased/decreased by X%"
+            value_text = f"{value:+.2f}%"
+            change_text = f"{direction_text} by <b>{value_text}</b> {direction_emoji}"
+        else:
+            # For absolute type: "increased/decreased by $X"
+            value_text = format_price(value)
+            change_text = f"{direction_text} by <b>{value_text}</b> {direction_emoji}"
         
         # Form message with improved formatting
         message = (
             f"{trigger_emoji} <b>{trigger_text}</b>\n"
-            f"<b>{crypto_name} ({crypto_symbol})</b> {direction_text} by <b>{value_text}</b> {direction_emoji}\n"
+            f"<b>{crypto_name} ({crypto_symbol})</b> {change_text}\n"
             f"Current price: <b>{format_price(current_price)}</b>"
         )
         

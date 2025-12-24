@@ -5,14 +5,20 @@ Pixel-perfect layout for 1701x1026 PNG
 
 import io
 import logging
+import time
+import asyncio
 from typing import List, Dict, Any, Optional
-from datetime import datetime, timezone
 from pathlib import Path
+from collections import OrderedDict
 
 import matplotlib
 matplotlib.use("Agg")
+matplotlib.rcParams['path.simplify'] = True
+matplotlib.rcParams['path.simplify_threshold'] = 1.0
+matplotlib.rcParams['agg.path.chunksize'] = 10000
 
-import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 import matplotlib.dates as mdates
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from PIL import Image, ImageDraw
@@ -48,6 +54,40 @@ class ChartGenerator:
         self._base_image_path = self._base_dir / "static" / "base.png"
         self._tp_image_path = self._base_dir / "static" / "tp.png"
         self._sl_image_path = self._base_dir / "static" / "sl.png"
+        self._cryptowatcher_image_path = self._base_dir / "static" / "cryptowatcher.png"
+        
+        self._card_left = self.CARD_LEFT_PX / self.WIDTH_PX
+        self._card_bottom = self.CARD_BOTTOM_PX / self.HEIGHT_PX
+        self._card_width = 1 - (self.CARD_LEFT_PX + self.CARD_RIGHT_PX) / self.WIDTH_PX
+        self._card_height = 1 - (self.CARD_TOP_PX + self.CARD_BOTTOM_PX) / self.HEIGHT_PX
+        self._header_y = (self.HEIGHT_PX - 220) / self.HEIGHT_PX
+        
+        ICON_SIZE = 256
+        ICON_ZOOM = 0.2
+        ICON_GAP_PX = 12
+        self._icon_width_norm = (ICON_SIZE * ICON_ZOOM) / self.WIDTH_PX
+        self._icon_gap_norm = ICON_GAP_PX / self.WIDTH_PX
+        
+        self._base_img_array = np.array(Image.open(self._base_image_path))
+        self._tp_img_array = np.array(Image.open(self._tp_image_path))
+        self._sl_img_array = np.array(Image.open(self._sl_image_path))
+        
+        self._load_cryptowatcher_icon()
+        
+        self._icon_cache: OrderedDict = OrderedDict()
+        self._icon_cache_max_size = 100
+        self._icon_cache_ttl = 3600
+        
+        self._circle_masks = {}
+        for size in [56, 256]:
+            mask = Image.new("L", (size, size), 0)
+            ImageDraw.Draw(mask).ellipse((0, 0, size, size), fill=255)
+            self._circle_masks[size] = mask
+        
+        self._http_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(5.0),
+            limits=httpx.Limits(max_keepalive_connections=10, max_connections=20)
+        )
 
     # ---------- FORMATTERS ----------
 
@@ -68,25 +108,73 @@ class ChartGenerator:
 
     # ---------- LOADERS ----------
 
+    def _load_cryptowatcher_icon(self):
+        """Preloads and processes cryptowatcher icon once"""
+        try:
+            cryptowatcher_img = Image.open(self._cryptowatcher_image_path).convert("RGBA")
+            original_width, original_height = cryptowatcher_img.size
+            
+            CRYPTOWATCHER_ICON_SIZE = 128
+            icon_height = CRYPTOWATCHER_ICON_SIZE
+            icon_width = int(CRYPTOWATCHER_ICON_SIZE * original_width / original_height)
+            
+            cryptowatcher_img = cryptowatcher_img.resize((icon_width, icon_height), Image.Resampling.LANCZOS)
+            
+            img_array = np.array(cryptowatcher_img)
+            img_array[:, :, 3] = (img_array[:, :, 3] * 0.4).astype(np.uint8)
+            
+            self._cryptowatcher_zoom = 16 / icon_height
+            self._cryptowatcher_img_array = img_array
+        except Exception as e:
+            logger.warning(f"Failed to load cryptowatcher icon: {e}")
+            self._cryptowatcher_img_array = None
+            self._cryptowatcher_zoom = None
+
     async def _load_icon(self, url: Optional[str], size=56):
+        """Loads icon with caching and HTTP client reuse, returns np.array"""
         if not url:
             return None
+        
+        cache_key = f"{url}_{size}"
+        current_time = time.time()
+        
+        if cache_key in self._icon_cache:
+            cached_arr, cached_time = self._icon_cache[cache_key]
+            if current_time - cached_time < self._icon_cache_ttl:
+                self._icon_cache.move_to_end(cache_key)
+                return cached_arr
+            else:
+                del self._icon_cache[cache_key]
+        
         try:
-            async with httpx.AsyncClient(timeout=5) as c:
-                r = await c.get(url)
-                r.raise_for_status()
+            r = await self._http_client.get(url)
+            r.raise_for_status()
 
             img = Image.open(io.BytesIO(r.content)).convert("RGBA")
             img = img.resize((size, size), Image.Resampling.LANCZOS)
 
-            mask = Image.new("L", (size, size), 0)
-            ImageDraw.Draw(mask).ellipse((0, 0, size, size), fill=255)
+            mask = self._circle_masks.get(size)
+            if mask is None:
+                mask = Image.new("L", (size, size), 0)
+                ImageDraw.Draw(mask).ellipse((0, 0, size, size), fill=255)
+                self._circle_masks[size] = mask
 
             out = Image.new("RGBA", (size, size))
             out.paste(img, (0, 0), mask)
-            return out
+            
+            out_arr = np.array(out)
+            
+            if len(self._icon_cache) >= self._icon_cache_max_size:
+                self._icon_cache.popitem(last=False)
+            self._icon_cache[cache_key] = (out_arr, current_time)
+            
+            return out_arr
         except Exception:
             return None
+    
+    async def close(self):
+        """Closes HTTP client (call on application shutdown)"""
+        await self._http_client.aclose()
 
     # ---------- MAIN ----------
 
@@ -105,22 +193,45 @@ class ChartGenerator:
         low_24h: Optional[float] = None,
         base_image_type: Optional[str] = None,
     ) -> Optional[bytes]:
+        """Async wrapper: loads icon, then renders chart in thread"""
+        icon = await self._load_icon(coin_icon_url, size=256)
+        return await asyncio.to_thread(
+            self._render_chart_sync,
+            coin_symbol, coin_name, current_price, percent_change_24h,
+            chart_data, days, icon, market_cap, volume_24h,
+            high_24h, low_24h, base_image_type
+        )
 
+    def _render_chart_sync(
+        self,
+        coin_symbol: str,
+        coin_name: str,
+        current_price: float,
+        percent_change_24h: float,
+        chart_data: List[Dict[str, Any]],
+        days: int,
+        icon: Optional[np.ndarray],
+        market_cap: Optional[float],
+        volume_24h: Optional[float],
+        high_24h: Optional[float],
+        low_24h: Optional[float],
+        base_image_type: Optional[str],
+    ) -> Optional[bytes]:
+        """Synchronous chart rendering (runs in thread)"""
         try:
             if base_image_type == "take-profit":
-                base_img_path = self._tp_image_path
+                base_img_array = self._tp_img_array
             elif base_image_type == "stop-loss":
-                base_img_path = self._sl_image_path
+                base_img_array = self._sl_img_array
             else:
-                base_img_path = self._base_image_path
-            
-            base_img = Image.open(base_img_path)
+                base_img_array = self._base_img_array
 
-            prices = [p["price"] for p in chart_data]
-            dates = [
-                datetime.fromtimestamp(p["timestamp"] / 1000, tz=timezone.utc)
-                for p in chart_data
-            ]
+            prices = np.array([p["price"] for p in chart_data], dtype=np.float64)
+            timestamps = np.array([p["timestamp"] for p in chart_data], dtype=np.float64) / 1000.0
+            # Convert Unix timestamps (seconds) to matplotlib date numbers
+            # Matplotlib uses days since 0001-01-01, Unix epoch is 1970-01-01
+            # Difference: 719163 days
+            x_dates = timestamps / 86400.0 + 719163.0
 
             if base_image_type == "stop-loss":
                 color = self.PRICE_DOWN
@@ -129,21 +240,23 @@ class ChartGenerator:
             else:
                 color = self.PRICE_UP if percent_change_24h >= 0 else self.PRICE_DOWN
 
-            fig = plt.figure(
-                figsize=(self.WIDTH_PX / 120, self.HEIGHT_PX / 120),
-                dpi=120
+            DPI = 120
+            fig = Figure(
+                figsize=(self.WIDTH_PX / DPI, self.HEIGHT_PX / DPI),
+                dpi=DPI,
+                facecolor='none'
             )
+            canvas = FigureCanvas(fig)
 
             # ===== BACKGROUND =====
             ax_bg = fig.add_axes([0, 0, 1, 1])
-            ax_bg.imshow(np.array(base_img))
+            ax_bg.imshow(base_img_array)
             ax_bg.axis("off")
 
-            # ===== CARD NORMALIZED GEOMETRY =====
-            card_left = self.CARD_LEFT_PX / self.WIDTH_PX
-            card_bottom = self.CARD_BOTTOM_PX / self.HEIGHT_PX
-            card_width = 1 - (self.CARD_LEFT_PX + self.CARD_RIGHT_PX) / self.WIDTH_PX
-            card_height = 1 - (self.CARD_TOP_PX + self.CARD_BOTTOM_PX) / self.HEIGHT_PX
+            card_left = self._card_left
+            card_bottom = self._card_bottom
+            card_width = self._card_width
+            card_height = self._card_height
 
             # ===== GRAPH =====
             ax = fig.add_axes([
@@ -154,22 +267,23 @@ class ChartGenerator:
             ])
             ax.set_facecolor("none")
 
-            ax.set_xlim(dates[0], dates[-1])
+            ax.set_xlim(x_dates[0], x_dates[-1])
             ax.xaxis.set_major_locator(mdates.DayLocator(interval=1))
             ax.xaxis.set_major_formatter(mdates.DateFormatter("%m/%d"))
             ax.tick_params(axis="x", pad=8)
 
-            y_min = min(prices)
-            y_max = max(prices)
+            y_min = float(np.min(prices))
+            y_max = float(np.max(prices))
+            y_range = y_max - y_min
             ax.set_ylim(
-                y_min - (y_max - y_min) * 0.05,
-                y_max + (y_max - y_min) * 0.05
+                y_min - y_range * 0.05,
+                y_max + y_range * 0.05
             )
 
             y_axis_min, _ = ax.get_ylim()
 
-            ax.plot(dates, prices, color=color, linewidth=2.6)
-            ax.fill_between(dates, prices, y_axis_min, color=color, alpha=0.30)
+            ax.plot(x_dates, prices, color=color, linewidth=2.6)
+            ax.fill_between(x_dates, prices, y_axis_min, color=color, alpha=0.30)
             
             ax.axhline(
                 y=current_price,
@@ -182,7 +296,7 @@ class ChartGenerator:
             
             price_label = self._format_price(current_price)
             ax.text(
-                dates[-1],
+                x_dates[-1],
                 current_price,
                 f"{price_label} ",
                 color=color,
@@ -212,31 +326,20 @@ class ChartGenerator:
             ax_ui = fig.add_axes([0, 0, 1, 1])
             ax_ui.axis("off")
 
-            # ================= HEADER =================
-            header_y = (self.HEIGHT_PX - 220) / self.HEIGHT_PX
+            header_y = self._header_y
+            HEADER_LEFT = 0.115
 
-            HEADER_LEFT = 0.115     # ← ДВИГАЕШЬ ВСЁ ТУТ
-            ICON_SIZE = 256
-            ICON_ZOOM = 0.2
-            ICON_GAP_PX = 12
-
-            icon = await self._load_icon(coin_icon_url, size=ICON_SIZE)
-
-            if icon:
+            if icon is not None:
                 ax_ui.add_artist(
                     AnnotationBbox(
-                        OffsetImage(np.array(icon), zoom=ICON_ZOOM),
+                        OffsetImage(icon, zoom=0.2),
                         (HEADER_LEFT, header_y + 0.004),
                         frameon=False
                     )
                 )
 
-            icon_width_norm = (ICON_SIZE * ICON_ZOOM) / self.WIDTH_PX
-            gap_norm = ICON_GAP_PX / self.WIDTH_PX
+            header_x = HEADER_LEFT + self._icon_width_norm + self._icon_gap_norm
 
-            header_x = HEADER_LEFT + icon_width_norm + gap_norm
-
-            # --- TICKER ---
             ticker_text = ax_ui.text(
                 header_x,
                 header_y,
@@ -248,14 +351,25 @@ class ChartGenerator:
                 ha="left"
             )
 
-            fig.canvas.draw()
-            renderer = fig.canvas.get_renderer()
-            bbox = ticker_text.get_window_extent(renderer=renderer)
-            ticker_width_norm = bbox.width / self.WIDTH_PX
+            bot_text = ax_ui.text(
+                card_left + 0.73,
+                card_bottom - 0.045,
+                f"@CryptoWatcherr_bot",
+                fontsize=10,
+                color=self.TEXT_COLOR_SECONDARY,
+                alpha=0.8
+            )
+
+            canvas.draw()
+            renderer = canvas.get_renderer()
+            ticker_bbox = ticker_text.get_window_extent(renderer=renderer)
+            ticker_width_norm = ticker_bbox.width / self.WIDTH_PX
+            bot_bbox = bot_text.get_window_extent(renderer=renderer)
+            bot_text_width_norm = bot_bbox.width / self.WIDTH_PX
 
             # --- FULL NAME ---
             ax_ui.text(
-                header_x + ticker_width_norm + gap_norm,
+                header_x + ticker_width_norm + self._icon_gap_norm,
                 header_y,
                 f"/ {coin_name}",
                 fontsize=16,
@@ -289,16 +403,14 @@ class ChartGenerator:
             value_y = label_y - 0.035
 
             METRICS_COUNT = 4
-            METRICS_PADDING_PX = 40  # одинаковый отступ слева и справа
+            METRICS_PADDING_PX = 40
 
             metrics_left = card_left + METRICS_PADDING_PX / self.WIDTH_PX
             metrics_right = card_left + card_width - METRICS_PADDING_PX / self.WIDTH_PX
             metrics_width = metrics_right - metrics_left
 
-            xs = [
-                metrics_left + (i + 0.5) * metrics_width / METRICS_COUNT
-                for i in range(METRICS_COUNT)
-            ]
+            metrics_step = metrics_width / METRICS_COUNT
+            xs = [metrics_left + (i + 0.5) * metrics_step for i in range(METRICS_COUNT)]
 
             labels = ["24h High", "24h Low", "Volume", "Market Cap"]
             values = [
@@ -315,7 +427,6 @@ class ChartGenerator:
                            fontsize=13, fontweight="600",
                            color=self.TEXT_COLOR, ha="center")
 
-            # ---- FOOTER ----
             ax_ui.text(
                 card_left + 0.01,
                 card_bottom - 0.045,
@@ -325,9 +436,28 @@ class ChartGenerator:
                 alpha=0.8
             )
 
+            if self._cryptowatcher_img_array is not None:
+                icon_x = card_left + 0.73 + bot_text_width_norm + 0.016
+                icon_y = card_bottom - 0.04
+                
+                ax_ui.add_artist(
+                    AnnotationBbox(
+                        OffsetImage(self._cryptowatcher_img_array, zoom=self._cryptowatcher_zoom),
+                        (icon_x, icon_y),
+                        frameon=False
+                    )
+                )
+
             buf = io.BytesIO()
-            plt.savefig(buf, format="png", dpi=150, pad_inches=0)
-            plt.close(fig)
+            # Use higher DPI for saving to get larger resolution (2126x1282 instead of 1701x1026)
+            SAVE_DPI = 187.5  # 150 * 1.25 = 187.5 (gives 2126x1282 from 1701x1026)
+            canvas.print_figure(
+                buf,
+                format="png",
+                dpi=SAVE_DPI,
+                bbox_inches=None,
+                pad_inches=0
+            )
 
             buf.seek(0)
             return buf.read()

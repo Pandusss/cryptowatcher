@@ -48,9 +48,9 @@ const TRIGGER_OPTIONS: { label: string; value: NotificationTrigger }[] = [
 
 const VALUE_TYPE_OPTIONS: { label: string; value: NotificationValueType }[] =
   [
+    { label: 'Price', value: 'price' },
     { label: 'Percent', value: 'percent' },
     { label: 'Absolute Value', value: 'absolute' },
-    { label: 'Price', value: 'price' },
   ]
 
 const EXPIRE_TIME_OPTIONS: { label: string; value: string }[] = [
@@ -85,7 +85,7 @@ export const CreateNotificationPage = () => {
   const [crypto, setCrypto] = useState<{ id: string; symbol: string; name: string; price: number; imageUrl?: string; priceDecimals?: number } | null>(null)
   const [direction, setDirection] = useState<NotificationDirection>('rise')
   const [trigger, setTrigger] = useState<NotificationTrigger>('stop-loss')
-  const [valueType, setValueType] = useState<NotificationValueType>('percent')
+  const [valueType, setValueType] = useState<NotificationValueType>('price')
   const [value, setValue] = useState<string>('')
   const [expireTime, setExpireTime] = useState<number | null>(null) // null = no expiration
   const [isLoading, setIsLoading] = useState(false)
@@ -109,6 +109,45 @@ export const CreateNotificationPage = () => {
   const valueTypeRef = useRef<HTMLDivElement>(null)
   const expireTimeRef = useRef<HTMLDivElement>(null)
   const valueInputRef = useRef<HTMLInputElement>(null)
+
+  // Filter options based on current selections
+  const filteredDirectionOptions = DIRECTION_OPTIONS.filter(opt => {
+    // If valueType is 'price', hide 'both' option
+    if (valueType === 'price' && opt.value === 'both') {
+      return false
+    }
+    return true
+  })
+
+  const filteredValueTypeOptions = VALUE_TYPE_OPTIONS.filter(opt => {
+    // If direction is 'both', hide 'price' option
+    if (direction === 'both' && opt.value === 'price') {
+      return false
+    }
+    return true
+  })
+
+  // Auto-correct incompatible combinations
+  useEffect(() => {
+    // If direction is 'both' and valueType is 'price', change valueType to 'percent'
+    if (direction === 'both' && valueType === 'price') {
+      setValueType('percent')
+    }
+  }, [valueType, direction])
+
+  // Auto-set direction based on price comparison when valueType is 'price'
+  useEffect(() => {
+    if (valueType === 'price' && crypto && value) {
+      const numValue = parseFloat(value)
+      if (!isNaN(numValue)) {
+        // If entered price > current price → rise, else → fall
+        const newDirection = numValue > crypto.price ? 'rise' : 'fall'
+        if (newDirection !== direction) {
+          setDirection(newDirection)
+        }
+      }
+    }
+  }, [valueType, value, crypto?.price, direction])
 
   // Calculate calculated value based on value type
   const calculatedValue = (() => {
@@ -975,39 +1014,7 @@ export const CreateNotificationPage = () => {
         </Group>
       </Block>
 
-      {/* Second island: Direction and Trigger */}
-      <Block margin="top" marginValue={12}>
-        <Group>
-          <div ref={directionRef}>
-            <GroupItem
-              text="Direction"
-              after={
-                <Text type="text" color="accent">
-                  {DIRECTION_OPTIONS.find((opt) => opt.value === direction)?.label || 'Rise'}
-                </Text>
-              }
-              chevron
-              chevronType="double"
-              onClick={() => setDirectionDropdownOpen(!directionDropdownOpen)}
-            />
-          </div>
-          <div ref={triggerRef}>
-            <GroupItem
-              text="Trigger"
-              after={
-                <Text type="text" color="accent">
-                  {TRIGGER_OPTIONS.find((opt) => opt.value === trigger)?.label || 'Stop-loss'}
-                </Text>
-              }
-              chevron
-              chevronType="double"
-              onClick={() => setTriggerDropdownOpen(!triggerDropdownOpen)}
-            />
-          </div>
-        </Group>
-      </Block>
-
-      {/* Third island: Value Type and Value */}
+      {/* Second island: Value Type and Value */}
       <Block margin="top" marginValue={12}>
         <Group>
           <div ref={valueTypeRef}>
@@ -1015,7 +1022,7 @@ export const CreateNotificationPage = () => {
               text="Value Type"
               after={
                 <Text type="text" color="accent">
-                  {VALUE_TYPE_OPTIONS.find((opt) => opt.value === valueType)?.label || 'Percent'}
+                  {VALUE_TYPE_OPTIONS.find((opt) => opt.value === valueType)?.label || 'Price'}
                 </Text>
               }
               chevron
@@ -1065,6 +1072,43 @@ export const CreateNotificationPage = () => {
         )}
       </Block>
 
+      {/* Third island: Direction and Trigger */}
+      <Block margin="top" marginValue={12}>
+        <Group>
+          <div ref={directionRef}>
+            <GroupItem
+              text="Direction"
+              after={
+                <Text type="text" color={valueType === 'price' ? 'secondary' : 'accent'}>
+                  {filteredDirectionOptions.find((opt) => opt.value === direction)?.label || 'Rise'}
+                </Text>
+              }
+              chevron={valueType !== 'price'}
+              chevronType="double"
+              disabled={valueType === 'price'}
+              onClick={() => {
+                if (valueType !== 'price') {
+                  setDirectionDropdownOpen(!directionDropdownOpen)
+                }
+              }}
+            />
+          </div>
+          <div ref={triggerRef}>
+            <GroupItem
+              text="Trigger"
+              after={
+                <Text type="text" color="accent">
+                  {TRIGGER_OPTIONS.find((opt) => opt.value === trigger)?.label || 'Stop-loss'}
+                </Text>
+              }
+              chevron
+              chevronType="double"
+              onClick={() => setTriggerDropdownOpen(!triggerDropdownOpen)}
+            />
+          </div>
+        </Group>
+      </Block>
+
       {/* Fourth island: Expire Time */}
       <Block margin="top" marginValue={12}>
         <Group>
@@ -1086,7 +1130,7 @@ export const CreateNotificationPage = () => {
 
       {/* Dropdowns */}
       <Dropdown
-        options={DIRECTION_OPTIONS}
+        options={filteredDirectionOptions}
         active={directionDropdownOpen}
         selectedValue={direction}
         onSelect={(val) => {
@@ -1110,7 +1154,7 @@ export const CreateNotificationPage = () => {
       />
 
       <Dropdown
-        options={VALUE_TYPE_OPTIONS}
+        options={filteredValueTypeOptions}
         active={valueTypeDropdownOpen}
         selectedValue={valueType}
         onSelect={(val) => {
