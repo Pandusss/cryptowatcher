@@ -7,9 +7,10 @@ import io
 import logging
 import time
 import asyncio
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
 from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
 
 import matplotlib
 matplotlib.use("Agg")
@@ -75,8 +76,8 @@ class ChartGenerator:
         self._load_cryptowatcher_icon()
         
         self._icon_cache: OrderedDict = OrderedDict()
-        self._icon_cache_max_size = 100
-        self._icon_cache_ttl = 3600
+        self._icon_cache_max_size = 100  # Increased to cover all coins with different sizes (56px and 256px)
+        self._icon_cache_ttl = 86400  # 24 hours (1 day) - icons don't change frequently
         
         self._circle_masks = {}
         for size in [56, 256]:
@@ -88,6 +89,13 @@ class ChartGenerator:
             timeout=httpx.Timeout(5.0),
             limits=httpx.Limits(max_keepalive_connections=10, max_connections=20)
         )
+        
+        # Thread pool executor for chart rendering (limit concurrent renders)
+        self._executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="chart_render")
+        
+        # Cache for x_dates computation (LRU with max 100 entries)
+        self._x_dates_cache: OrderedDict[Tuple[str, int, int], np.ndarray] = OrderedDict()
+        self._x_dates_cache_max_size = 100
 
     # ---------- FORMATTERS ----------
 
@@ -173,8 +181,9 @@ class ChartGenerator:
             return None
     
     async def close(self):
-        """Closes HTTP client (call on application shutdown)"""
+        """Closes HTTP client and executor (call on application shutdown)"""
         await self._http_client.aclose()
+        self._executor.shutdown(wait=True)
 
     # ---------- MAIN ----------
 
@@ -193,9 +202,11 @@ class ChartGenerator:
         low_24h: Optional[float] = None,
         base_image_type: Optional[str] = None,
     ) -> Optional[bytes]:
-        """Async wrapper: loads icon, then renders chart in thread"""
+        """Async wrapper: loads icon, then renders chart in thread pool"""
         icon = await self._load_icon(coin_icon_url, size=256)
-        return await asyncio.to_thread(
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            self._executor,
             self._render_chart_sync,
             coin_symbol, coin_name, current_price, percent_change_24h,
             chart_data, days, icon, market_cap, volume_24h,
@@ -227,11 +238,25 @@ class ChartGenerator:
                 base_img_array = self._base_img_array
 
             prices = np.array([p["price"] for p in chart_data], dtype=np.float64)
-            timestamps = np.array([p["timestamp"] for p in chart_data], dtype=np.float64) / 1000.0
-            # Convert Unix timestamps (seconds) to matplotlib date numbers
-            # Matplotlib uses days since 0001-01-01, Unix epoch is 1970-01-01
-            # Difference: 719163 days
-            x_dates = timestamps / 86400.0 + 719163.0
+            
+            # Cache x_dates computation (same for same chart_data)
+            cache_key = (coin_symbol, days, len(chart_data))
+            if cache_key in self._x_dates_cache:
+                # Move to end (LRU)
+                self._x_dates_cache.move_to_end(cache_key)
+                x_dates = self._x_dates_cache[cache_key]
+            else:
+                # Compute x_dates
+                timestamps = np.array([p["timestamp"] for p in chart_data], dtype=np.float64) / 1000.0
+                # Convert Unix timestamps (seconds) to matplotlib date numbers
+                # Matplotlib uses days since 0001-01-01, Unix epoch is 1970-01-01
+                # Difference: 719163 days
+                x_dates = timestamps / 86400.0 + 719163.0
+                
+                # Store in cache (LRU eviction)
+                if len(self._x_dates_cache) >= self._x_dates_cache_max_size:
+                    self._x_dates_cache.popitem(last=False)
+                self._x_dates_cache[cache_key] = x_dates
 
             if base_image_type == "stop-loss":
                 color = self.PRICE_DOWN
@@ -266,10 +291,30 @@ class ChartGenerator:
                 card_height - 0.28
             ])
             ax.set_facecolor("none")
+            
+            # Performance optimizations
+            ax.set_autoscale_on(False)
+            ax.set_rasterized(True)
 
-            ax.set_xlim(x_dates[0], x_dates[-1])
-            ax.xaxis.set_major_locator(mdates.DayLocator(interval=1))
-            ax.xaxis.set_major_formatter(mdates.DateFormatter("%m/%d"))
+            # Add small padding to the right so the last point is fully visible
+            x_range = x_dates[-1] - x_dates[0]
+            x_padding = x_range * 0.005  # 2% padding on the right
+            ax.set_xlim(x_dates[0], x_dates[-1] + x_padding)
+            
+            # Format X axis based on timeframe: adaptive intervals to avoid overlapping labels
+            if days == 1:
+                ax.xaxis.set_major_locator(mdates.HourLocator(interval=2))
+                ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
+            elif days == 7:
+                ax.xaxis.set_major_locator(mdates.DayLocator(interval=1))
+                ax.xaxis.set_major_formatter(mdates.DateFormatter("%m/%d"))
+            elif days == 30:
+                ax.xaxis.set_major_locator(mdates.DayLocator(interval=2))
+                ax.xaxis.set_major_formatter(mdates.DateFormatter("%m/%d"))
+            else:
+                ax.xaxis.set_major_locator(mdates.MonthLocator(interval=1))
+                ax.xaxis.set_major_formatter(mdates.DateFormatter("%m/%d"))
+            
             ax.tick_params(axis="x", pad=8)
 
             y_min = float(np.min(prices))
@@ -283,7 +328,7 @@ class ChartGenerator:
             y_axis_min, _ = ax.get_ylim()
 
             ax.plot(x_dates, prices, color=color, linewidth=2.6)
-            ax.fill_between(x_dates, prices, y_axis_min, color=color, alpha=0.30)
+            ax.fill_between(x_dates, prices, y_axis_min, color=color, alpha=0.30, linewidth=0)
             
             ax.axhline(
                 y=current_price,

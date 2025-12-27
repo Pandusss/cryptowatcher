@@ -6,6 +6,7 @@ from app.core.config import settings
 from app.api.v1.router import api_router
 from app.services.bot_polling import bot_polling
 from app.services.notification_checker import notification_checker
+from app.services.chart_generator import chart_generator
 from app.providers.cex.binance_websocket import binance_websocket_worker
 from app.providers.cex.okx_websocket import okx_websocket_worker
 from app.providers.cex.mexc_websocket import mexc_websocket_worker
@@ -31,7 +32,7 @@ async def lifespan(app: FastAPI):
     yield
     
     # Shutdown: Stop all services and cleanup
-    bot_polling.stop()
+    await bot_polling.stop()
     notification_checker.stop()
     binance_websocket_worker.stop()
     okx_websocket_worker.stop()
@@ -47,6 +48,9 @@ async def lifespan(app: FastAPI):
     # Close shared HTTP client
     from app.utils.http_client import SharedHTTPClient
     await SharedHTTPClient.close()
+    
+    # Close chart generator (HTTP client and thread pool)
+    await chart_generator.close()
 
 
 app = FastAPI(

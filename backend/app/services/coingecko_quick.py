@@ -5,8 +5,18 @@ Searches coins by symbol and fetches price/chart data
 import logging
 from typing import Optional, Dict, Any, List
 from app.providers.coingecko_client import CoinGeckoClient
+from app.core.coin_registry import coin_registry
 
 logger = logging.getLogger("CoinGeckoQuick")
+
+# Base parameters for /coins/markets endpoint
+MARKETS_BASE_PARAMS = {
+    "vs_currency": "usd",
+    "order": "market_cap_desc",
+    "per_page": 1,
+    "page": 1,
+    "sparkline": False,
+}
 
 
 class CoinGeckoQuickService:
@@ -19,14 +29,50 @@ class CoinGeckoQuickService:
         """
         Search for a coin by symbol (e.g., 'ETH', 'BTC')
         
+        First checks coin_registry (config), then falls back to CoinGecko API search.
+        This ensures we use the correct coin if it's in our config, even if there are
+        multiple coins with the same symbol.
+        
         Returns:
             Dict with coin_id, name, symbol, etc. or None if not found
         """
+        symbol_upper = symbol.upper()
+        
+        # First, check if coin is in our config (priority)
+        coin_config = coin_registry.find_coin_by_symbol(symbol_upper, enabled_only=True)
+        if coin_config:
+            coingecko_id = coin_config.external_ids.get("coingecko")
+            if coingecko_id:
+                logger.debug(f"Found {symbol} in coin_registry, using coingecko_id: {coingecko_id}")
+                # Try to get icon from /coins/markets (faster, returns image URL)
+                # This endpoint is already used for prices, so we can reuse it
+                try:
+                    response = await self.client.get(
+                        "/coins/markets",
+                        params={**MARKETS_BASE_PARAMS, "ids": coingecko_id}
+                    )
+                    
+                    if response and len(response) > 0:
+                        coin_data = response[0]
+                        image_url = coin_data.get("image", "")
+                        # CoinGecko markets returns single image URL, we use it for both thumb and large
+                        return {
+                            "id": coingecko_id,
+                            "name": coin_config.name,
+                            "symbol": coin_config.symbol.upper(),
+                            "thumb": image_url,
+                            "large": image_url,
+                        }
+                except Exception as e:
+                    logger.exception(f"Failed to get coin from markets for {coingecko_id}, falling back to API search")
+                # If getting details fails, fall through to API search
+        
+        # Fallback: search via CoinGecko API
         try:
             # CoinGecko search endpoint
             response = await self.client.get(
                 "/search",
-                params={"query": symbol.upper()}
+                params={"query": symbol_upper}
             )
             
             if not response or "coins" not in response:
@@ -38,7 +84,7 @@ class CoinGeckoQuickService:
             
             # Find exact symbol match (case-insensitive)
             for coin in coins:
-                if coin.get("symbol", "").upper() == symbol.upper():
+                if coin.get("symbol", "").upper() == symbol_upper:
                     return {
                         "id": coin.get("id"),
                         "name": coin.get("name"),
@@ -58,7 +104,7 @@ class CoinGeckoQuickService:
             }
             
         except Exception as e:
-            logger.error(f"Error searching coin {symbol}: {e}")
+            logger.exception(f"Error searching coin {symbol}")
             return None
     
     async def get_coin_price(self, coin_id: str) -> Optional[Dict[str, Any]]:
@@ -72,14 +118,7 @@ class CoinGeckoQuickService:
             # Use /coins/markets endpoint to get more data including market cap, high, low
             response = await self.client.get(
                 "/coins/markets",
-                params={
-                    "vs_currency": "usd",
-                    "ids": coin_id,
-                    "order": "market_cap_desc",
-                    "per_page": 1,
-                    "page": 1,
-                    "sparkline": False,
-                }
+                params={**MARKETS_BASE_PARAMS, "ids": coin_id}
             )
             
             if not response or len(response) == 0:
@@ -124,7 +163,7 @@ class CoinGeckoQuickService:
             }
             
         except Exception as e:
-            logger.error(f"Error fetching price for {coin_id}: {e}")
+            logger.exception(f"Error fetching price for {coin_id}")
             return None
     
     async def get_coin_chart_data(self, coin_id: str, days: int = 7) -> Optional[List[Dict[str, Any]]]:
@@ -165,7 +204,7 @@ class CoinGeckoQuickService:
             return chart_data
             
         except Exception as e:
-            logger.error(f"Error fetching chart data for {coin_id}: {e}")
+            logger.exception(f"Error fetching chart data for {coin_id}")
             return None
     
     async def get_coin_full_data(self, symbol: str, days: int = 7) -> Optional[Dict[str, Any]]:
@@ -220,4 +259,5 @@ class CoinGeckoQuickService:
 
 # Global instance
 coingecko_quick = CoinGeckoQuickService()
+
 

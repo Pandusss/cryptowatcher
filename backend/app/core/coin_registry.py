@@ -141,6 +141,15 @@ class CoinRegistry:
                 return coin
         return None
     
+    def find_coin_by_symbol(self, symbol: str, enabled_only: bool = True) -> Optional[CoinConfig]:
+        symbol_upper = symbol.upper()
+        for coin in self._coins.values():
+            if enabled_only and not coin.enabled:
+                continue
+            if coin.symbol.upper() == symbol_upper:
+                return coin
+        return None
+    
     def get_coins_by_source(self, source: str) -> List[CoinConfig]:
         return [
             coin for coin in self._coins.values()
