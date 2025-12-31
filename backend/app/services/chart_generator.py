@@ -242,7 +242,6 @@ class ChartGenerator:
             # Cache x_dates computation (same for same chart_data)
             cache_key = (coin_symbol, days, len(chart_data))
             if cache_key in self._x_dates_cache:
-                # Move to end (LRU)
                 self._x_dates_cache.move_to_end(cache_key)
                 x_dates = self._x_dates_cache[cache_key]
             else:

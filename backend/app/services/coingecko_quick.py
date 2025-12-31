@@ -38,7 +38,6 @@ class CoinGeckoQuickService:
         """
         symbol_upper = symbol.upper()
         
-        # First, check if coin is in our config (priority)
         coin_config = coin_registry.find_coin_by_symbol(symbol_upper, enabled_only=True)
         if coin_config:
             coingecko_id = coin_config.external_ids.get("coingecko")
@@ -67,9 +66,7 @@ class CoinGeckoQuickService:
                     logger.exception(f"Failed to get coin from markets for {coingecko_id}, falling back to API search")
                 # If getting details fails, fall through to API search
         
-        # Fallback: search via CoinGecko API
         try:
-            # CoinGecko search endpoint
             response = await self.client.get(
                 "/search",
                 params={"query": symbol_upper}
@@ -151,7 +148,7 @@ class CoinGeckoQuickService:
                     "low_24h": coin_data.get("usd_24h_low"),
                 }
             
-            coin_data = response[0]  # First (and only) result
+            coin_data = response[0]
             
             return {
                 "price": float(coin_data.get("current_price", 0)),
@@ -221,7 +218,6 @@ class CoinGeckoQuickService:
         
         coin_id = coin_info["id"]
         
-        # Get price and chart in parallel
         import asyncio
         price_data, chart_data = await asyncio.gather(
             self.get_coin_price(coin_id),

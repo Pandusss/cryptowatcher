@@ -442,27 +442,24 @@ export const CreateNotificationPage = () => {
     }
   }
 
-  // Format number with spaces for thousands and comma for decimals
+  // Format number with comma for decimals (no thousands separator)
   const formatPrice = (price: number) => {
     const decimals = crypto ? getPriceDecimals(crypto.price, crypto.priceDecimals) : 2
-    // Format with dots for thousands and comma for decimals (e.g.: 89.357,00)
+    // Format with comma for decimals only (e.g.: 89357,00)
     const parts = price.toFixed(decimals).split('.')
     const integerPart = parts[0]
     const decimalPart = parts[1] || '0'.repeat(decimals)
     
-    // Add dots for thousands separator
-    const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
-    
-    return `${formattedInteger},${decimalPart}`
+    return `${integerPart},${decimalPart}`
   }
 
   const formatCalculatedValue = (val: number) => {
     const decimals = crypto ? getPriceDecimals(crypto.price, crypto.priceDecimals) : 2
-    // Format: replace dot with comma, keep spaces for thousands
-    return val.toLocaleString('ru-RU', {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    }).replace(/,/g, ' ').replace('.', ',')
+    // Format: comma for decimals, no thousands separator
+    const parts = val.toFixed(decimals).split('.')
+    const integerPart = parts[0]
+    const decimalPart = parts[1] || '0'.repeat(decimals)
+    return `${integerPart},${decimalPart}`
   }
 
   // Calculate trigger level for chart display
@@ -1039,7 +1036,7 @@ export const CreateNotificationPage = () => {
                 placeholder={
                   valueType === 'percent' ? '5%' : 
                   valueType === 'absolute' ? '100' : 
-                  crypto ? crypto.price.toFixed(getPriceDecimals(crypto.price)) : '0'
+                  crypto ? crypto.price.toFixed(getPriceDecimals(crypto.price, crypto.priceDecimals)).replace('.', ',') : '0'
                 }
                 className={styles.valueInput}
                 inputRef={valueInputRef}
@@ -1055,9 +1052,9 @@ export const CreateNotificationPage = () => {
               {valueType === 'percent' 
                 ? `${value}% ≈ $${formatCalculatedValue(calculatedValue as number)}`
                 : valueType === 'absolute'
-                ? `$${formatCalculatedValue(parseFloat(value))} ≈ ${(calculatedValue as number).toFixed(2)}%`
+                ? `$${formatCalculatedValue(parseFloat(value))} ≈ ${(calculatedValue as number).toFixed(2).replace('.', ',')}%`
                 : typeof calculatedValue === 'object' && calculatedValue !== null && 'priceDiff' in calculatedValue
-                ? `$${formatCalculatedValue(parseFloat(value))} (${calculatedValue.priceDiff >= 0 ? '+' : ''}${calculatedValue.priceDiff.toFixed(crypto ? getPriceDecimals(crypto.price) : 2)} USD, ${calculatedValue.percentDiff >= 0 ? '+' : ''}${calculatedValue.percentDiff.toFixed(2)}%)`
+                ? `$${formatCalculatedValue(parseFloat(value))} (${calculatedValue.priceDiff >= 0 ? '+' : ''}${calculatedValue.priceDiff.toFixed(crypto ? getPriceDecimals(crypto.price, crypto.priceDecimals) : 2).replace('.', ',')} USD, ${calculatedValue.percentDiff >= 0 ? '+' : ''}${calculatedValue.percentDiff.toFixed(2).replace('.', ',')}%)`
                 : null
               }
             </Text>

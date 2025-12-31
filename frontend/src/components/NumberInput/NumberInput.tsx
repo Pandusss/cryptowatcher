@@ -33,13 +33,18 @@ export const NumberInput = ({
   const inputElementRef = inputRef || internalRef
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value
-    if (newValue === '' || /^-?\d*\.?\d*$/.test(newValue)) {
-      onChange(newValue)
+    let newValue = e.target.value
+    // Replace comma with dot for internal storage (parseFloat works with dots)
+    // But allow both comma and dot for user input
+    if (newValue === '' || /^-?\d*[,.]?\d*$/.test(newValue)) {
+      // Convert comma to dot for internal storage
+      const normalizedValue = newValue.replace(',', '.')
+      onChange(normalizedValue)
     }
   }
 
   const handleIncrement = () => {
+    // Value is stored with dot, so parseFloat works directly
     const currentValue = parseFloat(value) || 0
     const newValue = currentValue + step
     const finalValue = max !== undefined ? Math.min(newValue, max) : newValue
@@ -47,6 +52,7 @@ export const NumberInput = ({
   }
 
   const handleDecrement = () => {
+    // Value is stored with dot, so parseFloat works directly
     const currentValue = parseFloat(value) || 0
     const newValue = currentValue - step
     const finalValue = min !== undefined ? Math.max(newValue, min) : newValue
@@ -73,13 +79,16 @@ export const NumberInput = ({
     setIsFocused(false)
   }
 
+  // Display value with comma instead of dot for Russian locale
+  const displayValue = value.replace('.', ',')
+
   return (
     <div className={cn(styles.numberInputContainer, className)}>
       <input
         ref={inputElementRef}
         type="text"
         inputMode="decimal"
-        value={value}
+        value={displayValue}
         onChange={handleChange}
         onFocus={handleFocus}
         onBlur={handleBlur}
