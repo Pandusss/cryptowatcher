@@ -27,6 +27,7 @@ class Settings(BaseSettings):
 
     # Telegram Bot API
     TELEGRAM_BOT_TOKEN: str = Field(...)
+    TELEGRAM_API_URL: str = Field(default="http://localhost:8090/bot")
 
     # CORS origins (comma-separated). First origin is used for generating absolute URLs
     ALLOWED_ORIGINS: str = Field(...)

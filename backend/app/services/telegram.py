@@ -10,8 +10,8 @@ from app.core.config import settings
 logger = logging.getLogger(f"TelegramService")
 
 class TelegramService:
-    
-    BASE_URL = "https://api.telegram.org/bot"
+
+    BASE_URL = settings.TELEGRAM_API_URL
     
     def __init__(self):
         self.bot_token = settings.TELEGRAM_BOT_TOKEN

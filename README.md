@@ -6,7 +6,7 @@
 
 ## Summary
 
-CryptoWatcher is a Telegram Mini App for real-time cryptocurrency price monitoring with smart notifications. It aggregates price data from multiple exchanges via WebSocket connections and allows users to set up price alerts that are delivered directly through Telegram.
+Telegram mini-app for buying and selling advertising spots in Telegram channels.
 
 **Telegram Bot:** [@cryptowatcher_bot](https://t.me/cryptowatcher_bot)
 
