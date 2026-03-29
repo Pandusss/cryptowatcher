@@ -81,27 +81,22 @@ class InlineQueryHandler:
         coin_data: Dict[str, Any],
         days: int,
         timeframe_label: str,
-        chart_data: Optional[List[Dict[str, Any]]] = None
+        chart_data: List[Dict[str, Any]],
+        preloaded_icon,
     ) -> Optional[Dict[str, Any]]:
-        """Generate a single chart result for inline query"""
+        """Generate a single chart result for inline query.
+
+        Expects chart_data and preloaded_icon to be provided by the caller
+        so that HTTP fetches happen once, not per-timeframe.
+        """
         try:
-            # Use provided chart_data or fetch it
-            if chart_data is None:
-                coin_id = coin_data.get("id")
-                if not coin_id:
-                    return None
-                chart_data = await coingecko_quick.get_coin_chart_data(coin_id, days=days)
-            
             if not chart_data:
                 return None
-            
-            # Prepare price info
+
             price_text = format_price(coin_data['price'])
             change_text = f"{coin_data['percent_change_24h']:+.2f}%"
             change_emoji = "📈" if coin_data['percent_change_24h'] >= 0 else "📉"
-            
-            # Generate chart image
-            coin_icon_url = coin_data.get("large") or coin_data.get("thumb")
+
             chart_bytes = await chart_generator.generate_chart(
                 coin_symbol=coin_data["symbol"],
                 coin_name=coin_data["name"],
@@ -109,33 +104,30 @@ class InlineQueryHandler:
                 percent_change_24h=coin_data["percent_change_24h"],
                 chart_data=chart_data,
                 days=days,
-                coin_icon_url=coin_icon_url,
                 market_cap=coin_data.get("market_cap"),
                 volume_24h=coin_data.get("volume_24h"),
                 high_24h=coin_data.get("high_24h"),
                 low_24h=coin_data.get("low_24h"),
+                preloaded_icon=preloaded_icon,
             )
-            
+
             if not chart_bytes:
                 return None
-            
-            # Store chart and get ID
+
             chart_id = chart_storage.store_chart(chart_bytes, coin_data["symbol"])
-            
-            # Build image URL
+
             allowed_origins = settings.ALLOWED_ORIGINS.split(",")
             base_url = allowed_origins[0].strip().rstrip('/')
             image_url = f"{base_url}/api/v1/charts/{chart_id}"
-            
-            # Format message with embedded image
-            zwsp = "\u200B"  # Zero-width space
+
+            zwsp = "\u200B"
             message_text = (
                 f"[{zwsp}]({image_url})\n\n"
                 f"📊 {coin_data['name']} ({coin_data['symbol']}) • {timeframe_label}\n"
                 f"💰 {price_text}\n"
                 f"{change_emoji} {change_text}"
             )
-            
+
             return {
                 "type": "article",
                 "id": f"coin_{coin_data['symbol']}_{days}d",
@@ -148,61 +140,78 @@ class InlineQueryHandler:
                 "thumb_url": image_url,
             }
         except Exception as e:
-            logging.getLogger(__name__).exception(f"Error generating chart result")
+            logging.getLogger(__name__).exception("Error generating chart result")
             return None
-    
+
     @staticmethod
     async def process(inline_query: Dict[str, Any], logger):
         """Process an inline query update"""
         try:
             query_id = inline_query.get("id")
             query_text = inline_query.get("query", "").strip().upper()
-            
+
             if not query_id:
                 return
-            
-            # If query is empty or too short, don't search
+
             if not query_text or len(query_text) < 1:
                 await telegram_service.answer_inline_query(query_id, [])
                 return
-            
-            # Limit query length
+
             if len(query_text) > 10:
                 query_text = query_text[:10]
-            
-            # Search for coin (use default 7D for initial search)
+
+            # 1. Search coin and get base data (price + 7D chart)
             coin_data = await coingecko_quick.get_coin_full_data(query_text, days=7)
-            
+
             if not coin_data:
                 await telegram_service.answer_inline_query(query_id, [])
                 return
-            
-            # Prepare price info for fallback
+
             price_text = format_price(coin_data['price'])
             change_text = f"{coin_data['percent_change_24h']:+.2f}%"
             change_emoji = "📈" if coin_data['percent_change_24h'] >= 0 else "📉"
-            
-            # Generate results for different timeframes in parallel for better performance
-            # Reuse already fetched 7D chart_data to avoid redundant API call
-            chart_data_7d = coin_data.get("chart_data", [])
+
             coin_id = coin_data.get("id")
-            
-            result_7d, result_1d, result_30d = await asyncio.gather(
-                InlineQueryHandler._generate_chart_result(coin_data, days=7, timeframe_label="7D", chart_data=chart_data_7d),
-                InlineQueryHandler._generate_chart_result(coin_data, days=1, timeframe_label="1D", chart_data=None),
-                InlineQueryHandler._generate_chart_result(coin_data, days=30, timeframe_label="30D", chart_data=None),
+            coin_icon_url = coin_data.get("large") or coin_data.get("thumb")
+            chart_data_7d = coin_data.get("chart_data", [])
+
+            # 2. Pre-fetch icon + remaining chart data in ONE parallel batch
+            #    Icon is loaded once and reused across all 3 renders.
+            icon_future = chart_generator._load_icon(coin_icon_url, size=256)
+            chart_1d_future = coingecko_quick.get_coin_chart_data(coin_id, days=1)
+            chart_30d_future = coingecko_quick.get_coin_chart_data(coin_id, days=30)
+
+            preloaded_icon, chart_data_1d, chart_data_30d = await asyncio.gather(
+                icon_future, chart_1d_future, chart_30d_future,
                 return_exceptions=True
             )
-            
+
+            if isinstance(preloaded_icon, Exception):
+                preloaded_icon = None
+            if isinstance(chart_data_1d, Exception):
+                chart_data_1d = None
+            if isinstance(chart_data_30d, Exception):
+                chart_data_30d = None
+
+            # 3. Render all 3 charts in parallel (icon already loaded, no extra HTTP)
+            result_7d, result_1d, result_30d = await asyncio.gather(
+                InlineQueryHandler._generate_chart_result(
+                    coin_data, days=7, timeframe_label="7D",
+                    chart_data=chart_data_7d, preloaded_icon=preloaded_icon),
+                InlineQueryHandler._generate_chart_result(
+                    coin_data, days=1, timeframe_label="1D",
+                    chart_data=chart_data_1d or [], preloaded_icon=preloaded_icon),
+                InlineQueryHandler._generate_chart_result(
+                    coin_data, days=30, timeframe_label="30D",
+                    chart_data=chart_data_30d or [], preloaded_icon=preloaded_icon),
+                return_exceptions=True
+            )
+
             results = []
-            if result_7d and not isinstance(result_7d, Exception):
-                results.append(result_7d)
-            if result_1d and not isinstance(result_1d, Exception):
-                results.append(result_1d)
-            if result_30d and not isinstance(result_30d, Exception):
-                results.append(result_30d)
-            
-            # If no chart results, fallback to text
+            for r in (result_7d, result_1d, result_30d):
+                if r and not isinstance(r, Exception):
+                    results.append(r)
+
             if not results:
                 result = {
                     "type": "article",
@@ -216,12 +225,12 @@ class InlineQueryHandler:
                     },
                 }
                 results = [result]
-            
+
             logger.debug(f"Sending {len(results)} inline query results for {coin_data['symbol']}")
             success = await telegram_service.answer_inline_query(query_id, results)
             if not success:
                 logger.warning(f"Failed to answer inline query for {coin_data['symbol']}")
-            
+
         except Exception as e:
             logger.exception("Error processing inline query")
 
