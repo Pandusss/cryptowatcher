@@ -521,7 +521,6 @@ class ChartGenerator:
                 dpi=self.DPI,
                 bbox_inches=None,
                 pad_inches=0,
-                transparent=True,
             )
 
             # --- PIL compositing: paste transparent chart overlay onto base image ---
