@@ -11,7 +11,7 @@ from app.models.user import User
 from app.services.user_service import get_or_create_user
 
 router = APIRouter()
-logger = logging.getLogger("EndpointsUsers")
+logger = logging.getLogger(__name__)
 
 
 

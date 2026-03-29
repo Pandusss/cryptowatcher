@@ -8,7 +8,7 @@ import logging
 from app.services.chart_storage import chart_storage
 
 router = APIRouter()
-logger = logging.getLogger("EndpointsCharts")
+logger = logging.getLogger(__name__)
 
 
 @router.get("/charts/{chart_id}")

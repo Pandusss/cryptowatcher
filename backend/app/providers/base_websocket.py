@@ -10,11 +10,13 @@ Contains common logic for all WebSocket providers:
 import asyncio
 import json
 import logging
+import random
 import websockets
 from abc import ABC, abstractmethod
 from typing import Dict, Optional, Set, Tuple, Callable
 from pathlib import Path
 
+from app.core.config import settings
 from app.core.redis_client import get_redis
 from app.core.coin_registry import coin_registry
 from app.utils.websocket_price_handler import process_price_update
@@ -34,7 +36,8 @@ class BaseWebSocketWorker(ABC):
     - _get_volume_extractor() - function to extract volume from ticker
     """
     
-    RECONNECT_DELAY = 5  # Seconds before reconnection
+    RECONNECT_DELAY_INITIAL = settings.WS_RECONNECT_DELAY
+    RECONNECT_DELAY_MAX = settings.WS_MAX_RECONNECT_DELAY
     PRICE_UPDATE_INTERVAL = 0.1  # Update cache every 100ms
     LOG_INTERVAL = 5.0  # Logging statistics interval
     
@@ -171,43 +174,55 @@ class BaseWebSocketWorker(ABC):
         """Close WebSocket worker (alias for stop)"""
         await self.stop()
     
+    def _get_reconnect_delay(self, attempt: int) -> float:
+        """Calculate reconnect delay with exponential backoff and jitter."""
+        delay = min(self.RECONNECT_DELAY_INITIAL * (2 ** attempt), self.RECONNECT_DELAY_MAX)
+        jitter = delay * 0.2 * (random.random() * 2 - 1)  # +/- 20%
+        return max(1, delay + jitter)
+
     async def _websocket_loop(self):
-        """Main WebSocket loop with reconnection"""
+        """Main WebSocket loop with reconnection and exponential backoff"""
         ws_url = self._get_websocket_url()
-        
+        reconnect_attempt = 0
+
         while self._running:
             try:
-                self._logger.info(f"Connecting to {ws_url}")
-                
+                self._logger.info(f"Connecting to WebSocket...")
+
                 async with websockets.connect(ws_url) as ws:
                     self._ws = ws
                     self._logger.info("Connected to WebSocket")
-                    
+                    reconnect_attempt = 0  # Reset on successful connection
+
                     # Subscribe to tickers
                     await self._subscribe(ws)
-                    
+
                     # Process messages
                     async for message in ws:
                         if not self._running:
                             break
-                        
+
                         await self._process_message(message)
-                
+
             except websockets.exceptions.ConnectionClosed:
                 if self._running:
-                    self._logger.warning(f"Connection closed, reconnecting in {self.RECONNECT_DELAY} sec")
-                    await asyncio.sleep(self.RECONNECT_DELAY)
+                    delay = self._get_reconnect_delay(reconnect_attempt)
+                    self._logger.warning(f"Connection closed, reconnecting in {delay:.1f}s (attempt {reconnect_attempt + 1})")
+                    await asyncio.sleep(delay)
+                    reconnect_attempt += 1
                 else:
                     break
-            
+
             except Exception as e:
                 if self._running:
+                    delay = self._get_reconnect_delay(reconnect_attempt)
                     self._logger.error(f"WebSocket error: {e}")
-                    self._logger.info(f"Reconnecting in {self.RECONNECT_DELAY} sec")
-                    await asyncio.sleep(self.RECONNECT_DELAY)
+                    self._logger.info(f"Reconnecting in {delay:.1f}s (attempt {reconnect_attempt + 1})")
+                    await asyncio.sleep(delay)
+                    reconnect_attempt += 1
                 else:
                     break
-        
+
         self._logger.info("WebSocket loop ended")
     
     async def _process_message(self, message: str):

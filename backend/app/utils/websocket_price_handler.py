@@ -10,7 +10,9 @@ from app.core.redis_client import get_redis
 from app.core.coin_registry import coin_registry
 from app.utils.formatters import get_price_decimals
 
-logger = logging.getLogger(f"UtilsWebsocketPriceHandler")
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 async def process_price_update(
     ticker: Dict,
@@ -85,7 +87,7 @@ async def process_price_update(
         price_cache_key = f"coin_price:{coin_id}"
         await redis.setex(
             price_cache_key,
-            86400,
+            settings.CACHE_TTL_PRICE,
             json.dumps(price_data)
         )
         
@@ -95,7 +97,19 @@ async def process_price_update(
         
         try:
             from app.services.notification_checker import notification_checker
-            asyncio.create_task(notification_checker.check_notifications_for_coin(coin_id))
+            # Skip if a check for this coin is already running
+            existing_task = notification_checker._active_tasks.get(coin_id)
+            if existing_task is None or existing_task.done():
+                task = asyncio.create_task(
+                    notification_checker.check_notifications_for_coin(coin_id)
+                )
+                notification_checker._active_tasks[coin_id] = task
+
+                def _on_done(t, cid=coin_id):
+                    if not t.cancelled() and t.exception() is not None:
+                        logger.error(f"Notification check failed for {cid}: {t.exception()}")
+
+                task.add_done_callback(_on_done)
         except Exception as e:
             logger.error(f"Failed to trigger notification check for {coin_id}: {e}")
         

@@ -1,8 +1,33 @@
 """
 Utilities for formatting data
 """
-from typing import Union
+from typing import Optional, Union
 from datetime import datetime, timezone
+
+
+def utc_now() -> datetime:
+    """Return current UTC time as timezone-aware datetime."""
+    return datetime.now(timezone.utc)
+
+
+def format_price(price: Optional[float], use_separator: bool = True) -> str:
+    """
+    Format price with proper decimal places and optional thousands separator.
+
+    Args:
+        price: The price value to format
+        use_separator: Whether to use thousands separator (comma)
+
+    Returns:
+        Formatted price string like "$1,234.56" or "$0.001234"
+    """
+    if price is None:
+        return "N/A"
+    decimals = get_price_decimals(price)
+    if use_separator and price >= 1000:
+        return f"${price:,.{decimals}f}"
+    return f"${price:.{decimals}f}"
+
 
 def get_price_decimals(price: Union[float, int]) -> int:
     """
@@ -30,8 +55,6 @@ def format_chart_date(date_obj: datetime, period: str) -> str:
     Returns an ISO string with the UTC time zone for correct parsing on the frontend.
     Example: "2025-12-17T18:12:12+00:00"
     """
-    from datetime import timezone, datetime
-    
     # 1. Ensure datetime is in UTC
     if date_obj.tzinfo is None:
         # If datetime has no timezone - assume it's already UTC

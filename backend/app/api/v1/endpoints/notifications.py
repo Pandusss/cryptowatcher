@@ -11,7 +11,7 @@ from app.services.user_service import get_or_create_user
 from app.services.aggregation_service import aggregation_service
 
 router = APIRouter()
-logger = logging.getLogger("EndpointNotifications")
+logger = logging.getLogger(__name__)
 
 
 async def get_image_urls_for_notifications(notifications: List[Notification]) -> Dict[str, Optional[str]]:

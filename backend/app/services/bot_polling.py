@@ -13,15 +13,7 @@ from app.services.telegram import telegram_service
 from app.services.coingecko_quick import coingecko_quick
 from app.services.chart_generator import chart_generator
 from app.services.chart_storage import chart_storage
-from app.utils.formatters import get_price_decimals
-
-
-def format_price(price: float) -> str:
-    """Format price with proper decimals and thousands separator"""
-    decimals = get_price_decimals(price)
-    if price >= 1000:
-        return f"${price:,.{decimals}f}"
-    return f"${price:.{decimals}f}"
+from app.utils.formatters import format_price
 
 
 class MessageHandler:
@@ -156,7 +148,7 @@ class InlineQueryHandler:
                 "thumb_url": image_url,
             }
         except Exception as e:
-            logging.getLogger("InlineQueryHandler").exception(f"Error generating chart result")
+            logging.getLogger(__name__).exception(f"Error generating chart result")
             return None
     
     @staticmethod
@@ -274,7 +266,7 @@ class BotPolling:
         self.bot_token = settings.TELEGRAM_BOT_TOKEN
         self.offset = 0
         self.running = False
-        self._logger = logging.getLogger("BotPolling")
+        self._logger = logging.getLogger(__name__)
         
         # Create single HTTP client (reused across all polls)
         self.http_client = httpx.AsyncClient(timeout=30.0)

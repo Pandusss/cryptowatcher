@@ -25,7 +25,7 @@ class AggregationService:
     
     def __init__(self):
         self.cache = CoinCacheManager()
-        self._logger = logging.getLogger("AggregationService")
+        self._logger = logging.getLogger(__name__)
         
         # Provider registry
         self.static_providers = {

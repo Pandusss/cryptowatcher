@@ -7,7 +7,7 @@ import logging
 from app.core.redis_client import get_redis
 from app.utils.cache import CoinCacheManager
 
-logger = logging.getLogger("CoinCacheService")
+logger = logging.getLogger(__name__)
 
 class CoinCacheService:
     """

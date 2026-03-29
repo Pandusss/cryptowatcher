@@ -26,10 +26,10 @@ from PIL import Image, ImageDraw
 import httpx
 import numpy as np
 
-from app.utils.formatters import get_price_decimals 
+from app.utils.formatters import get_price_decimals, format_price as _global_format_price
 
 
-logger = logging.getLogger("ChartGenerator")
+logger = logging.getLogger(__name__)
 
 
 class ChartGenerator:
@@ -100,10 +100,7 @@ class ChartGenerator:
     # ---------- FORMATTERS ----------
 
     def _format_price(self, price: Optional[float]) -> str:
-        if price is None:
-            return "N/A"
-        decimals = get_price_decimals(price)
-        return f"${price:.{decimals}f}"
+        return _global_format_price(price, use_separator=False)
 
     def _format_large(self, v: Optional[float]) -> str:
         if v is None:

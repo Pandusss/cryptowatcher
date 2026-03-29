@@ -5,7 +5,7 @@ from app.services.coin_service import CoinService
 import logging
 
 router = APIRouter()
-logger = logging.getLogger("EndpointsCoins")
+logger = logging.getLogger(__name__)
 
 
 

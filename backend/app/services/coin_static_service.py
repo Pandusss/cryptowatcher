@@ -20,7 +20,7 @@ class CoinStaticService:
     def __init__(self):
         self.client = CoinGeckoClient()
         self.cache = CoinCacheManager()
-        self._logger = logging.getLogger("CoinStaticService")
+        self._logger = logging.getLogger(__name__)
 
     
     async def close(self):

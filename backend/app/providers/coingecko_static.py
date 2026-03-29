@@ -10,7 +10,7 @@ import logging
 from app.providers.coingecko_client import CoinGeckoClient
 from app.utils.cache import CoinCacheManager
 
-logger = logging.getLogger(f"CoingeckoStatic")
+logger = logging.getLogger(__name__)
 
 class CoinGeckoStaticAdapter:    
     def __init__(self):

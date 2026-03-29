@@ -5,23 +5,23 @@ Provides a configured httpx.AsyncClient with common parameters.
 """
 import httpx
 from typing import Optional
+from app.core.config import settings
 
 
 class SharedHTTPClient:
-    
+
     _client: Optional[httpx.AsyncClient] = None
-    
+
     @classmethod
     def get_client(cls) -> httpx.AsyncClient:
-
         if cls._client is None:
             cls._client = httpx.AsyncClient(
                 timeout=30.0,
                 verify=True,
                 follow_redirects=True,
                 limits=httpx.Limits(
-                    max_keepalive_connections=5,
-                    max_connections=10
+                    max_keepalive_connections=settings.HTTP_MAX_KEEPALIVE,
+                    max_connections=settings.HTTP_MAX_CONNECTIONS,
                 ),
                 headers={
                     "Accept": "application/json",

@@ -30,7 +30,7 @@ class CoinService:
         self.static_service = CoinStaticService()
         self.price_service = CoinPriceService()
         self.cache_service = CoinCacheService()
-        self._logger = logging.getLogger("CoinService")
+        self._logger = logging.getLogger(__name__)
 
     
     async def close(self):

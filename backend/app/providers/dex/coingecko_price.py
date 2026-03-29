@@ -13,7 +13,7 @@ from app.core.coin_registry import coin_registry
 from app.utils.cache import CoinCacheManager
 from app.utils.formatters import get_price_decimals
 
-logger = logging.getLogger("CoinGeckoPrice")
+logger = logging.getLogger(__name__)
 
 
 class CoinGeckoPriceAdapter(BasePriceAdapter):

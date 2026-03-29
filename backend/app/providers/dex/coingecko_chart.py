@@ -12,7 +12,7 @@ from app.providers.base_chart import BaseChartAdapter
 from app.providers.coingecko_client import CoinGeckoClient
 from app.core.coin_registry import coin_registry
 
-logger = logging.getLogger("CoinGeckoChart")
+logger = logging.getLogger(__name__)
 
 
 class CoinGeckoChartAdapter(BaseChartAdapter):

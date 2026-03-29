@@ -7,20 +7,45 @@ import logging
 from typing import Optional
 from app.core.config import settings
 
-logger = logging.getLogger(f"TelegramService")
+logger = logging.getLogger(__name__)
 
 class TelegramService:
 
     BASE_URL = settings.TELEGRAM_API_URL
-    
+
     def __init__(self):
         self.bot_token = settings.TELEGRAM_BOT_TOKEN
+        self._client = httpx.AsyncClient(timeout=30.0)
         if not self.bot_token:
-            logger.error(f"TELEGRAM_BOT_TOKEN is not installed. Notifications will not be sent")
-    
+            logger.error("TELEGRAM_BOT_TOKEN is not installed. Notifications will not be sent")
+
+    async def close(self):
+        await self._client.aclose()
+
     def _get_url(self, method: str) -> str:
         return f"{self.BASE_URL}{self.bot_token}/{method}"
-    
+
+    def _handle_http_error(self, e: httpx.HTTPStatusError, context: str) -> bool:
+        status_code = e.response.status_code
+        error_message = f"HTTP error {status_code}"
+
+        if status_code == 400:
+            try:
+                error_data = e.response.json()
+                error_code = error_data.get("error_code")
+                description = error_data.get("description", "")
+                if error_code and description:
+                    error_message += f" (Telegram API {error_code}: {description})"
+                else:
+                    error_message += f": {e.response.text[:200]}"
+            except Exception:
+                error_message += f": {e.response.text[:200]}"
+        else:
+            error_message += f": {e.response.text[:200]}"
+
+        logger.error(f"{context}: {error_message}")
+        return False
+
     async def send_message(
         self,
         chat_id: int,
@@ -31,48 +56,29 @@ class TelegramService:
 
         if not self.bot_token:
             return False
-        
+
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.post(
-                    self._get_url("sendMessage"),
-                    json={
-                        "chat_id": chat_id,
-                        "text": text,
-                        "parse_mode": parse_mode,
-                        "disable_web_page_preview": disable_web_page_preview,
-                    },
-                )
-                response.raise_for_status()
-                result = response.json()
-                
-                if result.get("ok"):
-                    return True
-                else:
-                    error_description = result.get("description", "Unknown error")
-                    logger.error(f"Error sending the message: {error_description}")
-                    return False
-                    
-        except httpx.HTTPStatusError as e:
-            status_code = e.response.status_code
-            error_message = f"HTTP error {status_code}"
-            
-            if status_code == 400:
-                try:
-                    error_data = e.response.json()
-                    error_code = error_data.get("error_code")
-                    description = error_data.get("description", "")
-                    if error_code and description:
-                        error_message += f" (Telegram API {error_code}: {description})"
-                    else:
-                        error_message += f": {e.response.text[:200]}"
-                except Exception:
-                    error_message += f": {e.response.text[:200]}"
+            response = await self._client.post(
+                self._get_url("sendMessage"),
+                json={
+                    "chat_id": chat_id,
+                    "text": text,
+                    "parse_mode": parse_mode,
+                    "disable_web_page_preview": disable_web_page_preview,
+                },
+            )
+            response.raise_for_status()
+            result = response.json()
+
+            if result.get("ok"):
+                return True
             else:
-                error_message += f": {e.response.text[:200]}"
-            
-            logger.error(error_message)
-            return False
+                error_description = result.get("description", "Unknown error")
+                logger.error(f"Error sending the message: {error_description}")
+                return False
+
+        except httpx.HTTPStatusError as e:
+            return self._handle_http_error(e, "send_message")
     
     async def send_notification(
         self,
@@ -86,16 +92,11 @@ class TelegramService:
         value: float,
         value_type: str,
     ) -> bool:
-        from app.utils.formatters import get_price_decimals
+        from app.utils.formatters import format_price
         from app.services.chart_generator import chart_generator
         from app.services.chart_storage import chart_storage
         from app.services.coingecko_quick import coingecko_quick
         from app.core.config import settings
-
-        # Format price with proper decimals (full amount, no abbreviations)
-        def format_price(price: float) -> str:
-            decimals = get_price_decimals(price)
-            return f"${price:.{decimals}f}"
         
         # Determine direction for text with emoji
         direction_info = {
@@ -115,7 +116,7 @@ class TelegramService:
         # Format value and message based on value type
         if value_type == "price":
             # For price type: "reached $X" or "increased/decreased to $X"
-            value_text = format_price(value)
+            value_text = format_price(value, use_separator=False)
             if direction == "rise":
                 change_text = f"increased to <b>{value_text}</b>"
             elif direction == "fall":
@@ -128,14 +129,14 @@ class TelegramService:
             change_text = f"{direction_text} by <b>{value_text}</b> {direction_emoji}"
         else:
             # For absolute type: "increased/decreased by $X"
-            value_text = format_price(value)
+            value_text = format_price(value, use_separator=False)
             change_text = f"{direction_text} by <b>{value_text}</b> {direction_emoji}"
         
         # Form message with improved formatting
         message = (
             f"{trigger_emoji} <b>{trigger_text}</b>\n"
             f"<b>{crypto_name} ({crypto_symbol})</b> {change_text}\n"
-            f"Current price: <b>{format_price(current_price)}</b>"
+            f"Current price: <b>{format_price(current_price, use_separator=False)}</b>"
         )
         
         # Try to generate and send chart image
@@ -223,53 +224,34 @@ class TelegramService:
             return False
         
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                files = {
-                    "photo": ("chart.png", photo_bytes, "image/png")
-                }
-                data = {
-                    "chat_id": chat_id,
-                }
-                if caption:
-                    data["caption"] = caption
-                if parse_mode:
-                    data["parse_mode"] = parse_mode
-                
-                response = await client.post(
-                    self._get_url("sendPhoto"),
-                    files=files,
-                    data=data,
-                )
-                response.raise_for_status()
-                result = response.json()
-                
-                if result.get("ok"):
-                    return True
-                else:
-                    error_description = result.get("description", "Unknown error")
-                    logger.error(f"Error sending photo: {error_description}")
-                    return False
-                    
-        except httpx.HTTPStatusError as e:
-            status_code = e.response.status_code
-            error_message = f"HTTP error {status_code}"
-            
-            if status_code == 400:
-                try:
-                    error_data = e.response.json()
-                    error_code = error_data.get("error_code")
-                    description = error_data.get("description", "")
-                    if error_code and description:
-                        error_message += f" (Telegram API {error_code}: {description})"
-                    else:
-                        error_message += f": {e.response.text[:200]}"
-                except Exception:
-                    error_message += f": {e.response.text[:200]}"
+            files = {
+                "photo": ("chart.png", photo_bytes, "image/png")
+            }
+            data = {
+                "chat_id": chat_id,
+            }
+            if caption:
+                data["caption"] = caption
+            if parse_mode:
+                data["parse_mode"] = parse_mode
+
+            response = await self._client.post(
+                self._get_url("sendPhoto"),
+                files=files,
+                data=data,
+            )
+            response.raise_for_status()
+            result = response.json()
+
+            if result.get("ok"):
+                return True
             else:
-                error_message += f": {e.response.text[:200]}"
-            
-            logger.error(error_message)
-            return False
+                error_description = result.get("description", "Unknown error")
+                logger.error(f"Error sending photo: {error_description}")
+                return False
+
+        except httpx.HTTPStatusError as e:
+            return self._handle_http_error(e, "send_photo")
     
     async def answer_inline_query(
         self,
@@ -292,47 +274,27 @@ class TelegramService:
             return False
         
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.post(
-                    self._get_url("answerInlineQuery"),
-                    json={
-                        "inline_query_id": inline_query_id,
-                        "results": results,
-                        "cache_time": cache_time,
-                    },
-                )
-                response.raise_for_status()
-                result = response.json()
-                
-                if result.get("ok"):
-                    return True
-                else:
-                    error_description = result.get("description", "Unknown error")
-                    logger.error(f"Error answering inline query: {error_description}")
-                    # Log the full response for debugging
-                    logger.error(f"Full response: {result}")
-                    return False
-                    
-        except httpx.HTTPStatusError as e:
-            status_code = e.response.status_code
-            error_message = f"HTTP error {status_code}"
-            
-            if status_code == 400:
-                try:
-                    error_data = e.response.json()
-                    error_code = error_data.get("error_code")
-                    description = error_data.get("description", "")
-                    if error_code and description:
-                        error_message += f" (Telegram API {error_code}: {description})"
-                    else:
-                        error_message += f": {e.response.text[:200]}"
-                except Exception:
-                    error_message += f": {e.response.text[:200]}"
+            response = await self._client.post(
+                self._get_url("answerInlineQuery"),
+                json={
+                    "inline_query_id": inline_query_id,
+                    "results": results,
+                    "cache_time": cache_time,
+                },
+            )
+            response.raise_for_status()
+            result = response.json()
+
+            if result.get("ok"):
+                return True
             else:
-                error_message += f": {e.response.text[:200]}"
-            
-            logger.error(error_message)
-            return False
+                error_description = result.get("description", "Unknown error")
+                logger.error(f"Error answering inline query: {error_description}")
+                logger.error(f"Full response: {result}")
+                return False
+
+        except httpx.HTTPStatusError as e:
+            return self._handle_http_error(e, "answer_inline_query")
 
 
 # Create global service instance

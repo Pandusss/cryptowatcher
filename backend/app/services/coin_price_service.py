@@ -10,7 +10,7 @@ from app.core.redis_client import get_redis
 from app.utils.cache import CoinCacheManager
 from app.utils.formatters import get_price_decimals
 
-logger = logging.getLogger("CoinPriceService")
+logger = logging.getLogger(__name__)
 
 class CoinPriceService:
     """

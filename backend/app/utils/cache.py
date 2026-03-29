@@ -5,17 +5,18 @@ import json
 import logging
 from typing import Dict, List, Optional
 
+from app.core.config import settings
 from app.core.redis_client import get_redis
 
-logger = logging.getLogger(f"UtilsCache")
+logger = logging.getLogger(__name__)
 
 class CoinCacheManager:
-    
-    # TTL for different data types
-    CACHE_TTL_COIN_STATIC = 3600  # 1 hour for static data
-    CACHE_TTL_COIN_PRICE = 86400  # 24 hours - price persists until overwritten
-    CACHE_TTL_IMAGE_URL = 604800  # 7 days for icons
-    CACHE_TTL_CHART = 60  # 1 minute for charts
+
+    # TTL for different data types (from config)
+    CACHE_TTL_COIN_STATIC = settings.CACHE_TTL_STATIC
+    CACHE_TTL_COIN_PRICE = settings.CACHE_TTL_PRICE
+    CACHE_TTL_IMAGE_URL = settings.CACHE_TTL_IMAGE
+    CACHE_TTL_CHART = settings.CACHE_TTL_CHART
     
     @staticmethod
     def _get_static_key(coin_id: str) -> str:

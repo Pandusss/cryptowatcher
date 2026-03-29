@@ -10,7 +10,7 @@ from typing import Dict, Any, Optional
 
 from app.core.config import settings
 
-logger = logging.getLogger(f"CoingeckoCLient")
+logger = logging.getLogger(__name__)
 
 class CoinGeckoClient:    
     BASE_URL = "https://api.coingecko.com/api/v3"

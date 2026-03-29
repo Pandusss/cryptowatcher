@@ -7,7 +7,7 @@ from typing import Optional, Dict, Any, List
 from app.providers.coingecko_client import CoinGeckoClient
 from app.core.coin_registry import coin_registry
 
-logger = logging.getLogger("CoinGeckoQuick")
+logger = logging.getLogger(__name__)
 
 # Base parameters for /coins/markets endpoint
 MARKETS_BASE_PARAMS = {
