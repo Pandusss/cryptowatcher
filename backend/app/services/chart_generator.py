@@ -534,8 +534,11 @@ class ChartGenerator:
 
             result = Image.alpha_composite(base_pil, chart_overlay)
 
+            # Convert to RGB (JPEG doesn't support alpha) and save
+            # JPEG quality=85 gives ~5-10x smaller files than PNG with
+            # negligible visual difference — critical for fast Telegram delivery.
             out_buf = io.BytesIO()
-            result.save(out_buf, format="PNG", optimize=False)
+            result.convert("RGB").save(out_buf, format="JPEG", quality=85)
             out_buf.seek(0)
             return out_buf.read()
 

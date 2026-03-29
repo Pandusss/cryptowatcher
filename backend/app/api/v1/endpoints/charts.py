@@ -26,9 +26,9 @@ async def get_chart_image(chart_id: str):
         
         return Response(
             content=image_bytes,
-            media_type="image/png",
+            media_type="image/jpeg",
             headers={
-                "Cache-Control": "public, max-age=3600",  # Cache for 1 hour
+                "Cache-Control": "public, max-age=3600",
             }
         )
         

@@ -225,7 +225,7 @@ class TelegramService:
         
         try:
             files = {
-                "photo": ("chart.png", photo_bytes, "image/png")
+                "photo": ("chart.jpg", photo_bytes, "image/jpeg")
             }
             data = {
                 "chat_id": chat_id,
