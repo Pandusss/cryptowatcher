@@ -6,3 +6,6 @@ logging.basicConfig(
     format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
+
+# Suppress httpx request logging (leaks bot token in URLs)
+logging.getLogger("httpx").setLevel(logging.WARNING)

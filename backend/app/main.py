@@ -34,15 +34,10 @@ async def lifespan(app: FastAPI):
     # Shutdown: Stop all services and cleanup
     await bot_polling.stop()
     notification_checker.stop()
-    binance_websocket_worker.stop()
-    okx_websocket_worker.stop()
-    mexc_websocket_worker.stop()
-    await coingecko_price_updater.stop()
-    
-    # Close WebSocket connections
     await binance_websocket_worker.close()
     await okx_websocket_worker.close()
     await mexc_websocket_worker.close()
+    await coingecko_price_updater.stop()
     await coingecko_price_updater.close()
     
     # Close shared HTTP client
