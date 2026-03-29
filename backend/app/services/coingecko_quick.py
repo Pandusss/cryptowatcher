@@ -2,6 +2,7 @@
 Quick CoinGecko service for bot commands
 Searches coins by symbol and fetches price/chart data
 """
+import asyncio
 import logging
 from typing import Optional, Dict, Any, List
 from app.providers.coingecko_client import CoinGeckoClient
@@ -21,159 +22,145 @@ MARKETS_BASE_PARAMS = {
 
 class CoinGeckoQuickService:
     """Quick service for searching and fetching coin data from CoinGecko"""
-    
+
     def __init__(self):
         self.client = CoinGeckoClient()
-    
-    async def search_coin(self, symbol: str) -> Optional[Dict[str, Any]]:
+
+    async def search_coin_with_price(self, symbol: str) -> Optional[Dict[str, Any]]:
         """
-        Search for a coin by symbol (e.g., 'ETH', 'BTC')
-        
-        First checks coin_registry (config), then falls back to CoinGecko API search.
-        This ensures we use the correct coin if it's in our config, even if there are
-        multiple coins with the same symbol.
-        
-        Returns:
-            Dict with coin_id, name, symbol, etc. or None if not found
+        Search for a coin by symbol and return info + price in a single API call.
+
+        For coins in coin_registry this is ONE /coins/markets request instead of two.
+        Returns dict with id, name, symbol, thumb, large, price, percent_change_24h,
+        market_cap, volume_24h, high_24h, low_24h — or None.
         """
         symbol_upper = symbol.upper()
-        
+
+        # 1. Check registry first
         coin_config = coin_registry.find_coin_by_symbol(symbol_upper, enabled_only=True)
         if coin_config:
             coingecko_id = coin_config.external_ids.get("coingecko")
             if coingecko_id:
-                logger.debug(f"Found {symbol} in coin_registry, using coingecko_id: {coingecko_id}")
-                # Try to get icon from /coins/markets (faster, returns image URL)
-                # This endpoint is already used for prices, so we can reuse it
                 try:
                     response = await self.client.get(
                         "/coins/markets",
                         params={**MARKETS_BASE_PARAMS, "ids": coingecko_id}
                     )
-                    
                     if response and len(response) > 0:
-                        coin_data = response[0]
-                        image_url = coin_data.get("image", "")
-                        # CoinGecko markets returns single image URL, we use it for both thumb and large
-                        return {
-                            "id": coingecko_id,
-                            "name": coin_config.name,
-                            "symbol": coin_config.symbol.upper(),
-                            "thumb": image_url,
-                            "large": image_url,
-                        }
-                except Exception as e:
-                    logger.exception(f"Failed to get coin from markets for {coingecko_id}, falling back to API search")
-                # If getting details fails, fall through to API search
-        
+                        d = response[0]
+                        price = float(d.get("current_price", 0))
+                        if price > 0:
+                            return {
+                                "id": coingecko_id,
+                                "name": coin_config.name,
+                                "symbol": coin_config.symbol.upper(),
+                                "thumb": d.get("image", ""),
+                                "large": d.get("image", ""),
+                                "price": price,
+                                "percent_change_24h": float(d.get("price_change_percentage_24h", 0)),
+                                "market_cap": d.get("market_cap"),
+                                "volume_24h": d.get("total_volume"),
+                                "high_24h": d.get("high_24h"),
+                                "low_24h": d.get("low_24h"),
+                            }
+                except Exception:
+                    logger.exception(f"Failed to get coin from markets for {coingecko_id}")
+
+        # 2. Fallback: CoinGecko search API → then /coins/markets for price
         try:
             response = await self.client.get(
                 "/search",
                 params={"query": symbol_upper}
             )
-            
             if not response or "coins" not in response:
                 return None
-            
+
             coins = response.get("coins", [])
             if not coins:
                 return None
-            
-            # Find exact symbol match (case-insensitive)
+
+            # Find exact symbol match
+            matched = None
             for coin in coins:
                 if coin.get("symbol", "").upper() == symbol_upper:
-                    return {
-                        "id": coin.get("id"),
-                        "name": coin.get("name"),
-                        "symbol": coin.get("symbol", "").upper(),
-                        "thumb": coin.get("thumb"),
-                        "large": coin.get("large"),
-                    }
-            
-            # If no exact match, return first result
-            first_coin = coins[0]
+                    matched = coin
+                    break
+            if not matched:
+                matched = coins[0]
+
+            coin_id = matched.get("id")
+            if not coin_id:
+                return None
+
+            # Fetch price data
+            price_data = await self._fetch_price(coin_id)
+            if not price_data:
+                return None
+
             return {
-                "id": first_coin.get("id"),
-                "name": first_coin.get("name"),
-                "symbol": first_coin.get("symbol", "").upper(),
-                "thumb": first_coin.get("thumb"),
-                "large": first_coin.get("large"),
+                "id": coin_id,
+                "name": matched.get("name"),
+                "symbol": matched.get("symbol", "").upper(),
+                "thumb": matched.get("thumb"),
+                "large": matched.get("large"),
+                **price_data,
             }
-            
-        except Exception as e:
+        except Exception:
             logger.exception(f"Error searching coin {symbol}")
             return None
-    
-    async def get_coin_price(self, coin_id: str) -> Optional[Dict[str, Any]]:
-        """
-        Get current price and 24h change for a coin
-        
-        Returns:
-            Dict with price, percent_change_24h, market_cap, volume_24h, high_24h, low_24h
-        """
+
+    async def _fetch_price(self, coin_id: str) -> Optional[Dict[str, Any]]:
+        """Fetch price data for a coin_id from /coins/markets or /simple/price."""
         try:
-            # Use /coins/markets endpoint to get more data including market cap, high, low
             response = await self.client.get(
                 "/coins/markets",
                 params={**MARKETS_BASE_PARAMS, "ids": coin_id}
             )
-            
-            if not response or len(response) == 0:
-                # Fallback to simple/price if markets endpoint fails
-                response_simple = await self.client.get(
-                    "/simple/price",
-                    params={
-                        "ids": coin_id,
-                        "vs_currencies": "usd",
-                        "include_24hr_change": "true",
-                        "include_24hr_vol": "true",
+            if response and len(response) > 0:
+                d = response[0]
+                price = float(d.get("current_price", 0))
+                if price > 0:
+                    return {
+                        "price": price,
+                        "percent_change_24h": float(d.get("price_change_percentage_24h", 0)),
+                        "market_cap": d.get("market_cap"),
+                        "volume_24h": d.get("total_volume"),
+                        "high_24h": d.get("high_24h"),
+                        "low_24h": d.get("low_24h"),
                     }
-                )
-                
-                if not response_simple or coin_id not in response_simple:
-                    return None
-                
-                coin_data = response_simple[coin_id]
-                price = coin_data.get("usd", 0)
-                
-                if price <= 0:
-                    return None
-                
-                return {
-                    "price": float(price),
-                    "percent_change_24h": float(coin_data.get("usd_24h_change", 0)),
-                    "market_cap": coin_data.get("usd_market_cap"),
-                    "volume_24h": coin_data.get("usd_24h_vol"),
-                    "high_24h": coin_data.get("usd_24h_high"),
-                    "low_24h": coin_data.get("usd_24h_low"),
+
+            # Fallback to simple/price
+            response_simple = await self.client.get(
+                "/simple/price",
+                params={
+                    "ids": coin_id,
+                    "vs_currencies": "usd",
+                    "include_24hr_change": "true",
+                    "include_24hr_vol": "true",
                 }
-            
-            coin_data = response[0]
-            
+            )
+            if not response_simple or coin_id not in response_simple:
+                return None
+
+            d = response_simple[coin_id]
+            price = float(d.get("usd", 0))
+            if price <= 0:
+                return None
+
             return {
-                "price": float(coin_data.get("current_price", 0)),
-                "percent_change_24h": float(coin_data.get("price_change_percentage_24h", 0)),
-                "market_cap": coin_data.get("market_cap"),
-                "volume_24h": coin_data.get("total_volume"),
-                "high_24h": coin_data.get("high_24h"),
-                "low_24h": coin_data.get("low_24h"),
+                "price": price,
+                "percent_change_24h": float(d.get("usd_24h_change", 0)),
+                "market_cap": d.get("usd_market_cap"),
+                "volume_24h": d.get("usd_24h_vol"),
+                "high_24h": d.get("usd_24h_high"),
+                "low_24h": d.get("usd_24h_low"),
             }
-            
-        except Exception as e:
+        except Exception:
             logger.exception(f"Error fetching price for {coin_id}")
             return None
-    
+
     async def get_coin_chart_data(self, coin_id: str, days: int = 7) -> Optional[List[Dict[str, Any]]]:
-        """
-        Get chart data for a coin
-        
-        Args:
-            coin_id: CoinGecko coin ID
-            days: Number of days (1, 7, 30, 365)
-            
-        Returns:
-            List of dicts with timestamp and price
-        """
+        """Get chart data for a coin."""
         try:
             response = await self.client.get(
                 f"/coins/{coin_id}/market_chart",
@@ -182,78 +169,40 @@ class CoinGeckoQuickService:
                     "days": days,
                 }
             )
-            
             if not response or "prices" not in response:
                 return None
-            
+
             prices = response.get("prices", [])
             if not prices:
                 return None
-            
-            # Convert to list of dicts
-            chart_data = []
-            for point in prices:
-                chart_data.append({
-                    "timestamp": point[0],  # milliseconds
-                    "price": float(point[1]),
-                })
-            
-            return chart_data
-            
-        except Exception as e:
+
+            return [
+                {"timestamp": point[0], "price": float(point[1])}
+                for point in prices
+            ]
+        except Exception:
             logger.exception(f"Error fetching chart data for {coin_id}")
             return None
-    
+
     async def get_coin_full_data(self, symbol: str, days: int = 7) -> Optional[Dict[str, Any]]:
         """
-        Get full data for a coin: info, price, and chart
-        
-        Returns:
-            Dict with coin info, price data, and chart data
+        Get full data for a coin: info + price (single API call) + chart data.
+
+        Previously this made 3 sequential HTTP calls; now it's 1 + 1.
         """
-        # Search for coin
-        coin_info = await self.search_coin(symbol)
-        if not coin_info:
+        # Single call: coin info + price + image
+        coin_data = await self.search_coin_with_price(symbol)
+        if not coin_data:
             return None
-        
-        coin_id = coin_info["id"]
-        
-        import asyncio
-        price_data, chart_data = await asyncio.gather(
-            self.get_coin_price(coin_id),
-            self.get_coin_chart_data(coin_id, days),
-            return_exceptions=True
-        )
-        
-        if isinstance(price_data, Exception):
-            price_data = None
+
+        # Chart data
+        chart_data = await self.get_coin_chart_data(coin_data["id"], days)
         if isinstance(chart_data, Exception):
             chart_data = None
-        
-        if not price_data:
-            return None
-        
-        result = {
-            **coin_info,
-            "price": price_data["price"],
-            "percent_change_24h": price_data["percent_change_24h"],
-            "chart_data": chart_data or [],
-        }
-        
-        # Add optional market data if available
-        if "market_cap" in price_data:
-            result["market_cap"] = price_data["market_cap"]
-        if "volume_24h" in price_data:
-            result["volume_24h"] = price_data["volume_24h"]
-        if "high_24h" in price_data:
-            result["high_24h"] = price_data["high_24h"]
-        if "low_24h" in price_data:
-            result["low_24h"] = price_data["low_24h"]
-        
-        return result
+
+        coin_data["chart_data"] = chart_data or []
+        return coin_data
 
 
 # Global instance
 coingecko_quick = CoinGeckoQuickService()
-
-

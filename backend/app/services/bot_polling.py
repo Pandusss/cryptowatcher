@@ -160,8 +160,8 @@ class InlineQueryHandler:
             if len(query_text) > 10:
                 query_text = query_text[:10]
 
-            # 1. Search coin and get base data (price + 7D chart)
-            coin_data = await coingecko_quick.get_coin_full_data(query_text, days=7)
+            # 1. Search coin + price in a single API call
+            coin_data = await coingecko_quick.search_coin_with_price(query_text)
 
             if not coin_data:
                 await telegram_service.answer_inline_query(query_id, [])
@@ -173,21 +173,20 @@ class InlineQueryHandler:
 
             coin_id = coin_data.get("id")
             coin_icon_url = coin_data.get("large") or coin_data.get("thumb")
-            chart_data_7d = coin_data.get("chart_data", [])
 
-            # 2. Pre-fetch icon + remaining chart data in ONE parallel batch
-            #    Icon is loaded once and reused across all 3 renders.
-            icon_future = chart_generator._load_icon(coin_icon_url, size=256)
-            chart_1d_future = coingecko_quick.get_coin_chart_data(coin_id, days=1)
-            chart_30d_future = coingecko_quick.get_coin_chart_data(coin_id, days=30)
-
-            preloaded_icon, chart_data_1d, chart_data_30d = await asyncio.gather(
-                icon_future, chart_1d_future, chart_30d_future,
+            # 2. Fetch ALL chart data (7d, 1d, 30d) + icon in ONE parallel batch
+            preloaded_icon, chart_data_7d, chart_data_1d, chart_data_30d = await asyncio.gather(
+                chart_generator._load_icon(coin_icon_url, size=256),
+                coingecko_quick.get_coin_chart_data(coin_id, days=7),
+                coingecko_quick.get_coin_chart_data(coin_id, days=1),
+                coingecko_quick.get_coin_chart_data(coin_id, days=30),
                 return_exceptions=True
             )
 
             if isinstance(preloaded_icon, Exception):
                 preloaded_icon = None
+            if isinstance(chart_data_7d, Exception):
+                chart_data_7d = None
             if isinstance(chart_data_1d, Exception):
                 chart_data_1d = None
             if isinstance(chart_data_30d, Exception):
