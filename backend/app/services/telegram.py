@@ -15,9 +15,10 @@ class TelegramService:
 
     def __init__(self):
         self.bot_token = settings.TELEGRAM_BOT_TOKEN
+        _proxy = settings.TELEGRAM_PROXY or None
         self._client = httpx.AsyncClient(
             timeout=30.0,
-            proxy=settings.TELEGRAM_PROXY or None,
+            **({'proxies': _proxy} if _proxy else {}),
         )
         if not self.bot_token:
             logger.error("TELEGRAM_BOT_TOKEN is not installed. Notifications will not be sent")

@@ -277,9 +277,10 @@ class BotPolling:
         self._logger = logging.getLogger(__name__)
         
         # Create single HTTP client (reused across all polls)
+        _proxy = settings.TELEGRAM_PROXY or None
         self.http_client = httpx.AsyncClient(
             timeout=30.0,
-            proxy=settings.TELEGRAM_PROXY or None,
+            **({'proxies': _proxy} if _proxy else {}),
         )
         
         if not self.bot_token:
