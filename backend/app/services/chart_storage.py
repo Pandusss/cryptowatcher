@@ -29,6 +29,15 @@ class ChartStorage:
             logger.debug(f"Evicted oldest chart {evicted_id} (capacity limit)")
 
         chart_id = secrets.token_urlsafe(16)
+        return self.store_chart_with_id(chart_id, image_bytes, symbol)
+
+    def store_chart_with_id(self, chart_id: str, image_bytes: bytes, symbol: str) -> str:
+        """Store under a caller-supplied (deterministic) ID.
+
+        Lets the inline handler reuse a stable URL for the same
+        (coin, timeframe, time-bucket), so an already-rendered image is served
+        straight from memory instead of being regenerated.
+        """
         now = datetime.now(timezone.utc)
 
         self.storage[chart_id] = {
@@ -37,9 +46,21 @@ class ChartStorage:
             "created_at": now,
             "expires_at": now + timedelta(hours=self.ttl_hours),
         }
+        # Keep most-recently-stored at the end for LRU-style eviction
+        self.storage.move_to_end(chart_id)
 
         logger.debug(f"Stored chart for {symbol} with ID {chart_id}")
         return chart_id
+
+    def has_fresh(self, chart_id: str) -> bool:
+        """True if a non-expired image exists for this ID (no bytes copy)."""
+        data = self.storage.get(chart_id)
+        if not data:
+            return False
+        if datetime.now(timezone.utc) > data["expires_at"]:
+            del self.storage[chart_id]
+            return False
+        return True
 
     def get_chart(self, chart_id: str) -> Optional[bytes]:
         if chart_id not in self.storage:

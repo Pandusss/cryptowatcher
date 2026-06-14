@@ -1,12 +1,19 @@
 """
 Quick CoinGecko service for bot commands
 Searches coins by symbol and fetches price/chart data
+
+All outward CoinGecko calls are cached in Redis with short TTLs so that the
+inline-query path (which fires roughly once per keystroke) does not hammer the
+CoinGecko rate limit. Cache misses fall back to the live API; a Redis outage
+degrades gracefully to direct API calls.
 """
 import asyncio
+import json
 import logging
 from typing import Optional, Dict, Any, List
 from app.providers.coingecko_client import CoinGeckoClient
 from app.core.coin_registry import coin_registry
+from app.core.redis_client import get_redis
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +26,39 @@ MARKETS_BASE_PARAMS = {
     "sparkline": False,
 }
 
+# --- Cache TTLs (seconds) ---
+# Price/markets data is volatile → short TTL. Chart data granularity grows with
+# the window, so longer windows tolerate longer caching.
+MARKETS_CACHE_TTL = 30
+CHART_CACHE_TTL = {1: 60, 7: 300, 30: 900}
+
+
+def _chart_ttl(days: int) -> int:
+    return CHART_CACHE_TTL.get(days, 600)
+
+
+async def _cache_get(key: str) -> Optional[Any]:
+    """Best-effort Redis JSON read. Returns None on miss or any error."""
+    try:
+        redis = await get_redis()
+        if not redis:
+            return None
+        raw = await redis.get(key)
+        return json.loads(raw) if raw else None
+    except Exception:
+        return None
+
+
+async def _cache_set(key: str, value: Any, ttl: int) -> None:
+    """Best-effort Redis JSON write. Silently ignores errors."""
+    try:
+        redis = await get_redis()
+        if not redis:
+            return
+        await redis.setex(key, ttl, json.dumps(value))
+    except Exception:
+        pass
+
 
 class CoinGeckoQuickService:
     """Quick service for searching and fetching coin data from CoinGecko"""
@@ -27,6 +67,26 @@ class CoinGeckoQuickService:
         self.client = CoinGeckoClient()
 
     async def search_coin_with_price(self, symbol: str) -> Optional[Dict[str, Any]]:
+        """Cached wrapper around the live lookup (TTL = MARKETS_CACHE_TTL).
+
+        Caches both hits and misses (misses as a short-lived sentinel) so a
+        burst of inline queries for the same symbol costs at most one API call.
+        """
+        symbol_upper = symbol.upper()
+        cache_key = f"cg:mkt:{symbol_upper}"
+
+        cached = await _cache_get(cache_key)
+        if cached is not None:
+            # Negative cache sentinel for "no such coin"
+            return None if cached == {} else cached
+
+        result = await self._search_coin_with_price_uncached(symbol_upper)
+        # Cache the result (or a {} sentinel for misses, shorter-lived)
+        await _cache_set(cache_key, result if result else {},
+                         MARKETS_CACHE_TTL if result else 15)
+        return result
+
+    async def _search_coin_with_price_uncached(self, symbol: str) -> Optional[Dict[str, Any]]:
         """
         Search for a coin by symbol and return info + price in a single API call.
 
@@ -160,6 +220,19 @@ class CoinGeckoQuickService:
             return None
 
     async def get_coin_chart_data(self, coin_id: str, days: int = 7) -> Optional[List[Dict[str, Any]]]:
+        """Cached wrapper for chart data (TTL scales with the window)."""
+        cache_key = f"cg:chart:{coin_id}:{days}"
+
+        cached = await _cache_get(cache_key)
+        if cached is not None:
+            return cached or None
+
+        result = await self._get_coin_chart_data_uncached(coin_id, days)
+        if result:
+            await _cache_set(cache_key, result, _chart_ttl(days))
+        return result
+
+    async def _get_coin_chart_data_uncached(self, coin_id: str, days: int = 7) -> Optional[List[Dict[str, Any]]]:
         """Get chart data for a coin."""
         try:
             response = await self.client.get(
